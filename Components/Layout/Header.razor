@@ -1,0 +1,19 @@
+﻿@using Syncfusion.Blazor.Navigations
+
+@rendermode InteractiveServer
+
+<SfAppBar ColorMode="AppBarColor.Inherit">
+    <AppBarContent>
+        <SfButton CssClass="e-flat"
+                  IconCss="e-icons e-menu"
+                  OnClick="ToggleSidebar">
+        </SfButton>
+
+        <span class="app-title">Finacial Monitoring System</span>
+    </AppBarContent>
+</SfAppBar>
+
+@code {
+    [Parameter]
+    public EventCallback ToggleSidebar { get; set; }
+}

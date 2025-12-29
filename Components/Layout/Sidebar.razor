@@ -1,0 +1,146 @@
+﻿@using Syncfusion.Blazor.Lists
+@using Syncfusion.Blazor.Navigations
+
+@inject NavigationManager Nav
+
+
+@rendermode InteractiveServer
+
+@* <section class="bg-body">
+    <div style="height: 700px;">
+        <SfSidebar Width="256px" IsOpen="@IsSidebarOpen" ShowBackdrop="@IsBackdropVisible" Type="SidebarType.Push" aria-label="main navigation menu" role="complementary" Target="@Target">
+            <div class="d-flex flex-column justify-content-between vh-100">
+                <div>
+                    <div class="d-flex flex-column justify-content-center align-items-center pt-4 mb-3">
+                        <span class="e-avatar e-avatar-xlarge e-avatar-circle">
+                            <img src="assets/images/common/avatar/avatar-2.jpg" alt="profile picture" />
+                        </span>
+                        <div class="fs-5 fw-medium text-body mt-3">John Wick</div>
+                        <a class="fs-6 text-body-secondary mt-2 text-decoration-none" href="mailto:johnwick@company.com">johnwick&#64;company.com</a>
+                    </div>
+                    <hr class="mx-3 border-light-subtle opacity-100" />
+                    <div>
+                        <SfListView CssClass="border-0 e-bigger" DataSource="@Data" aria-label="main navigation links" role="list">
+                            <ListViewFieldSettings TValue="MenuItem"></ListViewFieldSettings>
+                            <ListViewTemplates TValue="MenuItem">
+                                <Template>
+                                    <div class="e-list-wrapper d-flex align-items-center px-2">
+                                        <span class="e-icons @context.FontIcon fs-6"></span>
+                                        <span class="fs-6 fw-normal ps-2 ms-1">@context.Field</span>
+                                    </div>
+                                </Template>
+                            </ListViewTemplates>
+                        </SfListView>
+                    </div>
+                </div>
+                <div class="p-3">
+                    <SfButton CssClass="e-outline w-100" IconCss="e-icons sf-icon-logout-07 fs-6" Content="Logout" Type="button" aria-label="logout" role="button"></SfButton>
+                </div>
+            </div>
+        </SfSidebar>
+    </div>
+</section> *@
+
+@* <SfSidebar @bind-IsOpen="IsOpen"
+           Width="250px"
+           DockSize="60px"
+           EnableDock="true"
+           Type="SidebarType.Push">
+    <SidebarContent>
+        <SfMenu Items="MenuItems"></SfMenu>
+    </SidebarContent>
+</SfSidebar> *@
+
+<SfSidebar Width="256px" @bind-IsOpen="IsOpen" ShowBackdrop="@IsBackdropVisible" Type="SidebarType.Push" aria-label="main navigation menu" role="complementary">
+    <div class="d-flex flex-column justify-content-between vh-100">
+        <div>
+            <div class="d-flex flex-column justify-content-center align-items-center pt-4 mb-3">
+                <span class="e-avatar e-avatar-xlarge e-avatar-circle">
+                    <img src="assets/images/common/avatar/avatar-2.jpg" alt="profile picture" />
+                </span>
+                <div class="fs-5 fw-medium text-body mt-3">John Wick</div>
+                <a class="fs-6 text-body-secondary mt-2 text-decoration-none" href="mailto:johnwick@company.com">johnwick&#64;company.com</a>
+            </div>
+            <hr class="mx-3 border-light-subtle opacity-100" />
+            <div>
+                <SfListView CssClass="border-0 e-bigger" DataSource="@Data" aria-label="main navigation links" role="list">
+                    <ListViewFieldSettings TValue="MenuItem"></ListViewFieldSettings>
+                    <ListViewTemplates TValue="MenuItem">
+                        <Template>
+                            <div class="e-list-wrapper d-flex align-items-center px-2" @onclick="()=>Navigate(context.Url)">
+                                <span class="e-icons @context.FontIcon fs-6"></span>
+                                <span class="fs-6 fw-normal ps-2 ms-1">@context.Field</span>
+                            </div>
+                        </Template>
+                    </ListViewTemplates>
+                </SfListView>
+            </div>
+        </div>
+        <div class="p-3">
+            <SfButton CssClass="e-outline w-100" IconCss="e-icons sf-icon-logout-07 fs-6" Content="Logout" Type="button" aria-label="logout" role="button"></SfButton>
+        </div>
+    </div>
+</SfSidebar>
+
+
+
+@code {
+    [Parameter]
+    public bool IsOpen { get; set; } = true;
+
+    [Parameter]
+    public EventCallback<bool> IsOpenChanged { get; set; }
+
+    // List<MenuItem> MenuItems = new()
+    // {
+    //     new MenuItem { Text = "Dashboard", IconCss = "e-icons e-home" },s
+    //     new MenuItem { Text = "Reports", IconCss = "e-icons e-chart" },
+    //     new MenuItem { Text = "Settings", IconCss = "e-icons e-settings" }
+    // };
+
+    // public bool IsSidebarOpen = true;
+    public bool IsBackdropVisible = false;
+
+    public List<MenuItem> Data = new List<MenuItem>
+        {
+            // new MenuItem { Field = "Dashboard", FontIcon = "e-icons e-grid-view" },
+            // new MenuItem { Field = "Models", FontIcon = "e-icons e-send-backward" },
+            // new MenuItem { Field = "Bookmarks", FontIcon = "e-icons e-bookmark" },
+            // new MenuItem { Field = "Issues", FontIcon = "sf-icon-info-octagon" },
+            // new MenuItem { Field = "Milestones", FontIcon = "sf-icon-clock-rewind" },
+            // new MenuItem { Field = "Labels", FontIcon = "e-circle-check" },
+            // new MenuItem { Field = "Documents", FontIcon = "e-file-new" },
+            // new MenuItem { Field = "Libraries", FontIcon = "sf-icon-light-bulb" },
+            // new MenuItem { Field = "Members", FontIcon = "e-user" }
+            new MenuItem { Field = "Dashboard", Url="/", FontIcon = "e-icons e-grid-view" },
+            new MenuItem { Field = "Accounting", Url="/Accounting", FontIcon = "e-icons e-send-backward" },
+            new MenuItem { Field = "Budget", Url="/", FontIcon = "e-icons e-send-backward" },
+            new MenuItem { Field = "Cashier", Url="/", FontIcon = "e-icons e-send-backward" },
+            new MenuItem { Field = "Procurement", Url="/", FontIcon = "e-icons e-send-backward" },
+            new MenuItem { Field = "Property", Url="/", FontIcon = "e-icons e-send-backward" },
+            new MenuItem { Field = "Reports", Url="/", FontIcon = "e-file-new" },
+            new MenuItem { Field = "Members", Url="/", FontIcon = "e-user" }
+        };
+
+    [JSInvokable]
+    public void ResizeHandler(string message, int windowWidth)
+    {
+        if (message == "resizeAction")
+        {
+            IsBackdropVisible = windowWidth <= 640;
+        }
+        StateHasChanged();
+    }
+
+    public class MenuItem
+    {
+        public string Field { get; set; } = string.Empty;
+        public string FontIcon { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+    }
+
+    void Navigate(string url)
+    {
+        Nav.NavigateTo(url);
+    }
+}
