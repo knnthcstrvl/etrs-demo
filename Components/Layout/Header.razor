@@ -2,7 +2,7 @@
 
 @rendermode InteractiveServer
 
-<SfAppBar ColorMode="AppBarColor.Inherit">
+<SfAppBar ColorMode="AppBarColor.Primary" CssClass="custom-appbar" IsSticky="true">
     <AppBarContent>
         <SfButton CssClass="e-flat"
                   IconCss="e-icons e-menu"
@@ -12,6 +12,10 @@
         <span class="app-title">Finacial Monitoring System</span>
     </AppBarContent>
 </SfAppBar>
+
+<style>
+    
+</style>
 
 @code {
     [Parameter]
