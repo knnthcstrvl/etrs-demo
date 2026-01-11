@@ -1,6 +1,7 @@
 using Financial;
 using Financial.Components;
 using Financial.Data;
+using Financial.Hubs;
 using Financial.Services.Implements;
 using Financial.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ProcurementDbContext>(options =>
     options.UseSqlServer(connectionString));
 
+
+builder.Services.AddCors();
+builder.Services.AddLocalization();
+builder.Services.AddSignalR();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -121,5 +126,7 @@ app.MapControllers();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapHub<TransactionNotificationHub>("/transactionHub");
 
 app.Run();

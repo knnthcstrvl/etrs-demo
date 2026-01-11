@@ -1,5 +1,7 @@
 ﻿using Financial.DTO;
+using Financial.DTO.Library;
 using Financial.Model;
+using Financial.Model.Library;
 using Financial.Model.Modules;
 using Financial.Model.Trace;
 using Mapster;
@@ -61,6 +63,11 @@ namespace Financial
             // ======================
             config.NewConfig<DocumentDto, Document>();
             config.NewConfig<StatusHistoryDto, StatusHistory>();
+
+            // ======================
+            // LIBRARY
+            // ======================
+            config.NewConfig<SupplierDto, Supplier>();
         }
     }
 

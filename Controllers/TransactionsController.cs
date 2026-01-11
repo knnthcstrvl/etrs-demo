@@ -1,7 +1,9 @@
 ﻿using Financial.DTO;
+using Financial.Hubs;
 using Financial.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace Financial.Controllers
@@ -11,10 +13,12 @@ namespace Financial.Controllers
     public class TransactionsController : ControllerBase
     {
         private readonly ITransactionService _service;
+        private readonly IHubContext<TransactionNotificationHub> _hub;
 
-        public TransactionsController(ITransactionService service)
+        public TransactionsController(ITransactionService service, IHubContext<TransactionNotificationHub> hub)
         {
             _service = service;
+            _hub = hub;
         }
 
         [HttpPost]
@@ -26,6 +30,7 @@ namespace Financial.Controllers
         public async Task<IActionResult> Create(TransactionCreateDto dto)
         {
             var result = await _service.CreateAsync(dto);
+            await _hub.Clients.All.SendAsync("TransactionUpdated", result);
             return Ok(result);
         }
 
