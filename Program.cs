@@ -5,9 +5,11 @@ using Financial.Hubs;
 using Financial.Services.Implements;
 using Financial.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Syncfusion.Blazor;
 using Syncfusion.Licensing;
+using System.Text;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +18,23 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<ProcurementDbContext>(options =>
     options.UseSqlServer(connectionString));
+
+//builder.Services.AddAuthentication("Bearer")
+//    .AddJwtBearer("Bearer", options =>
+//    {
+//        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+//        {
+//            ValidateIssuer = true,
+//            ValidateAudience = true,
+//            ValidateLifetime = true,
+//            ValidateIssuerSigningKey = true,
+//            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+//            ValidAudience = builder.Configuration["Jwt:Audience"],
+//            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+//        };
+//    });
+
+//builder.Services.AddAuthorization();
 
 
 builder.Services.AddCors();
@@ -84,7 +103,6 @@ builder.Services.AddSwaggerGen(c =>
 
 
 
-
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IProcurementService, ProcurementService>();
 builder.Services.AddScoped<IStatusHistoryService, StatusHistoryService>();
@@ -122,6 +140,9 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseHttpsRedirection();
 
 app.UseAntiforgery();
+
+//app.UseAuthentication();
+//app.UseAuthorization();
 
 app.MapControllers();
 
