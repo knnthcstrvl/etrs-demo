@@ -95,6 +95,8 @@ builder.Services.AddScoped<ICashierService, CashierService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 
+builder.Services.AddScoped<ISupplierServices, SupplierServices>();
+
 
 MappingProfile.RegisterMappings();
 

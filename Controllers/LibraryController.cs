@@ -19,7 +19,7 @@ namespace Financial.Controllers
             
         }
 
-        [HttpPost]
+        [HttpPost(Name ="UpsertSupplier")]
         public async Task<IActionResult> Create(SupplierDto dto)
         {
             var result = await _supplierService.UpsertAsync(dto);
