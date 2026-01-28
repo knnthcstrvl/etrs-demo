@@ -7,7 +7,7 @@ namespace Financial.Model.Library
         [Key]
         public int PaymentModeId { get; set; }
 
-        [Required, MaxLength(50)]
+        [Required, MaxLength(100)]
         public string PaymentModeName { get; set; }
     }
 }

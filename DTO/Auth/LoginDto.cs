@@ -1,8 +1,12 @@
-﻿namespace Financial.DTO.Auth
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace Financial.DTO.Auth
 {
     public class LoginDto
     {
-        public string Email { get; set; }
-        public string Password { get; set; }
+        [Required]
+        public string Email { get; set; } = string.Empty;
+        [Required, DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
     }
 }

@@ -2,8 +2,13 @@ using Financial;
 using Financial.Components;
 using Financial.Data;
 using Financial.Hubs;
+using Financial.Repositories.Implement;
+using Financial.Repositories.Interface;
 using Financial.Services.Implements;
 using Financial.Services.Interfaces;
+using Financial.State;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -15,24 +20,32 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+string baseAddress = builder.Configuration["URL:BaseUrl"];
+
+
 
 builder.Services.AddDbContext<ProcurementDbContext>(options =>
     options.UseSqlServer(connectionString));
 
-//builder.Services.AddAuthentication("Bearer")
-//    .AddJwtBearer("Bearer", options =>
-//    {
-//        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
-//        {
-//            ValidateIssuer = true,
-//            ValidateAudience = true,
-//            ValidateLifetime = true,
-//            ValidateIssuerSigningKey = true,
-//            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-//            ValidAudience = builder.Configuration["Jwt:Audience"],
-//            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
-//        };
-//    });
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    //options.SaveToken = true;
+    //options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateIssuerSigningKey = true,
+        ValidateLifetime = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+    };
+});
 
 //builder.Services.AddAuthorization();
 
@@ -115,6 +128,16 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 builder.Services.AddScoped<ISupplierServices, SupplierServices>();
 
+//Account Service
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IUserAccountRepository, UserAccountRepository>();
+
+//Custom Auth
+builder.Services.AddScoped<IConstantState, ConstantState>();
+builder.Services.AddScoped<CustomAuthenticationStateProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(baseAddress) });
+
 
 MappingProfile.RegisterMappings();
 
@@ -141,10 +164,9 @@ app.UseHttpsRedirection();
 
 app.UseAntiforgery();
 
-//app.UseAuthentication();
-//app.UseAuthorization();
-
 app.MapControllers();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

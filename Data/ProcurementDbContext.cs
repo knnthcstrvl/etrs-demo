@@ -37,6 +37,9 @@ namespace Financial.Data
         public DbSet<Document> Documents { get; set; }
         public DbSet<StatusHistory> StatusHistories { get; set; }
 
+        //User Account
+        public DbSet<UserAccount> UserAccounts { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
