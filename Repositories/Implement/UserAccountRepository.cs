@@ -58,7 +58,8 @@ namespace Financial.Repositories.Implement
             var userClaims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.AccountId.ToString()),
-                new Claim("EmployeeName", user.FirstName + " " + user.LastName!),
+                new Claim("FirstName", user.FirstName),
+                new Claim("LastName", user.LastName),
                 new Claim(ClaimTypes.Email, user.Email!),
                 new Claim(ClaimTypes.Role, user.Role!)
             };

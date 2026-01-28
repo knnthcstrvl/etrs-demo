@@ -56,6 +56,7 @@ namespace Financial.Services.Implements
         public async Task<CustomResponses.LoginResponse> LoginAsync(LoginDto model)
         {
             Console.WriteLine("LoginAsync");
+            Console.WriteLine(_httpClient.BaseAddress.ToString());
             var response = await _httpClient.PostAsJsonAsync("api/account/login", model);
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
             return result!;

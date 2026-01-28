@@ -9,6 +9,8 @@ using static Financial.Responses.CustomResponses;
 
 namespace Financial.Controllers
 {
+    [Route("api/[controller]")]
+    [ApiController]
     public class AccountController : ControllerBase
     {
         private readonly IUserAccountRepository _userAccountRepository;

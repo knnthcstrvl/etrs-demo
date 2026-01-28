@@ -74,19 +74,17 @@ namespace Financial.State
             if (claims.Email is null) return new ClaimsPrincipal();
             _constant.JWTToken = claims.Jwt;
 
-            //Console.WriteLine($"Email: {claims.Email} JWTToken:{_constantss.JWTToken}");
+            Console.WriteLine($"Email: {claims.Email} JWTToken:{_constant.JWTToken}");
             //Console.WriteLine($"Email: {claims.Email}");
 
             return new ClaimsPrincipal(new ClaimsIdentity(
                 new List<Claim>
                 {
                     new("FirstName", claims.FirstName!),
-                    new("MiddleName", claims.MiddleName!),
                     new("LastName", claims.LastName!),
                     new(ClaimTypes.Email, claims.Email!),
                     new(ClaimTypes.Role, claims.Role!),
-                    new("Jwt", claims.Jwt!),
-                    new("DivisionId", claims.DivisionId)
+                    new("Jwt", claims.Jwt!)
                 }, "JwtAuth"));
         }
 

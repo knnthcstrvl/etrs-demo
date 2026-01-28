@@ -168,6 +168,11 @@ app.MapControllers();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.UseRequestLocalization(new RequestLocalizationOptions()
+    .AddSupportedCultures(new[] { "en-PH" })
+    .AddSupportedUICultures(new[] { "en-PH" })
+    );
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

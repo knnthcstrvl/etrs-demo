@@ -17,23 +17,19 @@ namespace Financial.State
 
                 var id = token.Claims.FirstOrDefault(_ => _.Type == ClaimTypes.NameIdentifier);
                 var fname = token.Claims.FirstOrDefault(_ => _.Type == "FirstName");
-                var mname = token.Claims.FirstOrDefault(_ => _.Type == "MiddleName");
                 var lname = token.Claims.FirstOrDefault(_ => _.Type == "LastName");
                 var email = token.Claims.FirstOrDefault(_ => _.Type == ClaimTypes.Email);
                 var role = token.Claims.FirstOrDefault(_ => _.Type == ClaimTypes.Role);
                 var exp = token.Claims.FirstOrDefault(_ => _.Type == "exp");
-                var divisionId = token.Claims.FirstOrDefault(_ => _.Type == "DivisionId");
 
                 return new CustomUserClaims(
                     Id: id.Value,
                     FirstName: fname.Value,
-                    MiddleName: mname.Value,
                     LastName: lname.Value,
                     Email: email.Value!,
                     Role: role.Value,
                     Jwt: jwtToken,
-                    Expiry: exp.Value,
-                    DivisionId: divisionId.Value);
+                    Expiry: exp.Value);
             }
             catch
             {

@@ -9,5 +9,24 @@
 @using Financial
 @using Financial.Components
 @using Financial.Components.Layout
-
+@using Newtonsoft.Json
 @using Syncfusion.Blazor.Buttons
+
+@using Financial.State
+@using Financial.Services.Interfaces
+@using Financial.Services.Implements
+
+@using static Financial.Responses.CustomResponses
+
+
+
+
+
+@inject IAccountService accountService
+
+
+
+@inject IJSRuntime js
+@inject NavigationManager NavManager
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject IConstantState _constants
