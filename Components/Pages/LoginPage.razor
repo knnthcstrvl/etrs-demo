@@ -1,85 +1,195 @@
-﻿@using Financial.DTO.Auth
-@using Syncfusion.Blazor.DataForm
+@using Financial.DTO.Auth
 @using Syncfusion.Blazor.Notifications
-
 
 @rendermode InteractiveServer
 
-<div class="col-lg-12 control-section">
-    <div class="control-wrapper">
-        <h4 class="control-header">Login Form</h4>
-        @if (isError == true)
+<div class="login-page">
+    <div class="login-card">
+        <h1 class="login-title">Welcome Back</h1>
+
+        @if (isError)
         {
-            <SfMessage Severity="MessageSeverity.Error">A problem occurred while submitting your data</SfMessage>
+            <SfMessage CssClass="login-message" Severity="MessageSeverity.Error">@errorMessage</SfMessage>
         }
-        <SfDataForm @ref="_loginForm" ID="MyForm"
-                    Model="@_loginDto" OnValidSubmit="LoginSubmit">
-            <FormValidator>
-                <DataAnnotationsValidator></DataAnnotationsValidator>
-            </FormValidator>
-            <FormItems>
-                <FormAutoGenerateItems></FormAutoGenerateItems>
-            </FormItems>
-        </SfDataForm>
+
+        <EditForm EditContext="_editContext" OnValidSubmit="LoginSubmit">
+            <DataAnnotationsValidator />
+
+            <div class="login-field">
+                <label for="email">Email *</label>
+                <InputText id="email" @bind-Value="_loginDto.Email" class="login-input" placeholder="Enter your Email" />
+                <ValidationMessage For="@(() => _loginDto.Email)" />
+            </div>
+
+            <div class="login-field">
+                <label for="password">Password *</label>
+                <InputText id="password" @bind-Value="_loginDto.Password" class="login-input" type="password" placeholder="Enter your Password" />
+                <ValidationMessage For="@(() => _loginDto.Password)" />
+            </div>
+
+            <label class="remember-row" for="rememberMe">
+                <InputCheckbox id="rememberMe" @bind-Value="_loginDto.RememberMe" class="remember-checkbox" />
+                <span>Remember me</span>
+            </label>
+
+            <button type="submit" class="login-button">Login</button>
+        </EditForm>
     </div>
 </div>
+
 <style>
-    .mobile .control-wrapper {
-        max-width: 100%;
+    .login-page {
+        background: #ffffff;
+        min-height: calc(100vh - 6rem);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem 1rem;
     }
 
-    .control-wrapper {
-        max-width: 400px;
-        margin: 0 auto;
-        padding: 0px 0px 0px;
+    .login-card {
+        width: min(100%, 420px);
+        padding: 1.25rem 1.5rem;
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
     }
 
-    .control-header {
+    .login-title {
+        margin: 0 0 1.75rem;
         text-align: center;
+        font-size: clamp(1.9rem, 4vw, 2.8rem);
+        font-weight: 800;
+        color: #111827;
+        letter-spacing: -0.04em;
+    }
+
+    .login-message {
+        margin-bottom: 1rem;
+    }
+
+    .login-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1.2rem;
+    }
+
+    .login-field label {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #111827;
+    }
+
+    .login-input {
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        padding: 0.95rem 1rem;
+        background: #f3f3f3;
+        color: #1f2937;
+        font-size: 1rem;
+    }
+
+    .login-input::placeholder {
+        color: #9a9a9a;
+    }
+
+    .remember-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 0.15rem 0 1.4rem;
+        font-size: 0.98rem;
+        color: #111827;
+        cursor: pointer;
+    }
+
+    .remember-checkbox {
+        width: 1.1rem;
+        height: 1.1rem;
+        margin: 0;
+    }
+
+    .login-button {
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        padding: 0.9rem 1.1rem;
+        background: #ebca4a;
+        color: #111827;
+        font-size: 1rem;
+        font-weight: 500;
+        transition: background-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .login-button:hover {
+        background: #dfbe42;
+    }
+
+    .login-button:active {
+        transform: translateY(1px);
+    }
+
+    @@media (max-width: 640px) {
+        .login-card {
+            width: min(100%, 360px);
+            padding: 1rem 1.1rem;
+        }
     }
 </style>
+
 @code {
     public bool isError = false;
-    private SfDataForm _loginForm = new SfDataForm();
-    private LoginDto _loginDto = new LoginDto();
-
+    public string errorMessage = "A problem occurred while submitting your data";
+    private readonly LoginDto _loginDto = new();
+    private EditContext _editContext = default!;
 
     protected override async Task OnInitializedAsync()
     {
+        _editContext = new EditContext(_loginDto);
+
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        if (user.Identity.IsAuthenticated)
+        if (user.Identity?.IsAuthenticated == true)
         {
-            // Console.WriteLine("Login Check: " + JsonConvert.SerializeObject(user));
-            _constants.JWTToken = user.Claims.FirstOrDefault(_ => _.Type == "Jwt").Value;
+            _constants.JWTToken = user.Claims.FirstOrDefault(_ => _.Type == "Jwt")?.Value!;
             NavManager.NavigateTo(NavManager.Uri, false);
         }
 
         isError = false;
-
     }
 
     public async Task LoginSubmit()
     {
-        // Console.WriteLine("Login Button");
-        // Console.WriteLine(JsonConvert.SerializeObject(_loginDto));
+        isError = false;
+        errorMessage = "A problem occurred while submitting your data";
 
-        LoginResponse response = await accountService.LoginAsync(_loginDto);
-
-        if (!response.Flag)
+        try
         {
-            _loginForm.Refresh();
-            isError = true;
-            return;
+            LoginResponse response = await accountService.LoginAsync(_loginDto);
+
+            if (!response.Flag)
+            {
+                errorMessage = string.IsNullOrWhiteSpace(response.Message)
+                    ? "A problem occurred while submitting your data"
+                    : response.Message;
+                isError = true;
+                return;
+            }
+
+            AuthStateProvider.UpdateAuthenticationState(response.JWTToken, _loginDto.RememberMe);
+            _constants.JWTToken = response.JWTToken;
+            StateHasChanged();
+
+            NavManager.NavigateTo("/", forceLoad: true);
         }
-
-        var customAuthStateProvider = (CustomAuthenticationStateProvider)AuthStateProvider;
-        customAuthStateProvider.UpdateAuthenticationState(response.JWTToken);
-        _constants.JWTToken = response.JWTToken;
-        StateHasChanged();
-
-        NavManager.NavigateTo("/", forceLoad: true);
-
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            isError = true;
+        }
     }
 }

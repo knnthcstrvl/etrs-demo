@@ -1,7 +1,57 @@
-﻿@page "/Member"
+@page "/Member"
+@using Financial.Data
+@using Financial.Model
+@using Microsoft.EntityFrameworkCore
+@inject ProcurementDbContext Db
 
-<h3>Index</h3>
+<PageTitle>Users</PageTitle>
+
+<section class="panel-card">
+    <div class="panel-heading">
+        <div>
+            <h1>System Users</h1>
+            <p class="mb-0 text-muted">Sample access accounts for demo and testing while external authentication is not yet connected.</p>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Office</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in users)
+                {
+                    <tr>
+                        <td>@user.FirstName @user.LastName</td>
+                        <td>@user.Email</td>
+                        <td>@user.Role</td>
+                        <td>@user.Office</td>
+                        <td><span class="status-badge @(user.IsActive ? "status-ok" : "status-danger")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                        <td>@user.DateCreated.ToString("MMM dd, yyyy")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
 
 @code {
+    private List<UserAccount> users = new();
 
+    protected override async Task OnInitializedAsync()
+    {
+        users = await Db.UserAccounts
+            .AsNoTracking()
+            .OrderBy(u => u.Role)
+            .ThenBy(u => u.LastName)
+            .ToListAsync();
+    }
 }

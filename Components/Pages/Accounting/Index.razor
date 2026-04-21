@@ -1,8 +1,58 @@
-﻿@page "/Accounting"
+@page "/Accounting"
+@using Financial.Data
+@using Financial.Model.Dtr
+@using Microsoft.EntityFrameworkCore
+@inject ProcurementDbContext Db
 
+<PageTitle>Attendance Logs</PageTitle>
 
-<h3>Index</h3>
+<section class="panel-card">
+    <div class="panel-heading">
+        <div>
+            <h1>Attendance Logs</h1>
+            <p class="mb-0 text-muted">Sample punches from seeded biometric records. This page can later be replaced with data from the actual device API.</p>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Date Time</th>
+                    <th>Type</th>
+                    <th>Verification</th>
+                    <th>Device</th>
+                    <th>Sync</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var log in logs)
+                {
+                    <tr>
+                        <td>@log.Employee.EmployeeNumber - @log.Employee.FirstName @log.Employee.LastName</td>
+                        <td>@log.LogTime.ToString("MMM dd, yyyy hh:mm tt")</td>
+                        <td>@log.LogType</td>
+                        <td>@log.VerificationMode</td>
+                        <td>@(log.BiometricDevice?.DeviceName ?? "No device")</td>
+                        <td><span class="status-badge @(log.IsSynced ? "status-ok" : "status-warning")">@(log.IsSynced ? "Synced" : "Pending")</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
 
 @code {
+    private List<AttendanceLog> logs = new();
 
+    protected override async Task OnInitializedAsync()
+    {
+        logs = await Db.AttendanceLogs
+            .AsNoTracking()
+            .Include(l => l.Employee)
+            .Include(l => l.BiometricDevice)
+            .OrderByDescending(l => l.LogTime)
+            .ToListAsync();
+    }
 }

@@ -1,7 +1,57 @@
-﻿@page "/Cashier"
+@page "/Cashier"
+@using Financial.Data
+@using Financial.Model.Dtr
+@using Microsoft.EntityFrameworkCore
+@inject ProcurementDbContext Db
 
-<h3>Index</h3>
+<PageTitle>Devices</PageTitle>
+
+<section class="panel-card">
+    <div class="panel-heading">
+        <div>
+            <h1>Biometric Devices</h1>
+            <p class="mb-0 text-muted">Device list and sync health. Later this can be updated using the vendor software API status endpoints.</p>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Device Code</th>
+                    <th>Name</th>
+                    <th>Location</th>
+                    <th>IP Address</th>
+                    <th>Last Sync</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var device in devices)
+                {
+                    <tr>
+                        <td>@device.DeviceCode</td>
+                        <td>@device.DeviceName</td>
+                        <td>@device.Location</td>
+                        <td>@device.IpAddress</td>
+                        <td>@(device.LastSyncedAt?.ToString("MMM dd, yyyy hh:mm tt") ?? "No sync yet")</td>
+                        <td><span class="status-badge @(device.IsOnline ? "status-ok" : "status-danger")">@device.SyncStatus</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
 
 @code {
+    private List<BiometricDevice> devices = new();
 
+    protected override async Task OnInitializedAsync()
+    {
+        devices = await Db.BiometricDevices
+            .AsNoTracking()
+            .OrderByDescending(d => d.IsOnline)
+            .ThenBy(d => d.DeviceName)
+            .ToListAsync();
+    }
 }

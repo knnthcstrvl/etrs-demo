@@ -1,21 +1,15 @@
-﻿@using Syncfusion.Blazor.Navigations
+@using Syncfusion.Blazor.Navigations
 
 @rendermode InteractiveServer
 
 <SfAppBar ColorMode="AppBarColor.Primary" CssClass="custom-appbar" IsSticky="true">
-    <AppBarContent>
-        <SfButton CssClass="e-flat"
-                  IconCss="e-icons e-menu"
-                  OnClick="ToggleSidebar">
-        </SfButton>
+    <SfButton CssClass="e-flat"
+              IconCss="e-icons e-menu"
+              OnClick="ToggleSidebar">
+    </SfButton>
 
-        <span class="app-title">Finacial Monitoring System</span>
-    </AppBarContent>
+    <span class="app-title">DTR Monitoring System</span>
 </SfAppBar>
-
-<style>
-    
-</style>
 
 @code {
     [Parameter]

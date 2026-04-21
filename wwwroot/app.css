@@ -60,6 +60,154 @@ h1:focus {
 }
 
 .custom-appbar {
-    background: #800000 !important;
+    background: linear-gradient(90deg, #6f0d13 0%, #8c171f 100%) !important;
     color: #ffffff !important;
+}
+
+body {
+    background: #f4f1eb;
+    color: #1f2933;
+}
+
+.dashboard-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1rem 0 2rem;
+}
+
+.dashboard-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #fff5ea 0%, #f7dfd3 100%);
+    border: 1px solid #ead2c6;
+}
+
+.dashboard-hero h1,
+.panel-heading h1,
+.panel-heading h2 {
+    margin: 0;
+}
+
+.dashboard-hero p {
+    margin: 0.4rem 0 0;
+    color: #5c6773;
+}
+
+.hero-chip {
+    padding: 0.6rem 1rem;
+    border-radius: 999px;
+    background: #6f0d13;
+    color: #fff;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.metric-card,
+.panel-card {
+    background: #fffdf9;
+    border: 1px solid #eadfd5;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(111, 13, 19, 0.06);
+}
+
+.metric-card {
+    padding: 1.2rem;
+}
+
+.metric-label {
+    display: block;
+    font-size: 0.85rem;
+    color: #7b8794;
+    margin-bottom: 0.35rem;
+}
+
+.metric-card strong {
+    font-size: 1.8rem;
+    color: #6f0d13;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+}
+
+.panel-card {
+    padding: 1.25rem;
+}
+
+.panel-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.panel-heading span {
+    color: #7b8794;
+    font-size: 0.85rem;
+}
+
+.issue-row,
+.device-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 0;
+    border-top: 1px solid #f1e7dd;
+}
+
+.issue-row:first-of-type,
+.device-row:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-ok {
+    background: #e6f6ec;
+    color: #186a3b;
+}
+
+.status-warning {
+    background: #fff0d6;
+    color: #9a6700;
+}
+
+.status-danger {
+    background: #fde7e9;
+    color: #ae1e2c;
+}
+
+@media (max-width: 768px) {
+    .dashboard-hero,
+    .panel-heading,
+    .issue-row,
+    .device-row {
+        flex-direction: column;
+    }
+
+    .hero-chip {
+        white-space: normal;
+    }
 }

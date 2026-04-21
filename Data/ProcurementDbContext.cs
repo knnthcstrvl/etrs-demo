@@ -1,11 +1,9 @@
-﻿using Financial.Model.Library;
+using Financial.Model;
+using Financial.Model.Dtr;
+using Financial.Model.Library;
 using Financial.Model.Modules;
 using Financial.Model.Trace;
-using Financial.Model;
 using Microsoft.EntityFrameworkCore;
-using SkiaSharp;
-using System.Collections.Generic;
-using System.Reflection.Emit;
 
 namespace Financial.Data
 {
@@ -37,16 +35,20 @@ namespace Financial.Data
         public DbSet<Document> Documents { get; set; }
         public DbSet<StatusHistory> StatusHistories { get; set; }
 
-        //User Account
+        // User Account
         public DbSet<UserAccount> UserAccounts { get; set; }
+
+        // DTR
+        public DbSet<Employee> Employees { get; set; }
+        public DbSet<BiometricDevice> BiometricDevices { get; set; }
+        public DbSet<AttendanceLog> AttendanceLogs { get; set; }
+        public DbSet<ShiftSchedule> ShiftSchedules { get; set; }
+        public DbSet<AttendanceIssue> AttendanceIssues { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // ==========================
-            // TRANSACTION
-            // ==========================
             modelBuilder.Entity<Transaction>()
                 .HasIndex(t => t.PrNumber)
                 .IsUnique();
@@ -57,9 +59,6 @@ namespace Financial.Data
                 .HasForeignKey(t => t.SupplierId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // ==========================
-            // ONE-TO-ONE MODULES
-            // ==========================
             modelBuilder.Entity<Transaction>()
                 .HasOne(t => t.Procurement)
                 .WithOne(p => p.Transaction)
@@ -85,9 +84,6 @@ namespace Financial.Data
                 .WithOne(c => c.Transaction)
                 .HasForeignKey<Cashier>(c => c.TransactionId);
 
-            // ==========================
-            // LOOKUP CONSTRAINTS
-            // ==========================
             modelBuilder.Entity<Supplier>()
                 .HasIndex(s => s.SupplierName)
                 .IsUnique();
@@ -107,6 +103,38 @@ namespace Financial.Data
             modelBuilder.Entity<PaymentMode>()
                 .HasIndex(p => p.PaymentModeName)
                 .IsUnique();
+
+            modelBuilder.Entity<Employee>()
+                .HasIndex(e => e.EmployeeNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<BiometricDevice>()
+                .HasIndex(d => d.DeviceCode)
+                .IsUnique();
+
+            modelBuilder.Entity<AttendanceLog>()
+                .HasOne(l => l.Employee)
+                .WithMany(e => e.AttendanceLogs)
+                .HasForeignKey(l => l.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AttendanceLog>()
+                .HasOne(l => l.BiometricDevice)
+                .WithMany(d => d.AttendanceLogs)
+                .HasForeignKey(l => l.BiometricDeviceId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ShiftSchedule>()
+                .HasOne(s => s.Employee)
+                .WithMany(e => e.ShiftSchedules)
+                .HasForeignKey(s => s.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AttendanceIssue>()
+                .HasOne(i => i.Employee)
+                .WithMany(e => e.AttendanceIssues)
+                .HasForeignKey(i => i.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

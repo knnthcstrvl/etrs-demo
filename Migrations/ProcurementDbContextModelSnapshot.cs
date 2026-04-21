@@ -22,6 +22,238 @@ namespace Financial.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Financial.Model.Dtr.AttendanceIssue", b =>
+                {
+                    b.Property<int>("AttendanceIssueId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendanceIssueId"));
+
+                    b.Property<DateTime>("AttendanceDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IssueType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Remarks")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("AttendanceIssueId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("AttendanceIssues");
+                });
+
+            modelBuilder.Entity("Financial.Model.Dtr.AttendanceLog", b =>
+                {
+                    b.Property<int>("AttendanceLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendanceLogId"));
+
+                    b.Property<int?>("BiometricDeviceId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsSynced")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("LogTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LogType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("VerificationMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("AttendanceLogId");
+
+                    b.HasIndex("BiometricDeviceId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("AttendanceLogs");
+                });
+
+            modelBuilder.Entity("Financial.Model.Dtr.BiometricDevice", b =>
+                {
+                    b.Property<int>("BiometricDeviceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BiometricDeviceId"));
+
+                    b.Property<string>("DeviceCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("DeviceName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("IpAddress")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastSyncedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("SyncStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("BiometricDeviceId");
+
+                    b.HasIndex("DeviceCode")
+                        .IsUnique();
+
+                    b.ToTable("BiometricDevices");
+                });
+
+            modelBuilder.Entity("Financial.Model.Dtr.Employee", b =>
+                {
+                    b.Property<int>("EmployeeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmployeeId"));
+
+                    b.Property<DateTime>("DateHired")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Department")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("EmployeeNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("EmploymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Position")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("PrimaryShift")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("EmployeeId");
+
+                    b.HasIndex("EmployeeNumber")
+                        .IsUnique();
+
+                    b.ToTable("Employees");
+                });
+
+            modelBuilder.Entity("Financial.Model.Dtr.ShiftSchedule", b =>
+                {
+                    b.Property<int>("ShiftScheduleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ShiftScheduleId"));
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRestDay")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ScheduleSource")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<TimeSpan>("ScheduledTimeIn")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan>("ScheduledTimeOut")
+                        .HasColumnType("time");
+
+                    b.Property<string>("ShiftName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("WorkDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ShiftScheduleId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("ShiftSchedules");
+                });
+
             modelBuilder.Entity("Financial.Model.Library.FundCluster", b =>
                 {
                     b.Property<int>("FundClusterId")
@@ -631,6 +863,46 @@ namespace Financial.Migrations
                     b.ToTable("UserAccounts");
                 });
 
+            modelBuilder.Entity("Financial.Model.Dtr.AttendanceIssue", b =>
+                {
+                    b.HasOne("Financial.Model.Dtr.Employee", "Employee")
+                        .WithMany("AttendanceIssues")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("Financial.Model.Dtr.AttendanceLog", b =>
+                {
+                    b.HasOne("Financial.Model.Dtr.BiometricDevice", "BiometricDevice")
+                        .WithMany("AttendanceLogs")
+                        .HasForeignKey("BiometricDeviceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Financial.Model.Dtr.Employee", "Employee")
+                        .WithMany("AttendanceLogs")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BiometricDevice");
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("Financial.Model.Dtr.ShiftSchedule", b =>
+                {
+                    b.HasOne("Financial.Model.Dtr.Employee", "Employee")
+                        .WithMany("ShiftSchedules")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
             modelBuilder.Entity("Financial.Model.Modules.Accounting", b =>
                 {
                     b.HasOne("Financial.Model.Transaction", "Transaction")
@@ -746,6 +1018,20 @@ namespace Financial.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("Financial.Model.Dtr.BiometricDevice", b =>
+                {
+                    b.Navigation("AttendanceLogs");
+                });
+
+            modelBuilder.Entity("Financial.Model.Dtr.Employee", b =>
+                {
+                    b.Navigation("AttendanceIssues");
+
+                    b.Navigation("AttendanceLogs");
+
+                    b.Navigation("ShiftSchedules");
                 });
 
             modelBuilder.Entity("Financial.Model.Library.Supplier", b =>

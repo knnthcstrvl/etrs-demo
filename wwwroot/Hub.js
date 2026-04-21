@@ -1,6 +1,9 @@
 ﻿function setupSignalRConnection() {
+    // Use the current origin so the hub uses the same host and port as the app
+    const hubUrl = `${window.location.origin}/transactionHub`;
+
     connection = new signalR.HubConnectionBuilder()
-        .withUrl("https://localhost:7269/transactionHub")
+        .withUrl(hubUrl)
         .withAutomaticReconnect()
         .build();
 
