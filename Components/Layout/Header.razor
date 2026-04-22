@@ -1,17 +1,10 @@
-@using Syncfusion.Blazor.Navigations
-
 @rendermode InteractiveServer
 
-<SfAppBar ColorMode="AppBarColor.Primary" CssClass="custom-appbar" IsSticky="true">
-    <SfButton CssClass="e-flat"
-              IconCss="e-icons e-menu"
-              OnClick="ToggleSidebar">
-    </SfButton>
-
-    <span class="app-title">DTR Monitoring System</span>
-</SfAppBar>
-
-@code {
-    [Parameter]
-    public EventCallback ToggleSidebar { get; set; }
-}
+<header class="finance-header">
+    <div class="finance-header-search" role="search">
+        <input type="search"
+               class="finance-search-input"
+               placeholder="Search"
+               aria-label="Search" />
+    </div>
+</header>

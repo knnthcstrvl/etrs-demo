@@ -1,40 +1,64 @@
-@using Syncfusion.Blazor.Lists
-@using Syncfusion.Blazor.Navigations
-
-@inject NavigationManager Nav
-
 @rendermode InteractiveServer
 
-<SfSidebar Width="256px" @bind-IsOpen="IsOpen" ShowBackdrop="@IsBackdropVisible" Type="SidebarType.Push" aria-label="main navigation menu" role="complementary">
-    <div class="d-flex flex-column justify-content-between vh-100">
-        <div>
-            <div class="d-flex flex-column justify-content-center align-items-center pt-4 mb-3">
-                <span class="e-avatar e-avatar-xlarge e-avatar-circle">
-                    <img src="data:image/png;base64,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" alt="profile picture" />
-                </span>
-                <div class="fs-5 fw-medium text-body mt-3">System Administrator</div>
-                <a class="fs-6 text-body-secondary mt-2 text-decoration-none" href="mailto:admin@local">admin&#64;local</a>
-            </div>
-            <hr class="mx-3 border-light-subtle opacity-100" />
-            <div>
-                <SfListView CssClass="border-0 e-bigger" DataSource="@Data" aria-label="main navigation links" role="list">
-                    <ListViewFieldSettings TValue="MenuItem"></ListViewFieldSettings>
-                    <ListViewTemplates TValue="MenuItem">
-                        <Template>
-                            <div class="e-list-wrapper d-flex align-items-center px-2" @onclick="() => Navigate(context.Url)">
-                                <span class="e-icons @context.FontIcon fs-6"></span>
-                                <span class="fs-6 fw-normal ps-2 ms-1">@context.Field</span>
-                            </div>
-                        </Template>
-                    </ListViewTemplates>
-                </SfListView>
+<aside class="finance-sidebar-shell @(IsOpen ? "is-open" : "is-collapsed")" aria-label="main navigation menu">
+    <div class="finance-sidebar">
+        <div class="finance-sidebar-top">
+            <div class="finance-profile-card">
+                <img class="finance-profile-avatar" src="/images/user-profile.jpg" alt="user profile picture" />
+
+                @if (IsOpen)
+                {
+                    <div class="finance-profile-meta">
+                        <strong>System Administrator</strong>
+                        <span>admin&#64;local</span>
+                    </div>
+                }
+
+                <button type="button"
+                        class="finance-sidebar-toggle"
+                        @onclick="ToggleSidebar"
+                        aria-label="Toggle sidebar">
+                    <i class="fa-solid @(IsOpen ? "fa-angle-left" : "fa-angle-right")" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
-        <div class="p-3">
-            <SfButton CssClass="e-outline w-100" IconCss="e-icons sf-icon-logout-07 fs-6" Content="Logout" Type="button" aria-label="logout" role="button"></SfButton>
+
+        <nav class="finance-sidebar-nav">
+            <div class="finance-nav-group">
+                @foreach (var item in MainItems)
+                {
+                    <NavLink href="@item.Url"
+                             Match="@item.Match"
+                             class="finance-nav-link"
+                             title="@item.Label">
+                        <span class="finance-nav-icon" aria-hidden="true">
+                            <i class="@item.Icon"></i>
+                        </span>
+                        @if (IsOpen)
+                        {
+                            <span class="finance-nav-label">@item.Label</span>
+                        }
+                    </NavLink>
+                }
+            </div>
+        </nav>
+
+        <div class="finance-sidebar-divider finance-sidebar-divider-bottom"></div>
+        <div class="finance-sidebar-bottom">
+            <button type="button"
+                    class="finance-nav-link finance-nav-button finance-settings-link"
+                    title="@SettingsItem.Label">
+                <span class="finance-nav-icon" aria-hidden="true">
+                    <i class="@SettingsItem.Icon"></i>
+                </span>
+                @if (IsOpen)
+                {
+                    <span class="finance-nav-label">@SettingsItem.Label</span>
+                }
+            </button>
         </div>
     </div>
-</SfSidebar>
+</aside>
 
 @code {
     [Parameter]
@@ -43,39 +67,34 @@
     [Parameter]
     public EventCallback<bool> IsOpenChanged { get; set; }
 
-    public bool IsBackdropVisible = false;
-
-    public List<MenuItem> Data = new()
+    private readonly List<MenuItem> MainItems = new()
     {
-        new MenuItem { Field = "Dashboard", Url = "/", FontIcon = "e-icons e-grid-view" },
-        new MenuItem { Field = "Attendance Logs", Url = "/Accounting", FontIcon = "e-icons e-clock" },
-        new MenuItem { Field = "Employees", Url = "/Budget", FontIcon = "e-icons e-user" },
-        new MenuItem { Field = "Devices", Url = "/Cashier", FontIcon = "e-icons e-file-sync" },
-        new MenuItem { Field = "Shifts", Url = "/Procurement", FontIcon = "e-icons e-day" },
-        new MenuItem { Field = "Exceptions", Url = "/Property", FontIcon = "e-icons e-warning" },
-        new MenuItem { Field = "Users", Url = "/Member", FontIcon = "e-icons e-people" }
+        new() { Label = "Dashboard", Url = "/", Icon = "fa-solid fa-house", Match = NavLinkMatch.All },
+        new() { Label = "Attendance Logs", Url = "/Accounting", Icon = "fa-solid fa-clock", Match = NavLinkMatch.Prefix },
+        new() { Label = "Employees", Url = "/Budget", Icon = "fa-regular fa-circle-user", Match = NavLinkMatch.Prefix },
+        new() { Label = "Devices", Url = "/Cashier", Icon = "fa-solid fa-tablet-screen-button", Match = NavLinkMatch.Prefix },
+        new() { Label = "Shifts", Url = "/Procurement", Icon = "fa-regular fa-rectangle-list", Match = NavLinkMatch.Prefix },
+        new() { Label = "Exceptions", Url = "/Property", Icon = "fa-solid fa-triangle-exclamation", Match = NavLinkMatch.Prefix },
+        new() { Label = "Users", Url = "/Member", Icon = "fa-solid fa-users", Match = NavLinkMatch.Prefix }
     };
 
-    [JSInvokable]
-    public void ResizeHandler(string message, int windowWidth)
+    private readonly MenuItem SettingsItem = new()
     {
-        if (message == "resizeAction")
-        {
-            IsBackdropVisible = windowWidth <= 640;
-        }
-
-        StateHasChanged();
-    }
+        Label = "Settings",
+        Icon = "fa-solid fa-gear"
+    };
 
     public class MenuItem
     {
-        public string Field { get; set; } = string.Empty;
-        public string FontIcon { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
         public string Url { get; set; } = string.Empty;
+        public string Icon { get; set; } = string.Empty;
+        public NavLinkMatch Match { get; set; } = NavLinkMatch.Prefix;
     }
 
-    private void Navigate(string url)
+    private async Task ToggleSidebar()
     {
-        Nav.NavigateTo(url);
+        IsOpen = !IsOpen;
+        await IsOpenChanged.InvokeAsync(IsOpen);
     }
 }

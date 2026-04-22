@@ -1,19 +1,50 @@
-html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+html,
+body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    min-height: 100%;
 }
 
-a, .btn-link {
-    color: #006bb7;
+:root {
+    --finance-bg: #f5f6f7;
+    --finance-surface: #ffffff;
+    --finance-surface-soft: #f8f8f8;
+    --finance-border: #dedede;
+    --finance-border-soft: #e9e9e9;
+    --finance-text: #213126;
+    --finance-text-muted: #6e756f;
+    --finance-brand: #2f6b3d;
+    --finance-brand-strong: #204d2b;
+    --finance-brand-soft: #e7f1e6;
+    --finance-gold: #d7b252;
+    --finance-gold-soft: #fbf2d9;
+    --finance-danger-soft: #f8e4e1;
+    --finance-danger-text: #9a3a2f;
+    --finance-shadow: 0 18px 40px rgba(32, 77, 43, 0.08);
+}
+
+body {
+    background: var(--finance-bg);
+    color: var(--finance-text);
+}
+
+a,
+.btn-link {
+    color: var(--finance-brand);
 }
 
 .btn-primary {
     color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    background-color: var(--finance-brand);
+    border-color: var(--finance-brand);
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+.btn:focus,
+.btn:active:focus,
+.btn-link.nav-link:focus,
+.form-control:focus,
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem #fff, 0 0 0 0.25rem rgba(47, 107, 61, 0.25);
 }
 
 .content {
@@ -37,43 +68,585 @@ h1:focus {
 }
 
 .blazor-error-boundary {
-    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA5NC4wODE1IDI5MSA5NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
+    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOng9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA5NC4wODE1IDI5MSA5NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
     padding: 1rem 1rem 1rem 3.7rem;
-    color: white;
+    color: #fff;
 }
 
-    .blazor-error-boundary::after {
-        content: "An error has occurred."
-    }
+.blazor-error-boundary::after {
+    content: "An error has occurred.";
+}
 
 .darker-border-checkbox.form-check-input {
     border-color: #929292;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+.form-floating > .form-control-plaintext::placeholder,
+.form-floating > .form-control::placeholder {
     color: var(--bs-secondary-color);
     text-align: end;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+.form-floating > .form-control-plaintext:focus::placeholder,
+.form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
 
-.custom-appbar {
-    background: linear-gradient(90deg, #6f0d13 0%, #8c171f 100%) !important;
-    color: #ffffff !important;
+.app-container {
+    min-height: 100vh;
 }
 
-body {
-    background: #f4f1eb;
-    color: #1f2933;
+.app-body {
+    display: flex;
+    min-height: 100vh;
+}
+
+.app-content {
+    flex: 1;
+    min-width: 0;
+    padding: 0 1.5rem 1.5rem;
+    overflow-y: auto;
+    background: var(--finance-bg);
+}
+
+.finance-sidebar-shell {
+    flex: 0 0 auto;
+    transition: width 0.22s ease;
+}
+
+.finance-sidebar-shell.is-open {
+    width: 320px;
+}
+
+.finance-sidebar-shell.is-collapsed {
+    width: 104px;
+}
+
+.finance-sidebar {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    height: 100vh;
+    padding: 1.5rem 1rem;
+    background: #fff;
+    border-right: 1px solid var(--finance-border);
+}
+
+.finance-sidebar-top {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.finance-profile-card {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0 0 1rem;
+    border: 0;
+    border-bottom: 1px solid var(--finance-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.finance-sidebar-shell.is-collapsed .finance-profile-card {
+    /* collapsed: stack avatar and toggle vertically; toggle centered below avatar */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0 1rem;
+}
+
+/* hide profile meta when collapsed so it doesn't take space */
+.finance-sidebar-shell.is-collapsed .finance-profile-meta {
+    display: none;
+}
+
+.finance-sidebar-shell.is-collapsed .finance-profile-avatar {
+    order: 1;
+}
+
+.finance-sidebar-shell.is-collapsed .finance-profile-card .finance-sidebar-toggle {
+    /* toggle centered under avatar */
+    position: static;
+    margin: 0.5rem 0 0 0;
+    align-self: center;
+    z-index: 2;
+    order: 2;
+}
+
+/* align the toggle arrow vertically with the avatar when expanded */
+.finance-profile-card .finance-sidebar-toggle {
+    /* reset margins and align to center of the profile card */
+    margin-left: 0;
+    align-self: center;
+}
+
+.finance-sidebar-shell.is-open .finance-profile-card {
+    /* expanded: use a three-column grid so the toggle can be centered in the right column
+       and align horizontally with the nav icons column */
+    display: grid;
+    grid-template-columns: 64px 1fr 64px;
+    grid-template-rows: auto;
+    align-items: center;
+    gap: 0.5rem 0.85rem;
+    padding: 0 0 1rem;
+}
+
+/* place avatar, meta and toggle into separate grid columns */
+.finance-sidebar-shell.is-open .finance-profile-avatar {
+    grid-column: 1 / 2;
+    justify-self: center;
+}
+.finance-sidebar-shell.is-open .finance-profile-meta {
+    grid-column: 2 / 3;
+}
+.finance-sidebar-shell.is-open .finance-profile-card .finance-sidebar-toggle {
+    grid-column: 3 / 4;
+    justify-self: center;
+    position: static;
+    transform: none;
+    z-index: 10;
+}
+
+.finance-profile-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #ead9b2;
+    flex-shrink: 0;
+}
+
+.finance-profile-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.finance-profile-meta strong {
+    font-size: 1.08rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.finance-profile-meta span:last-child {
+    color: var(--finance-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.finance-sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin-left: auto;
+    border: 0;
+    border-radius: 12px;
+    background: var(--finance-surface-soft);
+    color: var(--finance-brand-strong);
+    font-size: 1.25rem;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.finance-sidebar-toggle:hover {
+    background: #f2f2f2;
+}
+
+.finance-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin: 0 -1.5rem 1.5rem;
+    padding: 1rem 1.5rem;
+    background: var(--finance-surface-soft);
+    border-bottom: 1px solid var(--finance-border-soft);
+}
+
+.finance-header-search {
+    max-width: 420px;
+}
+
+.finance-header-search {
+    /* make search container wider */
+    max-width: 820px;
+    width: 100%;
+}
+
+.finance-search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--finance-border-soft) !important;
+    background: var(--finance-surface-soft);
+    font-size: 1rem;
+    color: var(--finance-text-muted);
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 6px;
+}
+
+.finance-search-input::placeholder {
+    color: #8d948f;
+}
+
+.finance-search-icon {
+    font-size: 1.05rem;
+}
+
+.finance-sidebar-nav {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 0.25rem 0;
+}
+
+.finance-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.finance-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-height: 52px;
+    padding: 0.85rem 1rem;
+    border: 0;
+    border-radius: 16px;
+    background: transparent;
+    color: var(--finance-text-muted);
+    text-decoration: none;
+    transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.finance-nav-link:hover {
+    /* lighter hover: soft surface (light gray) to reduce emphasis */
+    background: var(--finance-surface-soft);
+    color: var(--finance-text);
+}
+
+.finance-nav-link.active {
+    background: var(--finance-gold);
+    color: #2e2a1d;
+    box-shadow: 0 14px 26px rgba(215, 178, 82, 0.24);
+}
+
+.finance-nav-button {
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
+.finance-nav-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    min-width: 24px;
+    font-size: 1rem;
+}
+
+.finance-nav-icon i {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.finance-sidebar-shell.is-collapsed .finance-nav-link {
+    justify-content: center;
+    padding: 0.85rem 0.5rem;
+}
+
+.finance-sidebar-divider {
+    height: 1px;
+    margin: 0.8rem 0;
+    background: repeating-linear-gradient(to right, var(--finance-border-soft) 0 6px, transparent 6px 12px);
+}
+
+/* hide the dashed divider immediately above settings - we'll use a solid border on the settings area */
+.finance-sidebar-divider-bottom {
+    /* remove visible dashed line and spacing */
+    background: none;
+    height: 0;
+    margin: 0;
+}
+
+.finance-sidebar-bottom {
+    display: flex;
+    flex-direction: column;
+    /* reduce extra space around the settings area */
+    padding-bottom: 0.25rem;
+    /* apply a top border matching the profile card's bottom border */
+    border-top: 1px solid var(--finance-border);
+    /* tighten spacing between nav and settings area (overrides .finance-sidebar gap) */
+    margin-top: 0.25rem;
+}
+
+/* make settings link more compact than main nav items */
+.finance-sidebar-bottom .finance-nav-link {
+    padding: 0.35rem 0.75rem;
+    border-radius: 12px;
+}
+
+/* Metric cards under ETR Dashboard */
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.metric-card {
+    background: var(--finance-surface);
+    border: 1px solid var(--finance-border-soft);
+    border-radius: 18px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 8px 20px rgba(32, 77, 43, 0.04);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 112px;
+}
+
+/* stronger selector to ensure overrides from other theme files */
+.app-content .metric-grid .metric-card {
+    background: var(--finance-surface) !important;
+    border: 1px solid var(--finance-border-soft) !important;
+    border-radius: 18px !important;
+    padding: 1.25rem 1.5rem !important;
+    box-shadow: 0 8px 20px rgba(32, 77, 43, 0.04) !important;
+}
+
+.dashboard-metrics .metric-card {
+    background: var(--finance-surface) !important;
+    border: 1px solid var(--finance-border-soft) !important;
+    border-radius: 18px !important;
+    padding: 1.25rem 1.5rem !important;
+    box-shadow: 0 8px 20px rgba(32, 77, 43, 0.04) !important;
+}
+
+/* strongest override to ensure our metric styles win over theme libraries */
+body .app-content .dashboard-metrics .metric-card {
+    background: var(--finance-surface) !important;
+    border: 1px solid var(--finance-border-soft) !important;
+    border-radius: 18px !important;
+    padding: 1.5rem 2rem !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.04) !important;
+    min-height: 120px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+}
+
+body .app-content .dashboard-metrics .metric-card .metric-label {
+    color: var(--finance-text-muted) !important;
+    font-size: 1rem !important;
+}
+
+body .app-content .dashboard-metrics .metric-card strong {
+    color: var(--finance-brand-strong) !important;
+    font-size: 2.4rem !important;
+    font-weight: 700 !important;
+    margin-top: 0.6rem !important;
+    line-height: 1 !important;
+}
+
+.metric-card .metric-label {
+    color: var(--finance-text-muted);
+    font-size: 0.95rem;
+}
+
+.metric-card strong {
+    color: var(--finance-brand-strong);
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+@media (max-width: 992px) {
+    .metric-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .metric-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Dashboard hero / banner -------------------------------------------------- */
+.dashboard-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 2.2rem 2.5rem;
+    border-radius: 22px;
+    /* default light card appearance; specific hero variants override this */
+    background-image: linear-gradient(rgba(240,248,240,0.92), rgba(247,250,247,0.96)), url('/images/banner.jpg');
+    background-size: cover;
+    background-position: center;
+    border: 1px solid rgba(32, 77, 43, 0.06);
+    box-shadow: var(--finance-shadow);
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-hero > div:first-child h1 {
+    margin: 0;
+    font-size: 3rem;
+    line-height: 1.02;
+    color: var(--finance-text);
+    font-weight: 700;
+}
+
+/* Course hero variant: purple card with stars and CTA */
+
+.dashboard-hero.hero-course {
+    /* place the banner image directly as the card background so it is visible */
+    background: url('/images/banner.jpg') center/cover no-repeat !important;
+    background-size: cover !important;
+    color: #fff;
+    padding: 2.5rem 2.5rem;
+    border-radius: 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-hero.hero-course::before {
+    /* large soft ellipse highlight on the right like the template */
+    content: "";
+    position: absolute;
+    right: -6%;
+    top: 18%;
+    width: 58%;
+    height: 56%;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50% / 50%;
+    transform: rotate(-6deg);
+    filter: blur(6px);
+    pointer-events: none;
+}
+
+.dashboard-hero.hero-course .hero-left {
+    max-width: 62%;
+    padding-right: 1.25rem;
+    position: relative;
+    z-index: 2;
+    color: #fff; /* ensure contrast if image has dark areas */
+}
+
+.dashboard-hero.hero-course .hero-label {
+    letter-spacing: 2px;
+    font-size: 0.85rem;
+    opacity: 0.9;
+    margin-bottom: 0.6rem;
+}
+
+.dashboard-hero.hero-course h1 {
+    font-size: 3.2rem;
+    line-height: 1.02;
+    margin: 0 0 1.2rem 0;
+    font-weight: 800;
+    color: #ffffff !important;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.45);
+    position: relative;
+    z-index: 2;
+}
+
+.cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.9rem;
+    background: #0f0f0f;
+    color: #fff;
+    padding: 0.6rem 1.15rem;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 8px 20px rgba(15,15,15,0.2);
+}
+
+.cta-btn .cta-icon {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    background: #fff;
+    color: #000;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .dashboard-hero.hero-course .hero-left {
+        max-width: 100%;
+    }
+
+    .dashboard-hero.hero-course h1 {
+        font-size: 1.25rem;
+    }
+
+    .dashboard-hero.hero-course::after {
+        background-position: 72% 26%, 90% 56%;
+    }
+}
+
+.dashboard-hero > div:first-child p {
+    margin: 0.4rem 0 0;
+    color: var(--finance-text-muted);
+    font-size: 1.05rem;
+}
+
+.hero-chip {
+    display: inline-block;
+    background: var(--finance-brand-strong);
+    color: #fff;
+    padding: 0.75rem 2.2rem;
+    border-radius: 999px;
+    font-weight: 600;
+    box-shadow: 0 10px 24px rgba(32, 77, 43, 0.08);
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .dashboard-hero {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 1.1rem 1rem;
+    }
+
+    .dashboard-hero > div:first-child h1 {
+        font-size: 1.6rem;
+    }
+
+    .hero-chip {
+        align-self: flex-end;
+        margin-top: 0.8rem;
+    }
+}
+
+.finance-settings-link {
+    color: var(--finance-text-muted);
 }
 
 .dashboard-shell {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    padding: 1rem 0 2rem;
+    padding: 0 0 2rem;
 }
 
 .dashboard-hero {
@@ -82,9 +655,10 @@ body {
     align-items: center;
     gap: 1rem;
     padding: 1.5rem;
-    border-radius: 20px;
-    background: linear-gradient(135deg, #fff5ea 0%, #f7dfd3 100%);
-    border: 1px solid #ead2c6;
+    border: 1px solid #d9dfd4;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #fbfcf7 0%, #eef5e9 100%);
+    box-shadow: var(--finance-shadow);
 }
 
 .dashboard-hero h1,
@@ -95,13 +669,13 @@ body {
 
 .dashboard-hero p {
     margin: 0.4rem 0 0;
-    color: #5c6773;
+    color: var(--finance-text-muted);
 }
 
 .hero-chip {
-    padding: 0.6rem 1rem;
+    padding: 0.65rem 1rem;
     border-radius: 999px;
-    background: #6f0d13;
+    background: var(--finance-brand-strong);
     color: #fff;
     font-size: 0.9rem;
     white-space: nowrap;
@@ -115,10 +689,10 @@ body {
 
 .metric-card,
 .panel-card {
-    background: #fffdf9;
-    border: 1px solid #eadfd5;
-    border-radius: 18px;
-    box-shadow: 0 10px 30px rgba(111, 13, 19, 0.06);
+    background: var(--finance-surface);
+    border: 1px solid var(--finance-border);
+    border-radius: 20px;
+    box-shadow: var(--finance-shadow);
 }
 
 .metric-card {
@@ -127,14 +701,14 @@ body {
 
 .metric-label {
     display: block;
-    font-size: 0.85rem;
-    color: #7b8794;
     margin-bottom: 0.35rem;
+    color: var(--finance-text-muted);
+    font-size: 0.85rem;
 }
 
 .metric-card strong {
     font-size: 1.8rem;
-    color: #6f0d13;
+    color: var(--finance-brand);
 }
 
 .dashboard-grid {
@@ -156,7 +730,7 @@ body {
 }
 
 .panel-heading span {
-    color: #7b8794;
+    color: var(--finance-text-muted);
     font-size: 0.85rem;
 }
 
@@ -166,13 +740,13 @@ body {
     justify-content: space-between;
     gap: 1rem;
     padding: 0.9rem 0;
-    border-top: 1px solid #f1e7dd;
+    border-top: 1px solid var(--finance-border-soft);
 }
 
 .issue-row:first-of-type,
 .device-row:first-of-type {
-    border-top: 0;
     padding-top: 0;
+    border-top: 0;
 }
 
 .status-badge {
@@ -185,21 +759,48 @@ body {
 }
 
 .status-ok {
-    background: #e6f6ec;
-    color: #186a3b;
+    background: var(--finance-brand-soft);
+    color: var(--finance-brand-strong);
 }
 
 .status-warning {
-    background: #fff0d6;
-    color: #9a6700;
+    background: var(--finance-gold-soft);
+    color: #8c6720;
 }
 
 .status-danger {
-    background: #fde7e9;
-    color: #ae1e2c;
+    background: var(--finance-danger-soft);
+    color: var(--finance-danger-text);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 991.98px) {
+    .finance-sidebar-shell.is-open {
+        width: 280px;
+    }
+
+    .app-content {
+        padding: 0 1rem 1rem;
+    }
+
+    .finance-header {
+        margin: 0 -1rem 1rem;
+        padding: 0.9rem 1rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .finance-sidebar-shell.is-open {
+        width: 252px;
+    }
+
+    .finance-sidebar-shell.is-collapsed {
+        width: 88px;
+    }
+
+    .finance-sidebar {
+        padding: 1rem 0.75rem;
+    }
+
     .dashboard-hero,
     .panel-heading,
     .issue-row,
