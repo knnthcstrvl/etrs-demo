@@ -1,0 +1,112 @@
+@rendermode InteractiveServer
+@using Financial.Models
+@inject Financial.Services.IToastService ToastService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="toast-wrapper" aria-live="polite" aria-atomic="true">
+    @foreach (var t in _toasts)
+    {
+        <div class="toast-item @GetTypeClass(t.Type)" id="toast-@t.Id">
+            <div class="toast-left">
+                <div class="toast-icon">@GetIcon(t.Type)</div>
+            </div>
+            <div class="toast-body">
+                <div class="toast-title">@t.Title</div>
+                <div class="toast-message">@t.Message</div>
+            </div>
+            <button class="toast-close" @onclick="() => Close(t.Id)">×</button>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly List<ToastMessage> _toasts = new();
+    private const int MaxVisible = 1; // show only one toast at a time
+
+    protected override void OnInitialized()
+    {
+        // subscribe to the toast service events
+        ToastService.OnShow += Show;
+        ToastService.OnHide += Hide;
+
+        // populate any existing toasts in service (if shown before container initialized)
+        foreach (var m in ToastService.GetAll())
+        {
+            _toasts.Add(m);
+        }
+
+        // debug: notify browser that container initialized
+        try { JS.InvokeVoidAsync("console.log", "ToastContainer: initialized"); } catch { }
+    }
+
+    private void Show(ToastMessage message)
+    {
+        // ensure UI updates run on the renderer synchronization context
+        InvokeAsync(() => {
+            // server log for debugging
+            try { Console.WriteLine($"ToastContainer: Show invoked - {message.Title} / {message.Message}"); } catch { }
+            // enforce visible limit
+            while (_toasts.Count >= MaxVisible)
+            {
+                var oldest = _toasts[0];
+                _toasts.RemoveAt(0);
+                // ensure any pending timers for that toast are effectively cancelled by removing it
+                try { Hide(oldest.Id); } catch { }
+            }
+
+            _toasts.Add(message);
+            // write a debug message to the browser console to help troubleshooting
+            try { JS.InvokeVoidAsync("console.log", "ToastContainer: show", message.Title, message.Message); } catch { }
+            StateHasChanged();
+
+            if (message.Duration > 0)
+            {
+                _ = RemoveAfterDelay(message.Id, message.Duration);
+            }
+        });
+    }
+
+    private async Task RemoveAfterDelay(string id, int ms)
+    {
+        await Task.Delay(ms);
+        Hide(id);
+    }
+
+    private void Hide(string id)
+    {
+        var existing = _toasts.Find(t => t.Id == id);
+        if (existing != null)
+        {
+            _toasts.Remove(existing);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void Close(string id) => Hide(id);
+
+    public void Dispose()
+    {
+        ToastService.OnShow -= Show;
+        ToastService.OnHide -= Hide;
+    }
+
+    private static string GetTypeClass(ToastType type) => type switch
+    {
+        ToastType.Success => "toast-success",
+        ToastType.Error => "toast-error",
+        ToastType.Warning => "toast-warning",
+        _ => "toast-info",
+    };
+
+    private static MarkupString GetIcon(ToastType type)
+    {
+        return type switch
+        {
+            ToastType.Success => (MarkupString)"<svg width=20 height=20 viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=2 stroke-linecap=round stroke-linejoin=round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"></path><polyline points=\"22 4 12 14.01 9 11.01\"></polyline></svg>",
+            ToastType.Error => (MarkupString)"<svg width=20 height=20 viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=2 stroke-linecap=round stroke-linejoin=round\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><line x1=\"15\" y1=\"9\" x2=\"9\" y2=\"15\"></line><line x1=\"9\" y1=\"9\" x2=\"15\" y2=\"15\"></line></svg>",
+            ToastType.Warning => (MarkupString)"<svg width=20 height=20 viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=2 stroke-linecap=round stroke-linejoin=round\"><path d=\"M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z\"></path><line x1=\"12\" y1=\"9\" x2=\"12\" y2=\"13\"></line><line x1=\"12\" y1=\"17\" x2=\"12.01\" y2=\"17\"></line></svg>",
+            _ => (MarkupString)"<svg width=20 height=20 viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=2 stroke-linecap=round stroke-linejoin=round\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><line x1=\"12\" y1=\"8\" x2=\"12\" y2=\"12\"></line><line x1=\"12\" y1=\"16\" x2=\"12.01\" y2=\"16\"></line></svg>"
+        };
+    }
+}

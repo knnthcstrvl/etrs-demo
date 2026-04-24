@@ -47,6 +47,27 @@ a,
     box-shadow: 0 0 0 0.1rem #fff, 0 0 0 0.25rem rgba(47, 107, 61, 0.25);
 }
 
+/* required star */
+label.required-star::after,
+.required-star::after {
+    content: " *";
+    color: #e11d48 !important; /* red */
+}
+
+/* focus style: yellow outline matching button bg */
+.focus-yellow:focus,
+.focus-yellow:focus-visible,
+.etr-input:focus,
+.etr-textarea:focus,
+.login-input:focus {
+    outline: 0;
+    box-shadow: 0 0 0 0.05rem #fff, 0 0 0 0.25rem rgba(235, 202, 74, 0.45);
+    border-color: #ebca4a;
+}
+
+/* option card selected highlight use gold/yellow when selected */
+.option-card.selected { border-color: #ebca4a; box-shadow: 0 0 0 4px rgba(235,202,74,0.08); }
+
 .content {
     padding-top: 1.1rem;
 }
@@ -286,7 +307,7 @@ h1:focus {
 .finance-search-input {
     width: 100%;
     padding: 0.5rem 0.75rem;
-    border: 1px solid var(--finance-border-soft) !important;
+    border: none !important;
     background: var(--finance-surface-soft);
     font-size: 1rem;
     color: var(--finance-text-muted);
@@ -340,7 +361,7 @@ h1:focus {
 .finance-nav-link.active {
     background: var(--finance-gold);
     color: #2e2a1d;
-    box-shadow: 0 14px 26px rgba(215, 178, 82, 0.24);
+    box-shadow: none; /* remove large shadow for active nav */
 }
 
 .finance-nav-button {
@@ -552,6 +573,8 @@ body .app-content .dashboard-metrics .metric-card strong {
     font-size: 0.85rem;
     opacity: 0.9;
     margin-bottom: 0.6rem;
+    /* match title text shadow so subtitle reads over the image */
+    text-shadow: 0 2px 6px rgba(0,0,0,0.45);
 }
 
 .dashboard-hero.hero-course h1 {
@@ -684,7 +707,9 @@ body .app-content .dashboard-metrics .metric-card strong {
 .metric-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
+    gap: 0; /* remove gap between metric cards per design */
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
 .metric-card,
@@ -693,6 +718,48 @@ body .app-content .dashboard-metrics .metric-card strong {
     border: 1px solid var(--finance-border);
     border-radius: 20px;
     box-shadow: var(--finance-shadow);
+}
+
+/* simple tab style like image: text with underline for active tab */
+.simple-tabs {
+    position: relative;
+    /* increase space below the tab text so the underline sits further down */
+    padding-bottom: 20px;
+}
+.simple-tabs::after {
+    /* light gray full-width border under the tabs */
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 12px; /* place the gray line further below the text */
+    height: 1px;
+    background: #ececec;
+    z-index: 1;
+}
+.simple-tabs .tab {
+    background: transparent;
+    border: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    color: var(--finance-text-muted);
+    cursor: pointer;
+    position: relative;
+}
+.simple-tabs .tab.active {
+    color: var(--finance-brand-strong);
+}
+.simple-tabs .tab.active::after {
+    /* active tab highlight aligned to the light gray border */
+    content: "";
+    position: absolute;
+    left: 0.25rem;
+    right: 0.25rem;
+    bottom: 12px; /* match the gray border vertical position */
+    height: 3px;
+    background: var(--finance-brand);
+    border-radius: 3px;
+    z-index: 2;
 }
 
 .metric-card {
@@ -715,6 +782,8 @@ body .app-content .dashboard-metrics .metric-card strong {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 1rem;
+    margin-top: 0; /* remove extra vertical spacing */
+    margin-bottom: 0;
 }
 
 .panel-card {
@@ -812,3 +881,86 @@ body .app-content .dashboard-metrics .metric-card strong {
         white-space: normal;
     }
 }
+
+/* Toast notifications */
+.toast-wrapper {
+    position: fixed;
+    right: 24px;
+    top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 2147483647; /* ensure toasts are on top */
+    max-width: 420px;
+}
+
+.toast-debug {
+    position: fixed;
+    right: 24px;
+    top: 6px;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    z-index: 2147483648;
+}
+
+.toast-item {
+    display: flex;
+    align-items: center;
+    background: var(--finance-surface);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+    padding: 14px 16px;
+    overflow: hidden;
+    position: relative;
+}
+
+.toast-left {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    min-width: 56px;
+    height: 56px;
+    border-radius: 12px 0 0 12px;
+    margin-right: 12px;
+}
+
+.toast-icon svg { color: inherit; }
+
+.toast-body {
+    flex: 1;
+}
+
+.toast-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.toast-message {
+    color: var(--finance-text-muted);
+}
+
+.toast-close {
+    border: 0;
+    background: transparent;
+    color: #999;
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.toast-info .toast-left { background: #e6f3ff; color: #1762a6; }
+.toast-info { border-left: 8px solid #cfe9ff; }
+
+.toast-success .toast-left { background: #e8fbec; color: #2e8b4a; }
+.toast-success { border-left: 8px solid #cfead6; }
+
+.toast-warning .toast-left { background: #fff7e6; color: #b97a00; }
+.toast-warning { border-left: 8px solid #ffefc6; }
+
+.toast-error .toast-left { background: #fdecec; color: #b32a2a; }
+.toast-error { border-left: 8px solid #ffd6d6; }

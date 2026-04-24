@@ -1,0 +1,155 @@
+@page "/attendance-log"
+@rendermode InteractiveServer
+
+<div class="dashboard-shell app-content">
+    <div class="panel-heading">
+        <div>
+            <h1>Attendance Logs</h1>
+            <span>Last 7 days</span>
+        </div>
+    </div>
+
+    <div class="metric-grid" style="margin-top:1rem;display:flex;gap:0;">
+            <div class="metric-card">
+                <span class="metric-label">New</span>
+                <strong>@Metrics.New</strong>
+                <small style="color:var(--finance-text-muted);">+24% since last week</small>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Closed</span>
+                <strong>@Metrics.Closed</strong>
+                <small style="color:var(--finance-text-muted);">-4% since last week</small>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Lost</span>
+                <strong>@Metrics.Lost</strong>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Total</span>
+                <strong>@Metrics.Total</strong>
+            </div>
+        </div>
+
+    <div style="margin-top:1rem;">
+            <div style="display:flex;justify-content:flex-start;align-items:center;margin-bottom:0.6rem;gap:0.5rem;">
+                <button class='btn @(ViewMode=="onsite"?"btn-primary":"btn-outline-secondary")' @onclick='() => SetView("onsite")'>Onsite (Biometric)</button>
+                <button class='btn @(ViewMode=="wfh"?"btn-primary":"btn-outline-secondary")' @onclick='() => SetView("wfh")'>WFH (ETR)</button>
+            </div>
+
+        <div class="panel-card" style="padding:1rem;">
+                <table class="table" style="margin:0;border-collapse:collapse;">
+                    <thead style="background:var(--finance-surface-soft);border-bottom:1px solid var(--finance-border);">
+                        <tr>
+                            <th style="width:40px;"><input type="checkbox" @onclick="ToggleSelectAll" /></th>
+                            <th>Employee</th>
+                            <th>Source</th>
+                            <th>Status</th>
+                            <th>Time</th>
+                            <th>Last Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in FilteredRows)
+                        {
+                            <tr style="border-bottom:1px solid var(--finance-border-soft);">
+                                <td><input type="checkbox" @bind="row.IsSelected" /></td>
+                                <td>
+                                    <div style="font-weight:600;">@row.Name</div>
+                                    <div style="color:var(--finance-text-muted);font-size:0.9rem;">@row.Email</div>
+                                </td>
+                                <td><span class="status-badge" style="background:#f1f1f1;color:#333;border-radius:8px;padding:0.25rem 0.6rem;font-weight:600;">@row.Source</span></td>
+                                <td>
+                                    @if (row.Status == "Present")
+                                    {
+                                        <span class="status-badge status-ok">Present</span>
+                                    }
+                                    else if (row.Status == "Late")
+                                    {
+                                        <span class="status-badge status-warning">Late</span>
+                                    }
+                                    else if (row.Status == "Absent")
+                                    {
+                                        <span class="status-badge status-danger">Absent</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-badge">@row.Status</span>
+                                    }
+                                </td>
+                                <td>@row.Time.ToString("MMM dd, yyyy HH:mm")</td>
+                                <td>@row.LastAction</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+@code {
+    private string filter = string.Empty;
+    private string ViewMode = "onsite";
+    private bool Group = false;
+
+    private List<Row> Rows = new()
+    {
+        new Row("Andy Shepard","a.shepard@gmail.com","Biometric","Present", DateTime.UtcNow.AddHours(-2), "Checked In"),
+        new Row("Emily Thompson","e.thompson@gmail.com","Mobile","Late", DateTime.UtcNow.AddHours(-1), "Marked Late"),
+        new Row("Michael Carter","m.carter@gmail.com","Biometric","Absent", DateTime.UtcNow.AddDays(-1), "No Show"),
+        new Row("David Anderson","d.anderson@gmail.com","Mobile","Present", DateTime.UtcNow.AddHours(-3), "Checked In"),
+        new Row("Lily Hernandez","l.hernandez@gmail.com","Web","On Leave", DateTime.UtcNow.AddDays(-2), "Approved Leave"),
+        new Row("Christopher Wilson","c.wilson@gmail.com","Biometric","Present", DateTime.UtcNow.AddHours(-5), "Checked In"),
+        new Row("Isabella Lopez","i.lopez@gmail.com","Mobile","Late", DateTime.UtcNow.AddHours(-6), "Marked Late"),
+        new Row("Sophia Morgan","s.morgan@gmail.com","Web","Present", DateTime.UtcNow.AddHours(-4), "Checked In"),
+        new Row("John Davis","j.davis@gmail.com","Biometric","Absent", DateTime.UtcNow.AddDays(-3), "No Show"),
+    };
+
+    private (int New, int Closed, int Lost, string Total) Metrics => (New: Rows.Count(r => r.Status == "Present"), Closed: Rows.Count(r => r.Status == "On Leave"), Lost: Rows.Count(r => r.Status == "Absent"), Total: Rows.Count().ToString());
+
+    // simplified metrics required by design
+    // simplified metrics required by design
+    private int TotalEmployees => 125; // TODO: replace with real data
+    private int OnsiteCount => Rows.Count(r => r.Source == "Biometric");
+    private int WfhCount => Rows.Count(r => r.Source == "Web" || r.Source == "Mobile");
+
+    private IEnumerable<Row> FilteredRows => string.IsNullOrWhiteSpace(filter) ? Rows : Rows.Where(r => r.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) || r.Email.Contains(filter, StringComparison.OrdinalIgnoreCase) || r.Source.Contains(filter, StringComparison.OrdinalIgnoreCase) || r.Status.Contains(filter, StringComparison.OrdinalIgnoreCase));
+
+    private void ToggleSelectAll()
+    {
+        var anyUnselected = Rows.Any(r => !r.IsSelected);
+        foreach (var r in Rows) r.IsSelected = anyUnselected;
+    }
+
+    private void CreateNew()
+    {
+        // placeholder for create action
+    }
+
+    private void SetView(string mode)
+    {
+        ViewMode = mode;
+        // TODO: load data depending on selected view (onsite vs wfh) using API or DbContext
+    }
+
+    private class Row
+    {
+        public Row(string name, string email, string source, string status, DateTime time, string lastAction)
+        {
+            Name = name;
+            Email = email;
+            Source = source;
+            Status = status;
+            Time = time;
+            LastAction = lastAction;
+        }
+
+        public bool IsSelected { get; set; }
+        public string Name { get; }
+        public string Email { get; }
+        public string Source { get; }
+        public string Status { get; }
+        public DateTime Time { get; }
+        public string LastAction { get; }
+    }
+}

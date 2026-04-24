@@ -80,6 +80,8 @@ builder.Services.AddScoped<IConstantState, ConstantState>();
 builder.Services.AddScoped<CustomAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
 builder.Services.AddScoped(sp => new HttpClient());
+// Toast notifications (scoped so JS interop can be used per-circuit)
+builder.Services.AddScoped<Financial.Services.IToastService, Financial.Services.ToastService>();
 builder.Services.Configure<Microsoft.AspNetCore.Components.Server.CircuitOptions>(options =>
 {
     options.DetailedErrors = true;

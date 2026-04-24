@@ -1,0 +1,377 @@
+@page "/etr-work-from-home"
+@using Financial.Data
+@using Financial.Model.Dtr
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@inject ProcurementDbContext Db
+@inject IToastService ToastService
+@inject IJSRuntime JS
+@layout BlankLayout
+
+@rendermode InteractiveServer
+
+<PageTitle>Electronic Daily Time Record - Work From Home</PageTitle>
+
+<div class="etr-shell">
+    <div class="etr-card">
+        <h1 class="etr-title">Electronic Daily Time Record - Work From Home</h1>
+        <p class="etr-sub">Please provide your ID number and full name. Choose whether you are timing IN or OUT. If timing OUT, please provide your accomplishments for the day.</p>
+
+        @* Notifications are shown as global toasts *@
+
+        <div class="etr-form-wrap">
+        <EditForm Model="entryModel" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+
+            <div class="form-row">
+                <label class="required-star">ID Number</label>
+                <InputText @bind-Value="entryModel.EmployeeNumber" class="etr-input focus-yellow" disabled="@isSubmitting" />
+                <ValidationMessage For="() => entryModel.EmployeeNumber" />
+            </div>
+
+            <div class="form-row">
+                <label class="required-star">Full Name</label>
+                <InputText @bind-Value="entryModel.FullName" class="etr-input focus-yellow" disabled="@isSubmitting" />
+                <ValidationMessage For="() => entryModel.FullName" />
+            </div>
+
+            <div class="form-row">
+                <label class="required-star">Attendance</label>
+                <div class="options-row">
+                    <label class=@GetOptionClass("IN") tabindex="0" @onclick="() => { if (!isSubmitting) SelectIn(); }">
+                        <div class="opt-title">IN</div>
+                        <div class="opt-sub">Start of work</div>
+                    </label>
+
+                    <label class=@GetOptionClass("OUT") tabindex="0" @onclick="() => { if (!isSubmitting) SelectOut(); }">
+                        <div class="opt-title">OUT</div>
+                        <div class="opt-sub">End of work</div>
+                    </label>
+                </div>
+            </div>
+
+            @if (entryModel.LogType == "OUT")
+            {
+                <div class="form-row">
+                    <label class="required-star">Accomplishment</label>
+                    <InputTextArea @bind-Value="entryModel.Accomplishment" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
+                </div>
+            }
+
+            <div class="form-actions">
+                <button type="submit" class="etr-submit" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner" aria-hidden="true"></span><span>Submitting&#8230;</span>
+                    }
+                    else
+                    {
+                        <span>Submit</span>
+                    }
+                </button>
+            </div>
+        </EditForm>
+
+        @if (isSubmitting)
+        {
+            <div class="loading-overlay" aria-hidden="true">
+                <div class="overlay-content">
+                    <span class="spinner large" aria-hidden="true"></span>
+                    <span class="loading-text">Submitting&#8230;</span>
+                </div>
+            </div>
+        }
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .etr-shell {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff; /* page background white */
+        padding: 2rem;
+    }
+
+    .etr-card {
+        width: min(100%, 520px); /* a bit wider */
+        background: transparent; /* no visible card */
+        padding: 0.8rem 0.9rem;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .etr-title {
+        margin: 0 0 1rem;
+        text-align: center;
+        font-size: clamp(1.75rem, 3.6vw, 2.4rem); /* slightly larger title */
+        font-weight: 800;
+        color: #111827;
+        letter-spacing: -0.02em;
+    }
+
+    .etr-sub {
+        margin: 0 0 0.9rem;
+        color: #6b7280;
+        font-size: 0.9rem; /* slightly smaller */
+        text-align: center;
+    }
+
+    .form-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .etr-input {
+        width: 100%;
+        border: 0;
+        border-radius: 10px;
+        padding: 0.6rem 0.75rem;
+        background: #f3f3f3;
+        color: #1f2937;
+        font-size: 0.9rem; /* smaller text */
+    }
+
+    .etr-textarea {
+        min-height: 100px;
+        padding: 0.6rem 0.75rem;
+        border-radius: 10px;
+        border: 0;
+        background: #f3f3f3;
+        color: #1f2937;
+        font-size: 0.9rem;
+    }
+
+    .radio-row { display:flex; gap:1rem; align-items:center; }
+
+    .options-row { display:flex; gap:0.6rem; }
+    .option-card {
+        border: 1px solid #e6e6e6;
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        min-width: 140px;
+        cursor: pointer;
+        background: #fff;
+    }
+    .option-card .opt-title { font-weight: 700; }
+    .option-card .opt-sub { font-size: 0.82rem; color: #6b7280; }
+    .option-card.selected { border-color: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,0.08); }
+
+    .form-actions { margin-top: 0.9rem; }
+
+    .etr-submit {
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        padding: 0.65rem 0.9rem;
+        background: #ebca4a;
+        color: #111827;
+        font-size: 0.92rem;
+        font-weight: 500;
+    }
+
+    /* simple spinner for submit button */
+    .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(0,0,0,0.12);
+        border-top-color: #111827;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+        vertical-align: middle;
+        animation: spin 0.9s linear infinite;
+    }
+
+    .spinner.large {
+        width: 48px;
+        height: 48px;
+        border-width: 4px;
+        margin-right: 12px;
+    }
+
+    .loading-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(255,255,255,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 60;
+        border-radius: 8px;
+    }
+
+    .overlay-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 1rem 1.25rem;
+        background: rgba(255,255,255,0.95);
+        border-radius: 10px;
+        box-shadow: 0 6px 18px rgba(17,24,39,0.08);
+    }
+
+    .loading-text { font-weight: 600; color: #111827; }
+
+    @@keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .etr-message { margin-bottom: 0.75rem; color: #065f46; }
+
+    /* match login page background */
+    :root {
+        --login-bg: #ffffff;
+    }
+
+    body { background: var(--login-bg); }
+</style>
+
+@code {
+    private bool isSubmitting = false;
+
+    private EtrEntryModel entryModel = new();
+
+    private class EtrEntryModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string EmployeeNumber { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string FullName { get; set; } = string.Empty;
+
+        // "IN" or "OUT"
+        public string LogType { get; set; } = "IN";
+
+        public string Accomplishment { get; set; } = string.Empty;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        isSubmitting = true;
+        StateHasChanged();
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+        // lookup or create employee
+        var emp = await Db.Employees.FirstOrDefaultAsync(e => e.EmployeeNumber == entryModel.EmployeeNumber);
+
+        if (emp == null)
+        {
+            var names = entryModel.FullName?.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+            emp = new Employee
+            {
+                EmployeeNumber = entryModel.EmployeeNumber,
+                FirstName = names.Length > 0 ? names[0] : entryModel.FullName,
+                LastName = names.Length > 1 ? names[1] : string.Empty,
+                DateHired = DateTime.UtcNow,
+            };
+            Db.Employees.Add(emp);
+            await Db.SaveChangesAsync();
+        }
+        else
+        {
+            // update name if changed
+            if (!string.Equals($"{emp.FirstName} {emp.LastName}".Trim(), entryModel.FullName.Trim(), StringComparison.Ordinal))
+            {
+                var names = entryModel.FullName?.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+                emp.FirstName = names.Length > 0 ? names[0] : entryModel.FullName;
+                emp.LastName = names.Length > 1 ? names[1] : string.Empty;
+                Db.Employees.Update(emp);
+                await Db.SaveChangesAsync();
+            }
+        }
+
+        var log = new AttendanceLog
+        {
+            EmployeeId = emp.EmployeeId,
+            LogTime = DateTime.UtcNow,
+            LogType = entryModel.LogType,
+            Source = "ETR",
+            VerificationMode = "Manual",
+            IsSynced = true
+        };
+
+        Db.AttendanceLogs.Add(log);
+
+        if (entryModel.LogType == "OUT" && !string.IsNullOrWhiteSpace(entryModel.Accomplishment))
+        {
+            var issue = new AttendanceIssue
+            {
+                EmployeeId = emp.EmployeeId,
+                AttendanceDate = DateTime.Today,
+                IssueType = "WFH Accomplishment",
+                Severity = "Info",
+                Status = "Recorded",
+                Remarks = entryModel.Accomplishment
+            };
+            Db.AttendanceIssues.Add(issue);
+        }
+
+        await Db.SaveChangesAsync();
+
+        // ensure the submit action takes at least 2 seconds so the user sees the loading animation
+        sw.Stop();
+        var minMs = 2000;
+        var elapsed = sw.ElapsedMilliseconds;
+        if (elapsed < minMs)
+        {
+            await Task.Delay((int)(minMs - elapsed));
+        }
+
+        // show success as toast instead of inline message after minimum delay
+        ToastService.Show(new ToastMessage
+        {
+            Type = ToastType.Success,
+            Title = "Success",
+            Message = "Thank you. Your entry has been recorded.",
+            Duration = 4000
+        });
+
+        // capture a copy of the employee number for logging
+        var submittedEmpNumber = entryModel?.EmployeeNumber ?? emp?.EmployeeNumber ?? string.Empty;
+
+        // write debug marker to browser console to confirm the call path
+        try { await JS.InvokeVoidAsync("console.log", "ETR: ToastService.Show called", submittedEmpNumber); } catch { }
+
+        // also write server-side log so we can see the call in the server output
+        try
+        {
+            Console.WriteLine($"ETR: ToastService.Show called for {submittedEmpNumber}");
+            var count = System.Linq.Enumerable.Count(ToastService.GetAll());
+            Console.WriteLine($"ETR: ToastService queue count={count}");
+        }
+        catch { }
+
+            entryModel = new EtrEntryModel();
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SelectIn()
+    {
+        entryModel.LogType = "IN";
+    }
+
+    private void SelectOut()
+    {
+        entryModel.LogType = "OUT";
+    }
+
+    private string GetOptionClass(string t) => entryModel.LogType == t ? "option-card selected" : "option-card";
+
+
+}

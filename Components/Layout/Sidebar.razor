@@ -67,10 +67,10 @@
     [Parameter]
     public EventCallback<bool> IsOpenChanged { get; set; }
 
-    private readonly List<MenuItem> MainItems = new()
+        private readonly List<MenuItem> MainItems = new()
     {
-        new() { Label = "Dashboard", Url = "/", Icon = "fa-solid fa-house", Match = NavLinkMatch.All },
-        new() { Label = "Attendance Logs", Url = "/Accounting", Icon = "fa-solid fa-clock", Match = NavLinkMatch.Prefix },
+        new() { Label = "Dashboard", Url = "/dashboard", Icon = "fa-solid fa-house", Match = NavLinkMatch.All },
+        new() { Label = "Attendance Logs", Url = "/attendance-log", Icon = "fa-solid fa-clock", Match = NavLinkMatch.Prefix },
         new() { Label = "Employees", Url = "/Budget", Icon = "fa-regular fa-circle-user", Match = NavLinkMatch.Prefix },
         new() { Label = "Devices", Url = "/Cashier", Icon = "fa-solid fa-tablet-screen-button", Match = NavLinkMatch.Prefix },
         new() { Label = "Shifts", Url = "/Procurement", Icon = "fa-regular fa-rectangle-list", Match = NavLinkMatch.Prefix },

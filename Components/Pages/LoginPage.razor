@@ -1,5 +1,8 @@
+@page "/login"
+@layout BlankLayout
 @using Financial.DTO.Auth
 @using Syncfusion.Blazor.Notifications
+@inject Financial.Services.IToastService ToastService
 
 @rendermode InteractiveServer
 
@@ -7,23 +10,20 @@
     <div class="login-card">
         <h1 class="login-title">Welcome Back</h1>
 
-        @if (isError)
-        {
-            <SfMessage CssClass="login-message" Severity="MessageSeverity.Error">@errorMessage</SfMessage>
-        }
+        @* Errors and notifications are shown as global toasts *@
 
         <EditForm EditContext="_editContext" OnValidSubmit="LoginSubmit">
             <DataAnnotationsValidator />
 
             <div class="login-field">
-                <label for="email">Email *</label>
-                <InputText id="email" @bind-Value="_loginDto.Email" class="login-input" placeholder="Enter your Email" />
+                <label for="email" class="required-star">Email</label>
+                <InputText id="email" @bind-Value="_loginDto.Email" class="login-input focus-yellow" placeholder="Enter your Email" />
                 <ValidationMessage For="@(() => _loginDto.Email)" />
             </div>
 
             <div class="login-field">
-                <label for="password">Password *</label>
-                <InputText id="password" @bind-Value="_loginDto.Password" class="login-input" type="password" placeholder="Enter your Password" />
+                <label for="password" class="required-star">Password</label>
+                <InputText id="password" @bind-Value="_loginDto.Password" class="login-input focus-yellow" type="password" placeholder="Enter your Password" />
                 <ValidationMessage For="@(() => _loginDto.Password)" />
             </div>
 
@@ -155,8 +155,10 @@
 
         if (user.Identity?.IsAuthenticated == true)
         {
+            // already authenticated - redirect to dashboard
             _constants.JWTToken = user.Claims.FirstOrDefault(_ => _.Type == "Jwt")?.Value!;
-            NavManager.NavigateTo(NavManager.Uri, false);
+            NavManager.NavigateTo("/dashboard", true);
+            return;
         }
 
         isError = false;
@@ -173,10 +175,10 @@
 
             if (!response.Flag)
             {
-                errorMessage = string.IsNullOrWhiteSpace(response.Message)
+                var msg = string.IsNullOrWhiteSpace(response.Message)
                     ? "A problem occurred while submitting your data"
                     : response.Message;
-                isError = true;
+                ToastService.Show(new Models.ToastMessage { Type = Models.ToastType.Warning, Title = "Warning", Message = msg, Duration = 6000 });
                 return;
             }
 
@@ -184,12 +186,12 @@
             _constants.JWTToken = response.JWTToken;
             StateHasChanged();
 
-            NavManager.NavigateTo("/", forceLoad: true);
+            ToastService.Show(new Models.ToastMessage { Type = Models.ToastType.Success, Title = "Success", Message = "You are logged in.", Duration = 3000 });
+            NavManager.NavigateTo("/dashboard", forceLoad: true);
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
-            isError = true;
+            ToastService.Show(new Models.ToastMessage { Type = Models.ToastType.Error, Title = "Error", Message = ex.Message, Duration = 0 });
         }
     }
 }
