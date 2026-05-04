@@ -1,4 +1,7 @@
 @rendermode InteractiveServer
+@inject Financial.State.CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+@inject Financial.Services.IToastService ToastService
 
 <aside class="finance-sidebar-shell @(IsOpen ? "is-open" : "is-collapsed")" aria-label="main navigation menu">
     <div class="finance-sidebar">
@@ -45,17 +48,33 @@
 
         <div class="finance-sidebar-divider finance-sidebar-divider-bottom"></div>
         <div class="finance-sidebar-bottom">
-            <button type="button"
-                    class="finance-nav-link finance-nav-button finance-settings-link"
-                    title="@SettingsItem.Label">
-                <span class="finance-nav-icon" aria-hidden="true">
-                    <i class="@SettingsItem.Icon"></i>
-                </span>
-                @if (IsOpen)
-                {
-                    <span class="finance-nav-label">@SettingsItem.Label</span>
-                }
-            </button>
+            <div class="finance-settings-wrap">
+                <button type="button"
+                        class="finance-nav-link finance-nav-button finance-settings-link"
+                        title="@SettingsItem.Label">
+                    <span class="finance-nav-icon" aria-hidden="true">
+                        <i class="@SettingsItem.Icon"></i>
+                    </span>
+                    @if (IsOpen)
+                    {
+                        <span class="finance-nav-label">@SettingsItem.Label</span>
+                    }
+                </button>
+
+                <!-- Logout button placed under settings -->
+                <button type="button"
+                        class="finance-nav-link finance-nav-button logout-button"
+                        @onclick="Logout"
+                        title="Logout">
+                    <span class="finance-nav-icon" aria-hidden="true">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </span>
+                    @if (IsOpen)
+                    {
+                        <span class="finance-nav-label">Logout</span>
+                    }
+                </button>
+            </div>
         </div>
     </div>
 </aside>
@@ -70,12 +89,11 @@
         private readonly List<MenuItem> MainItems = new()
     {
         new() { Label = "Dashboard", Url = "/dashboard", Icon = "fa-solid fa-house", Match = NavLinkMatch.All },
-        new() { Label = "Attendance Logs", Url = "/attendance-log", Icon = "fa-solid fa-clock", Match = NavLinkMatch.Prefix },
-        new() { Label = "Employees", Url = "/Budget", Icon = "fa-regular fa-circle-user", Match = NavLinkMatch.Prefix },
-        new() { Label = "Devices", Url = "/Cashier", Icon = "fa-solid fa-tablet-screen-button", Match = NavLinkMatch.Prefix },
-        new() { Label = "Shifts", Url = "/Procurement", Icon = "fa-regular fa-rectangle-list", Match = NavLinkMatch.Prefix },
-        new() { Label = "Exceptions", Url = "/Property", Icon = "fa-solid fa-triangle-exclamation", Match = NavLinkMatch.Prefix },
-        new() { Label = "Users", Url = "/Member", Icon = "fa-solid fa-users", Match = NavLinkMatch.Prefix }
+        new() { Label = "Attendance Logs", Url = "/attendance-logs", Icon = "fa-solid fa-clock", Match = NavLinkMatch.Prefix },
+        new() { Label = "Employees", Url = "/employees", Icon = "fa-regular fa-circle-user", Match = NavLinkMatch.Prefix },
+        new() { Label = "Devices", Url = "/devices", Icon = "fa-solid fa-tablet-screen-button", Match = NavLinkMatch.Prefix },
+        new() { Label = "Exceptions", Url = "/exceptions", Icon = "fa-solid fa-triangle-exclamation", Match = NavLinkMatch.Prefix },
+        new() { Label = "Users", Url = "/users", Icon = "fa-solid fa-users", Match = NavLinkMatch.Prefix }
     };
 
     private readonly MenuItem SettingsItem = new()
@@ -96,5 +114,23 @@
     {
         IsOpen = !IsOpen;
         await IsOpenChanged.InvokeAsync(IsOpen);
+    }
+
+    private void Logout()
+    {
+        try
+        {
+            AuthStateProvider.UpdateAuthenticationState(string.Empty);
+        }
+        catch { }
+
+        try
+        {
+            ToastService.Show(new Models.ToastMessage { Type = Models.ToastType.Information, Title = "Signed out", Message = "You have been logged out.", Duration = 2500 });
+        }
+        catch { }
+
+        // navigate to login and force reload
+        NavManager.NavigateTo("/login", true);
     }
 }

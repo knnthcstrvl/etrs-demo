@@ -1,0 +1,62 @@
+@page "/exceptions"
+@using Financial.Data
+@using Financial.Model.Dtr
+@using Microsoft.EntityFrameworkCore
+@inject ProcurementDbContext Db
+
+<PageTitle>Exceptions</PageTitle>
+
+<section class="panel-card">
+    <div class="panel-heading">
+        <div>
+            <h1>Exception Conditions</h1>
+            <p class="mb-0 text-muted">Reserved table for future exception rules. No seeded data is included.</p>
+        </div>
+    </div>
+
+    @if (conditions.Count == 0)
+    {
+        <div class="empty-state">
+            <strong>No exception conditions yet.</strong>
+            <p class="mb-0 text-muted">The `exceptions_conditions` table is available but intentionally empty.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Condition</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var condition in conditions)
+                    {
+                        <tr>
+                            <td>@condition.ConditionName</td>
+                            <td>@condition.Description</td>
+                            <td><span class="status-badge @(condition.IsActive ? "status-ok" : "status-warning")">@(condition.IsActive ? "Active" : "Inactive")</span></td>
+                            <td>@condition.DateCreated.ToString("MMM dd, yyyy")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private List<ExceptionCondition> conditions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        conditions = await Db.ExceptionConditions
+            .AsNoTracking()
+            .OrderBy(c => c.ConditionName)
+            .ToListAsync();
+    }
+}

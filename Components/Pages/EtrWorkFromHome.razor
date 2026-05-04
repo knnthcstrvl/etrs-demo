@@ -1,11 +1,14 @@
 @page "/etr-work-from-home"
 @using Financial.Data
 @using Financial.Model.Dtr
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
-@using Microsoft.AspNetCore.Authorization
+@using System.ComponentModel.DataAnnotations
+@using System.Text.RegularExpressions
 @inject ProcurementDbContext Db
 @inject IToastService ToastService
-@inject IJSRuntime JS
+@inject IWebHostEnvironment Environment
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @layout BlankLayout
 
 @rendermode InteractiveServer
@@ -14,74 +17,113 @@
 
 <div class="etr-shell">
     <div class="etr-card">
-        <h1 class="etr-title">Electronic Daily Time Record - Work From Home</h1>
-        <p class="etr-sub">Please provide your ID number and full name. Choose whether you are timing IN or OUT. If timing OUT, please provide your accomplishments for the day.</p>
-
-        @* Notifications are shown as global toasts *@
+        <h1 class="etr-title">Electronic<br>Daily Time Record<br>Work From Home</h1>
 
         <div class="etr-form-wrap">
-        <EditForm Model="entryModel" OnValidSubmit="HandleValidSubmit">
-            <DataAnnotationsValidator />
+            <p class="etr-sub">Log your WFH attendance using your employee ID number. Time in records target, while time out records accomplishment and optional MOV upload.</p>
+            <EditForm Model="entryModel" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
 
-            <div class="form-row">
-                <label class="required-star">ID Number</label>
-                <InputText @bind-Value="entryModel.EmployeeNumber" class="etr-input focus-yellow" disabled="@isSubmitting" />
-                <ValidationMessage For="() => entryModel.EmployeeNumber" />
-            </div>
-
-            <div class="form-row">
-                <label class="required-star">Full Name</label>
-                <InputText @bind-Value="entryModel.FullName" class="etr-input focus-yellow" disabled="@isSubmitting" />
-                <ValidationMessage For="() => entryModel.FullName" />
-            </div>
-
-            <div class="form-row">
-                <label class="required-star">Attendance</label>
-                <div class="options-row">
-                    <label class=@GetOptionClass("IN") tabindex="0" @onclick="() => { if (!isSubmitting) SelectIn(); }">
-                        <div class="opt-title">IN</div>
-                        <div class="opt-sub">Start of work</div>
-                    </label>
-
-                    <label class=@GetOptionClass("OUT") tabindex="0" @onclick="() => { if (!isSubmitting) SelectOut(); }">
-                        <div class="opt-title">OUT</div>
-                        <div class="opt-sub">End of work</div>
-                    </label>
-                </div>
-            </div>
-
-            @if (entryModel.LogType == "OUT")
-            {
                 <div class="form-row">
-                    <label class="required-star">Accomplishment</label>
-                    <InputTextArea @bind-Value="entryModel.Accomplishment" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
+                    <label class="required-star">Attendance</label>
+                    <div class="options-row">
+                        <button type="button" class="@GetOptionClass("IN")" @onclick='() => SelectLogType("IN")'>
+                            <span class="option-indicator" aria-hidden="true"></span>
+                            <div class="opt-title">IN</div>
+                            <div class="opt-sub">Start of work</div>
+                        </button>
+
+                        <button type="button" class="@GetOptionClass("OUT")" @onclick='() => SelectLogType("OUT")'>
+                            <span class="option-indicator" aria-hidden="true"></span>
+                            <div class="opt-title">OUT</div>
+                            <div class="opt-sub">End of work</div>
+                        </button>
+                    </div>
                 </div>
-            }
 
-            <div class="form-actions">
-                <button type="submit" class="etr-submit" disabled="@isSubmitting">
-                    @if (isSubmitting)
-                    {
-                        <span class="spinner" aria-hidden="true"></span><span>Submitting&#8230;</span>
-                    }
-                    else
-                    {
-                        <span>Submit</span>
-                    }
-                </button>
-            </div>
-        </EditForm>
+                <div class="form-row">
+                    <label class="required-star">ID Number</label>
+                    <div class="employee-search-wrap">
+                        <div class="employee-search-input-wrap">
+                            <input
+                                value="@employeeSearchText"
+                                @oninput="HandleIdInputChanged"
+                                @onfocus="HandleIdInputFocus"
+                                class="etr-input focus-yellow employee-search-input"
+                                disabled="@isSubmitting"
+                                autocomplete="off" />
+                            <span class="employee-search-icon" aria-hidden="true">Search</span>
+                        </div>
 
-        @if (isSubmitting)
-        {
-            <div class="loading-overlay" aria-hidden="true">
-                <div class="overlay-content">
-                    <span class="spinner large" aria-hidden="true"></span>
-                    <span class="loading-text">Submitting&#8230;</span>
+                        <div class="@GetEmployeeOverlayClass()">
+                            @if (showEmployeeResults)
+                            {
+                                @if (employeeSearchResults.Count == 0)
+                                {
+                                    <div class="employee-empty-state">No Employee Found</div>
+                                }
+                                else
+                                {
+                                    <div class="employee-results-grid">
+                                        @foreach (var employee in employeeSearchResults)
+                                        {
+                                            <button type="button" class="@GetEmployeeResultClass(employee)" @onclick="() => SelectEmployee(employee)">
+                                                <span class="employee-result-id">@employee.IdNumber</span>
+                                                <span class="employee-result-name">@FormatEmployeeName(employee)</span>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                    <ValidationMessage For="() => entryModel.IdNumber" />
                 </div>
-            </div>
-        }
 
+                <div class="@GetSectionClass("IN")" aria-hidden="@(entryModel.LogType != "IN")">
+                <div class="form-row">
+                        <label class="required-star">Target</label>
+                        <div class="full-bleed">
+                            <InputTextArea @bind-Value="entryModel.Target" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
+                        </div>
+                        <ValidationMessage For="() => entryModel.Target" />
+                    </div>
+
+                    <div class="section-spacer" aria-hidden="true"></div>
+                </div>
+
+                <div class="@GetSectionClass("OUT")" aria-hidden="@(entryModel.LogType != "OUT")">
+                    <div class="form-row">
+                        <label class="required-star">Accomplishment</label>
+                        <div class="full-bleed">
+                            <InputTextArea @bind-Value="entryModel.Accomplishment" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
+                        </div>
+                        <ValidationMessage For="() => entryModel.Accomplishment" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Means of Verification</label>
+                        <div class="file-upload-wrap">
+                            <label for="movUpload" class="etr-file-button">Choose File</label>
+                            <InputFile id="movUpload" class="etr-file-input" OnChange="HandleMovSelected" disabled="@isSubmitting" />
+                            <span class="upload-note upload-file-name">@(string.IsNullOrWhiteSpace(entryModel.MovFileName) ? "No file chosen." : entryModel.MovFileName)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="etr-submit" disabled="@IsSubmitDisabled">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner" aria-hidden="true"></span><span>Submitting&#8230;</span>
+                        }
+                        else
+                        {
+                            <span>Submit</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
         </div>
     </div>
 </div>
@@ -92,13 +134,16 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #ffffff; /* page background white */
+        background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('/images/etr-bg.jpg');
+        background-position: center;
+        background-size: cover;
+        background-repeat: no-repeat;
         padding: 2rem;
     }
 
     .etr-card {
-        width: min(100%, 520px); /* a bit wider */
-        background: transparent; /* no visible card */
+        width: min(100%, 560px);
+        background: transparent;
         padding: 0.8rem 0.9rem;
         border: 0;
         border-radius: 0;
@@ -108,17 +153,27 @@
     .etr-title {
         margin: 0 0 1rem;
         text-align: center;
-        font-size: clamp(1.75rem, 3.6vw, 2.4rem); /* slightly larger title */
+        font-size: clamp(1.75rem, 3.6vw, 2.4rem);
         font-weight: 800;
-        color: #111827;
+        color: #ffffff;
         letter-spacing: -0.02em;
     }
 
     .etr-sub {
         margin: 0 0 0.9rem;
-        color: #6b7280;
-        font-size: 0.9rem; /* slightly smaller */
+        color: rgba(255,255,255,0.95);
+        font-size: 0.9rem;
         text-align: center;
+    }
+
+    .etr-form-wrap {
+        padding: 1.15rem;
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08));
+        border: 1px solid rgba(255,255,255,0.2);
+        box-shadow: 0 18px 40px rgba(0,0,0,0.24);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
     }
 
     .form-row {
@@ -126,42 +181,250 @@
         flex-direction: column;
         gap: 0.35rem;
         margin-bottom: 0.75rem;
+        position: relative;
     }
 
-    .etr-input {
+    .form-row label,
+    .required-star,
+    .upload-note {
+        color: #ffffff;
+    }
+
+    .etr-input,
+    .etr-textarea {
         width: 100%;
         border: 0;
         border-radius: 10px;
         padding: 0.6rem 0.75rem;
-        background: #f3f3f3;
-        color: #1f2937;
-        font-size: 0.9rem; /* smaller text */
-    }
-
-    .etr-textarea {
-        min-height: 100px;
-        padding: 0.6rem 0.75rem;
-        border-radius: 10px;
-        border: 0;
-        background: #f3f3f3;
+        box-sizing: border-box;
+        min-width: 0;
+        display: block;
+        background: #ffffff;
         color: #1f2937;
         font-size: 0.9rem;
     }
 
-    .radio-row { display:flex; gap:1rem; align-items:center; }
+    .full-bleed {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+    }
 
-    .options-row { display:flex; gap:0.6rem; }
+    .full-bleed .etr-textarea {
+        min-height: 110px;
+        padding: 0.75rem;
+        line-height: 1.5;
+        border-radius: 10px;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0;
+        background: #ffffff;
+        display: block;
+        resize: vertical;
+    }
+
+    .employee-search-wrap {
+        position: relative;
+    }
+
+    .employee-search-input-wrap {
+        position: relative;
+    }
+
+    .employee-search-input {
+        padding-right: 5.5rem;
+    }
+
+    .employee-search-icon {
+        position: absolute;
+        top: 50%;
+        right: 0.9rem;
+        transform: translateY(-50%);
+        color: #4b5563;
+        font-size: 0.82rem;
+        font-weight: 600;
+        pointer-events: none;
+    }
+
+    .employee-results-overlay {
+        position: absolute;
+        top: calc(100% + 0.45rem);
+        left: 0;
+        right: 0;
+        z-index: 20;
+        padding: 0.8rem;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.96);
+        border: 1px solid rgba(209,213,219,0.9);
+        box-shadow: 0 16px 34px rgba(15,23,42,0.2);
+        max-height: 280px;
+        overflow-y: auto;
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .employee-results-overlay.active {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .employee-results-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.7rem;
+    }
+
+    .employee-result-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        width: 100%;
+        padding: 0.8rem 0.85rem;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #ffffff;
+        text-align: left;
+        color: #111827;
+        opacity: 0;
+        transform: translateY(8px);
+        animation: employee-card-in 0.22s ease forwards;
+    }
+
+    .employee-result-card.selected {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16,185,129,0.14);
+    }
+
+    .employee-result-id {
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .employee-result-name {
+        font-size: 0.78rem;
+        color: #6b7280;
+        line-height: 1.35;
+    }
+
+    .employee-empty-state {
+        padding: 0.5rem 0.15rem;
+        color: #6b7280;
+        font-size: 0.9rem;
+    }
+
+    .transition-panel {
+        overflow: hidden;
+        max-height: 0;
+        opacity: 0;
+        transform: translateY(10px);
+        pointer-events: none;
+        transition: max-height 0.3s ease, opacity 0.25s ease, transform 0.25s ease, margin-bottom 0.3s ease;
+        margin-bottom: 0;
+    }
+
+    .transition-panel.active {
+        max-height: 320px;
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+        margin-bottom: 0.75rem;
+    }
+
+    .section-spacer {
+        height: 0;
+    }
+
+    .options-row { display:flex; gap:0.6rem; width:100%; }
     .option-card {
         border: 1px solid #e6e6e6;
-        padding: 0.5rem 0.75rem;
+        padding: 0.5rem 2.75rem 0.5rem 0.75rem;
         border-radius: 8px;
-        min-width: 140px;
+        flex: 1 1 50%;
+        min-width: 0;
         cursor: pointer;
         background: #fff;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        position: relative;
+        appearance: none;
+        text-align: left;
     }
-    .option-card .opt-title { font-weight: 700; }
-    .option-card .opt-sub { font-size: 0.82rem; color: #6b7280; }
+
+    .option-card .opt-title { font-weight: 700; color: #111827; }
+    .option-card .opt-sub { font-size: 0.82rem; color: #9ca3af; }
     .option-card.selected { border-color: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,0.08); }
+    .option-indicator {
+        position: absolute;
+        top: 50%;
+        right: 0.75rem;
+        width: 18px;
+        height: 18px;
+        border: 2px solid #d1d5db;
+        border-radius: 999px;
+        background: #ffffff;
+        transform: translateY(-50%);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .option-indicator::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border-radius: 999px;
+        background: transparent;
+        transition: background-color 0.15s ease;
+    }
+
+    .option-card.selected .option-indicator {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16,185,129,0.18);
+    }
+
+    .option-card.selected .option-indicator::after {
+        background: #10b981;
+    }
+
+    .file-upload-wrap {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .etr-file-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .etr-file-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.6rem 0.9rem;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #111827 !important;
+        cursor: pointer;
+        font-size: 0.9rem;
+        min-width: 116px;
+    }
+
+    .upload-file-name {
+        color: #ffffff;
+    }
 
     .form-actions { margin-top: 0.9rem; }
 
@@ -176,7 +439,6 @@
         font-weight: 500;
     }
 
-    /* simple spinner for submit button */
     .spinner {
         width: 16px;
         height: 16px;
@@ -189,189 +451,358 @@
         animation: spin 0.9s linear infinite;
     }
 
-    .spinner.large {
-        width: 48px;
-        height: 48px;
-        border-width: 4px;
-        margin-right: 12px;
+    @@keyframes employee-card-in {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
-
-    .loading-overlay {
-        position: absolute;
-        inset: 0;
-        background: rgba(255,255,255,0.8);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 60;
-        border-radius: 8px;
-    }
-
-    .overlay-content {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 1rem 1.25rem;
-        background: rgba(255,255,255,0.95);
-        border-radius: 10px;
-        box-shadow: 0 6px 18px rgba(17,24,39,0.08);
-    }
-
-    .loading-text { font-weight: 600; color: #111827; }
 
     @@keyframes spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
     }
-
-    .etr-message { margin-bottom: 0.75rem; color: #065f46; }
-
-    /* match login page background */
-    :root {
-        --login-bg: #ffffff;
-    }
-
-    body { background: var(--login-bg); }
 </style>
 
 @code {
-    private bool isSubmitting = false;
-
+    private bool isSubmitting;
     private EtrEntryModel entryModel = new();
+    private List<Employee> employeeSearchResults = new();
+    private Employee? selectedEmployee;
+    private bool showEmployeeResults;
+    private string employeeSearchText = string.Empty;
 
     private class EtrEntryModel
+        : IValidatableObject
     {
-        [System.ComponentModel.DataAnnotations.Required]
-        public string EmployeeNumber { get; set; } = string.Empty;
+        [Required]
+        public string IdNumber { get; set; } = string.Empty;
 
-        [System.ComponentModel.DataAnnotations.Required]
-        public string FullName { get; set; } = string.Empty;
-
-        // "IN" or "OUT"
         public string LogType { get; set; } = "IN";
 
+        public string Target { get; set; } = string.Empty;
+
         public string Accomplishment { get; set; } = string.Empty;
+
+        public string MovFileName { get; set; } = string.Empty;
+        public IBrowserFile? MovFile { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (LogType == "IN" && !IsMeaningfulEntry(Target))
+            {
+                yield return new ValidationResult(
+                    "Target must be at least 20 characters and contain meaningful text.",
+                    new[] { nameof(Target) });
+            }
+
+            if (LogType == "OUT" && !IsMeaningfulEntry(Accomplishment))
+            {
+                yield return new ValidationResult(
+                    "Accomplishment must be at least 20 characters and contain meaningful text.",
+                    new[] { nameof(Accomplishment) });
+            }
+        }
     }
+
+    private bool IsSubmitDisabled => isSubmitting || selectedEmployee is null || !string.Equals(entryModel.IdNumber.Trim(), selectedEmployee.IdNumber, StringComparison.OrdinalIgnoreCase);
 
     private async Task HandleValidSubmit()
     {
         isSubmitting = true;
-        StateHasChanged();
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
-        // lookup or create employee
-        var emp = await Db.Employees.FirstOrDefaultAsync(e => e.EmployeeNumber == entryModel.EmployeeNumber);
+            var trimmedId = entryModel.IdNumber.Trim();
+            var employee = selectedEmployee;
 
-        if (emp == null)
-        {
-            var names = entryModel.FullName?.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
-            emp = new Employee
+            if (employee is null || !string.Equals(employee.IdNumber, trimmedId, StringComparison.OrdinalIgnoreCase))
             {
-                EmployeeNumber = entryModel.EmployeeNumber,
-                FirstName = names.Length > 0 ? names[0] : entryModel.FullName,
-                LastName = names.Length > 1 ? names[1] : string.Empty,
-                DateHired = DateTime.UtcNow,
-            };
-            Db.Employees.Add(emp);
-            await Db.SaveChangesAsync();
-        }
-        else
-        {
-            // update name if changed
-            if (!string.Equals($"{emp.FirstName} {emp.LastName}".Trim(), entryModel.FullName.Trim(), StringComparison.Ordinal))
-            {
-                var names = entryModel.FullName?.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
-                emp.FirstName = names.Length > 0 ? names[0] : entryModel.FullName;
-                emp.LastName = names.Length > 1 ? names[1] : string.Empty;
-                Db.Employees.Update(emp);
-                await Db.SaveChangesAsync();
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = "Select employee",
+                    Message = "Choose an employee from the search results before submitting.",
+                    Duration = 4000
+                });
+                return;
             }
-        }
 
-        var log = new AttendanceLog
-        {
-            EmployeeId = emp.EmployeeId,
-            LogTime = DateTime.UtcNow,
-            LogType = entryModel.LogType,
-            Source = "ETR",
-            VerificationMode = "Manual",
-            IsSynced = true
-        };
+            var today = DateTime.Today;
+            var now = DateTime.Now;
+            var log = await Db.AttendanceLogsWfh.FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == today);
 
-        Db.AttendanceLogs.Add(log);
-
-        if (entryModel.LogType == "OUT" && !string.IsNullOrWhiteSpace(entryModel.Accomplishment))
-        {
-            var issue = new AttendanceIssue
+            if (log is null)
             {
-                EmployeeId = emp.EmployeeId,
-                AttendanceDate = DateTime.Today,
-                IssueType = "WFH Accomplishment",
-                Severity = "Info",
-                Status = "Recorded",
-                Remarks = entryModel.Accomplishment
-            };
-            Db.AttendanceIssues.Add(issue);
-        }
+                log = new AttendanceLogWfh
+                {
+                    EmployeeId = employee.EmployeeId,
+                    AttendanceDate = today,
+                    IdNumber = employee.IdNumber,
+                    LastName = employee.LastName,
+                    FirstName = employee.FirstName,
+                    MiddleName = employee.MiddleName,
+                    DivisionCenterUnit = employee.DivisionCenterUnit,
+                    Designation = employee.Designation
+                };
+                Db.AttendanceLogsWfh.Add(log);
+            }
 
-        await Db.SaveChangesAsync();
+            if (entryModel.LogType == "IN")
+            {
+                // Prevent multiple time-in records for the same day
+                if (log.TimeIn.HasValue)
+                {
+                    ToastService.Show(new ToastMessage
+                    {
+                        Type = ToastType.Warning,
+                        Title = "Already clocked in",
+                        Message = "You have already recorded time IN for today.",
+                        Duration = 4000
+                    });
+                    return;
+                }
 
-        // ensure the submit action takes at least 2 seconds so the user sees the loading animation
-        sw.Stop();
-        var minMs = 2000;
-        var elapsed = sw.ElapsedMilliseconds;
-        if (elapsed < minMs)
-        {
-            await Task.Delay((int)(minMs - elapsed));
-        }
+                log.TimeIn = now;
+                log.Target = entryModel.Target.Trim();
+            }
+            else
+            {
+                // Prevent multiple time-out records for the same day
+                if (log.TimeOut.HasValue)
+                {
+                    ToastService.Show(new ToastMessage
+                    {
+                        Type = ToastType.Warning,
+                        Title = "Already clocked out",
+                        Message = "You have already recorded time OUT for today.",
+                        Duration = 4000
+                    });
+                    return;
+                }
 
-        // show success as toast instead of inline message after minimum delay
-        ToastService.Show(new ToastMessage
-        {
-            Type = ToastType.Success,
-            Title = "Success",
-            Message = "Thank you. Your entry has been recorded.",
-            Duration = 4000
-        });
+                log.TimeOut = now;
+                log.Accomplishment = entryModel.Accomplishment.Trim();
+                log.Mov = await SaveMovFileAsync(entryModel.MovFile) ?? log.Mov;
+            }
 
-        // capture a copy of the employee number for logging
-        var submittedEmpNumber = entryModel?.EmployeeNumber ?? emp?.EmployeeNumber ?? string.Empty;
+            log.Tardiness = CalculateWfhTardiness(log.TimeIn);
 
-        // write debug marker to browser console to confirm the call path
-        try { await JS.InvokeVoidAsync("console.log", "ETR: ToastService.Show called", submittedEmpNumber); } catch { }
+            await Db.SaveChangesAsync();
 
-        // also write server-side log so we can see the call in the server output
-        try
-        {
-            Console.WriteLine($"ETR: ToastService.Show called for {submittedEmpNumber}");
-            var count = System.Linq.Enumerable.Count(ToastService.GetAll());
-            Console.WriteLine($"ETR: ToastService queue count={count}");
-        }
-        catch { }
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Success,
+                Title = "Saved",
+                Message = $"WFH time {entryModel.LogType} recorded for {employee.FirstName} {employee.LastName}.",
+                Duration = 3500
+            });
 
             entryModel = new EtrEntryModel();
+            selectedEmployee = null;
+            employeeSearchResults.Clear();
+            employeeSearchText = string.Empty;
+            showEmployeeResults = false;
         }
         finally
         {
             isSubmitting = false;
-            StateHasChanged();
         }
     }
 
-    private void SelectIn()
+    private async Task HandleIdInputChanged(ChangeEventArgs e)
     {
-        entryModel.LogType = "IN";
+        employeeSearchText = e.Value?.ToString() ?? string.Empty;
+
+        if (!string.Equals(selectedEmployee?.IdNumber, employeeSearchText.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            selectedEmployee = null;
+            entryModel.IdNumber = employeeSearchText;
+        }
+
+        await SearchEmployeesAsync(employeeSearchText);
     }
 
-    private void SelectOut()
+    private async Task HandleIdInputFocus(FocusEventArgs _)
     {
-        entryModel.LogType = "OUT";
+        await SearchEmployeesAsync(selectedEmployee is null ? employeeSearchText : entryModel.IdNumber);
     }
 
-    private string GetOptionClass(string t) => entryModel.LogType == t ? "option-card selected" : "option-card";
+    private async Task HandleMovSelected(InputFileChangeEventArgs e)
+    {
+        entryModel.MovFile = e.File;
+        entryModel.MovFileName = e.File?.Name ?? string.Empty;
+    }
 
+    private string GetOptionClass(string type) => entryModel.LogType == type ? "option-card selected" : "option-card";
 
+    private string GetEmployeeResultClass(Employee employee)
+        => selectedEmployee?.EmployeeId == employee.EmployeeId ? "employee-result-card selected" : "employee-result-card";
+
+    private string GetEmployeeOverlayClass()
+        => showEmployeeResults ? "employee-results-overlay active" : "employee-results-overlay";
+
+    private string GetSectionClass(string type) => entryModel.LogType == type ? "transition-panel active" : "transition-panel";
+
+    private void SelectLogType(string type) => entryModel.LogType = type;
+
+    private async Task SearchEmployeesAsync(string? searchText)
+    {
+        var query = (searchText ?? string.Empty).Trim();
+        showEmployeeResults = query.Length >= 3;
+
+        if (!showEmployeeResults)
+        {
+            employeeSearchResults.Clear();
+            return;
+        }
+
+        employeeSearchResults = await Db.Employees
+            .AsNoTracking()
+            .Where(e => e.IdNumber.Contains(query))
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .Take(12)
+            .ToListAsync();
+    }
+
+    private void SelectEmployee(Employee employee)
+    {
+        selectedEmployee = employee;
+        entryModel.IdNumber = employee.IdNumber;
+        employeeSearchText = $"{employee.IdNumber} - {FormatEmployeeName(employee)}";
+        showEmployeeResults = false;
+    }
+
+    private static string FormatEmployeeName(Employee employee)
+    {
+        var middleInitial = string.IsNullOrWhiteSpace(employee.MiddleName) ? string.Empty : $" {employee.MiddleName.Trim()[0]}.";
+        return $"{employee.FirstName} {employee.LastName}{middleInitial}";
+    }
+
+    private static bool IsMeaningfulEntry(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = Regex.Replace(value.Trim(), "\\s+", " ");
+        if (normalized.Length < 20)
+        {
+            return false;
+        }
+
+        var alphaNumericCount = normalized.Count(char.IsLetterOrDigit);
+        var hasLetter = normalized.Any(char.IsLetter);
+
+        return hasLetter && alphaNumericCount >= 10;
+    }
+
+    private async Task<string?> SaveMovFileAsync(IBrowserFile? file)
+    {
+        if (file is null)
+        {
+            return null;
+        }
+        // Read configured upload path from appsettings (e.g. a NAS UNC path)
+        var configuredPath = Configuration["Uploads:WfhMovPath"];
+
+        var safeName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Path.GetFileName(file.Name)}";
+
+        async Task<string?> WriteToPathAsync(string root, bool returnWebRelative)
+        {
+            try
+            {
+                var uploadsRootResolved = Path.IsPathRooted(root) ? root : Path.Combine(Environment.ContentRootPath, root);
+                Directory.CreateDirectory(uploadsRootResolved);
+
+                var fullPath = Path.Combine(uploadsRootResolved, safeName);
+
+                await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+                await using var fileStream = File.Create(fullPath);
+                await stream.CopyToAsync(fileStream);
+
+                if (returnWebRelative)
+                {
+                    var wwwroot = Environment.WebRootPath ?? string.Empty;
+                    var relative = Path.GetRelativePath(wwwroot, fullPath).Replace('\\', '/');
+                    return "/" + relative;
+                }
+
+                return fullPath;
+            }
+            catch (Exception ex)
+            {
+                // Let caller decide fallback; log toast to inform user
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Error,
+                    Title = "File upload failed",
+                    Message = $"Could not save MOV to '{root}': {ex.Message}",
+                    Duration = 6000
+                });
+
+                return null;
+            }
+        }
+
+        // Try configured path first
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            var result = await WriteToPathAsync(configuredPath, false);
+            if (!string.IsNullOrWhiteSpace(result))
+            {
+                return result;
+            }
+
+            // fallback to wwwroot/uploads/wfh-mov if configured path failed
+            var fallback = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
+            var fallbackResult = await WriteToPathAsync(fallback, true);
+            return fallbackResult;
+        }
+
+        // No configured path: write under wwwroot/uploads/wfh-mov and return web relative path
+        var defaultRoot = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
+        return await WriteToPathAsync(defaultRoot, true);
+    }
+
+    private static string CalculateWfhTardiness(DateTime? timeIn)
+    {
+        if (timeIn is null)
+        {
+            return string.Empty;
+        }
+
+        var workDate = timeIn.Value.Date;
+        var shiftStart = workDate.AddHours(8);
+        if (timeIn <= shiftStart)
+        {
+            return "On time";
+        }
+
+        var lunchStart = workDate.AddHours(12);
+        var lunchEnd = workDate.AddHours(13);
+        var lateMinutes = (int)Math.Round((timeIn.Value - shiftStart).TotalMinutes);
+
+        if (timeIn > lunchStart)
+        {
+            var deductedLunchMinutes = (int)Math.Round((Min(timeIn.Value, lunchEnd) - lunchStart).TotalMinutes);
+            lateMinutes -= Math.Max(deductedLunchMinutes, 0);
+        }
+
+        lateMinutes = Math.Max(lateMinutes, 0);
+        if (lateMinutes == 0)
+        {
+            return "On time";
+        }
+
+        return $"{lateMinutes} minute(s) late";
+    }
+
+    private static DateTime Min(DateTime left, DateTime right) => left <= right ? left : right;
 }

@@ -1,0 +1,217 @@
+@page "/dashboard"
+@using Financial.Data
+@using Financial.Model.Dtr
+@using Microsoft.EntityFrameworkCore
+@inject ProcurementDbContext Db
+
+<PageTitle>ETRS Dashboard</PageTitle>
+
+<div class="dashboard-shell">
+    <div class="dashboard-hero hero-course">
+        <div class="hero-left">
+            <div class="hero-label">Overview</div>
+            <h1>ETRS Dashboard</h1>
+        </div>
+        <div class="hero-right" aria-hidden="true"></div>
+    </div>
+
+    <div class="metric-grid dashboard-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Employees</span>
+            <strong>@employeeCount</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Onsite Logs Today</span>
+            <strong>@onsiteLogsToday</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">WFH Logs Today</span>
+            <strong>@wfhLogsToday</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Devices</span>
+            <strong>@activeDevices / @deviceCount</strong>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <section class="panel-card">
+            <div class="panel-heading">
+                <h2>Recent Onsite Logs</h2>
+                <span>Latest @recentOnsiteLogs.Count records</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle dashboard-log-table">
+                    <thead>
+                        <tr>
+                            <th>ID Number</th>
+                            <th>Employee</th>
+                            <th>AM</th>
+                            <th>PM</th>
+                            <th>Tardiness</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in recentOnsiteLogs)
+                        {
+                            <tr>
+                                <td>@log.IdNumber</td>
+                                <td>@FormatName(log.LastName, log.FirstName, log.MiddleName)</td>
+                                <td style="white-space:pre-line;">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</td>
+                                <td style="white-space:pre-line;">@FormatTimeRange(log.TimeInPm, log.TimeOutPm)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.Tardiness) ? "-" : log.Tardiness)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel-card">
+            <div class="panel-heading">
+                <h2>Recent WFH Logs</h2>
+                <span>Latest @recentWfhLogs.Count records</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle dashboard-log-table dashboard-log-table-wfh">
+                    <thead>
+                        <tr>
+                            <th>ID Number</th>
+                            <th>Employee</th>
+                            <th>Target</th>
+                            <th>MOV</th>
+                            <th>Time In</th>
+                            <th>Time Out</th>
+                            <th>Tardiness</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in recentWfhLogs)
+                        {
+                            <tr>
+                                <td>@log.IdNumber</td>
+                                <td>@FormatName(log.LastName, log.FirstName, log.MiddleName)</td>
+                                <td>@DisplayValue(log.Target)</td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(log.Mov))
+                                    {
+                                        <span>-</span>
+                                    }
+                                    else
+                                    {
+                                        <a href="@log.Mov" target="_blank">File</a>
+                                    }
+                                </td>
+                                <td style="white-space:pre-line;">@FormatTime(log.TimeIn)</td>
+                                <td style="white-space:pre-line;">@FormatTime(log.TimeOut)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.Tardiness) ? "-" : log.Tardiness)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel-card">
+            <div class="panel-heading">
+                <h2>Biometric Devices</h2>
+                <span>Current inventory</span>
+            </div>
+            @foreach (var device in devices)
+            {
+                <div class="device-row">
+                    <div>
+                        <strong>@device.DeviceName</strong>
+                        <div>@device.Location</div>
+                    </div>
+                    <div class="text-end">
+                        <span class="status-badge @(device.Status == "Active" ? "status-ok" : "status-warning")">@device.Status</span>
+                        <div class="text-muted small">@device.SerialNumber</div>
+                    </div>
+                </div>
+            }
+        </section>
+    </div>
+</div>
+
+<style>
+    .dashboard-log-table {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    .dashboard-log-table th,
+    .dashboard-log-table td {
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        vertical-align: top;
+    }
+
+    .dashboard-log-table-wfh th:nth-child(3),
+    .dashboard-log-table-wfh td:nth-child(3) {
+        width: 26%;
+    }
+
+    .dashboard-log-table-wfh th:nth-child(5),
+    .dashboard-log-table-wfh td:nth-child(5),
+    .dashboard-log-table-wfh th:nth-child(6),
+    .dashboard-log-table-wfh td:nth-child(6) {
+        width: 13%;
+    }
+</style>
+
+@code {
+    private int employeeCount;
+    private int onsiteLogsToday;
+    private int wfhLogsToday;
+    private int deviceCount;
+    private int activeDevices;
+    private List<AttendanceLog> recentOnsiteLogs = new();
+    private List<AttendanceLogWfh> recentWfhLogs = new();
+    private List<BiometricDevice> devices = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateTime.Today;
+
+        employeeCount = await Db.Employees.CountAsync();
+        onsiteLogsToday = await Db.AttendanceLogs.CountAsync(l => l.AttendanceDate == today);
+        wfhLogsToday = await Db.AttendanceLogsWfh.CountAsync(l => l.AttendanceDate == today);
+        deviceCount = await Db.BiometricDevices.CountAsync();
+        activeDevices = await Db.BiometricDevices.CountAsync(d => d.Status == "Active");
+
+        recentOnsiteLogs = await Db.AttendanceLogs
+            .AsNoTracking()
+            .OrderByDescending(l => l.AttendanceDate)
+            .ThenBy(l => l.LastName)
+            .Take(6)
+            .ToListAsync();
+
+        recentWfhLogs = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .OrderByDescending(l => l.AttendanceDate)
+            .ThenBy(l => l.LastName)
+            .Take(6)
+            .ToListAsync();
+
+        devices = await Db.BiometricDevices
+            .AsNoTracking()
+            .OrderBy(d => d.DeviceName)
+            .Take(5)
+            .ToListAsync();
+    }
+
+    private static string FormatName(string lastName, string firstName, string middleName)
+    {
+        var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
+        return $"{lastName}, {firstName}{middleInitial}";
+    }
+
+    private static string FormatTime(DateTime? value) => value?.ToString("MMM dd, yyyy\nhh:mm tt") ?? "-";
+
+    private static string FormatTimeRange(DateTime? start, DateTime? end)
+        => $"{(start?.ToString("hh:mm tt") ?? "-")} / {(end?.ToString("hh:mm tt") ?? "-")}";
+
+    private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+}

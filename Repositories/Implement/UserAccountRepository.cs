@@ -4,7 +4,6 @@ using Financial.DTO.Auth;
 using Financial.Model;
 using Financial.Repositories.Interface;
 using Financial.Responses;
-using HarfBuzzSharp;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -57,7 +56,7 @@ namespace Financial.Repositories.Implement
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
             var userClaims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, user.AccountId.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.UserAccountId.ToString()),
                 new Claim("FirstName", user.FirstName),
                 new Claim("LastName", user.LastName),
                 new Claim(ClaimTypes.Email, user.Email!),
@@ -94,8 +93,10 @@ namespace Financial.Repositories.Implement
                     FirstName = model.FirstName,
                     LastName = model.LastName,
                     Email = model.Email,
+                    Username = model.Email,
                     Password = BCrypt.Net.BCrypt.HashPassword(model.Password),
-                    IsActive = true
+                    IsActive = true,
+                    DateCreated = DateTime.UtcNow
                 });
 
             await _context.SaveChangesAsync();

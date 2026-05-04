@@ -1,0 +1,67 @@
+@page "/users"
+@using Financial.Data
+@using Financial.Model
+@using Microsoft.EntityFrameworkCore
+@inject ProcurementDbContext Db
+
+<PageTitle>Users</PageTitle>
+
+<section class="panel-card">
+    <div class="panel-heading">
+        <div>
+            <h1>System Users</h1>
+            <p class="mb-0 text-muted">Application users stored in the new `users` table.</p>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Division / Unit</th>
+                    <th>Designation</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in users)
+                {
+                    <tr>
+                        <td>@FormatName(user.LastName, user.FirstName, user.MiddleName)</td>
+                        <td>@user.Username</td>
+                        <td>@user.Email</td>
+                        <td>@user.Role</td>
+                        <td>@user.DivisionCenterUnit</td>
+                        <td>@user.Designation</td>
+                        <td><span class="status-badge @(user.IsActive ? "status-ok" : "status-danger")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                        <td>@user.DateCreated.ToString("MMM dd, yyyy")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private List<UserAccount> users = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = await Db.UserAccounts
+            .AsNoTracking()
+            .OrderBy(u => u.LastName)
+            .ThenBy(u => u.FirstName)
+            .ToListAsync();
+    }
+
+    private static string FormatName(string lastName, string firstName, string middleName)
+    {
+        var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
+        return $"{lastName}, {firstName}{middleInitial}";
+    }
+}

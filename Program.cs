@@ -131,8 +131,10 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = scope.ServiceProvider.GetRequiredService<ProcurementDbContext>();
-        db.Database.Migrate();
-        await DtrDataSeeder.SeedAsync(db);
+        db.Database.EnsureCreated();
+        await DatabaseSchemaUpdater.EnsureAttendanceLogWfhColumnsAsync(db);
+        await UserAccountSeeder.SeedAdminAsync(db);
+        await EmployeeSeeder.SeedAsync(db);
     }
     catch (Exception ex)
     {

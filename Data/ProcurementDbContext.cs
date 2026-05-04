@@ -14,36 +14,25 @@ namespace Financial.Data
         {
         }
 
-        // Library
         public DbSet<Supplier> Suppliers { get; set; }
         public DbSet<ProcurementMode> ProcurementModes { get; set; }
         public DbSet<ProcurementType> ProcurementTypes { get; set; }
         public DbSet<FundCluster> FundClusters { get; set; }
         public DbSet<PaymentMode> PaymentModes { get; set; }
-
-        // Core
         public DbSet<Transaction> Transactions { get; set; }
-
-        // Modules
         public DbSet<Procurement> Procurements { get; set; }
         public DbSet<Budget> Budgets { get; set; }
         public DbSet<Property> Properties { get; set; }
         public DbSet<Accounting> Accountings { get; set; }
         public DbSet<Cashier> Cashiers { get; set; }
-
-        // Trace/Docu
         public DbSet<Document> Documents { get; set; }
         public DbSet<StatusHistory> StatusHistories { get; set; }
-
-        // User Account
         public DbSet<UserAccount> UserAccounts { get; set; }
-
-        // DTR
         public DbSet<Employee> Employees { get; set; }
         public DbSet<BiometricDevice> BiometricDevices { get; set; }
         public DbSet<AttendanceLog> AttendanceLogs { get; set; }
-        public DbSet<ShiftSchedule> ShiftSchedules { get; set; }
-        public DbSet<AttendanceIssue> AttendanceIssues { get; set; }
+        public DbSet<AttendanceLogWfh> AttendanceLogsWfh { get; set; }
+        public DbSet<ExceptionCondition> ExceptionConditions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -104,12 +93,20 @@ namespace Financial.Data
                 .HasIndex(p => p.PaymentModeName)
                 .IsUnique();
 
+            modelBuilder.Entity<UserAccount>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
+
+            modelBuilder.Entity<UserAccount>()
+                .HasIndex(u => u.Username)
+                .IsUnique();
+
             modelBuilder.Entity<Employee>()
-                .HasIndex(e => e.EmployeeNumber)
+                .HasIndex(e => e.IdNumber)
                 .IsUnique();
 
             modelBuilder.Entity<BiometricDevice>()
-                .HasIndex(d => d.DeviceCode)
+                .HasIndex(d => d.SerialNumber)
                 .IsUnique();
 
             modelBuilder.Entity<AttendanceLog>()
@@ -124,17 +121,17 @@ namespace Financial.Data
                 .HasForeignKey(l => l.BiometricDeviceId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            modelBuilder.Entity<ShiftSchedule>()
-                .HasOne(s => s.Employee)
-                .WithMany(e => e.ShiftSchedules)
-                .HasForeignKey(s => s.EmployeeId)
+            modelBuilder.Entity<AttendanceLogWfh>()
+                .HasOne(l => l.Employee)
+                .WithMany(e => e.AttendanceLogsWfh)
+                .HasForeignKey(l => l.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<AttendanceIssue>()
-                .HasOne(i => i.Employee)
-                .WithMany(e => e.AttendanceIssues)
-                .HasForeignKey(i => i.EmployeeId)
-                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<AttendanceLog>()
+                .HasIndex(l => new { l.EmployeeId, l.AttendanceDate });
+
+            modelBuilder.Entity<AttendanceLogWfh>()
+                .HasIndex(l => new { l.EmployeeId, l.AttendanceDate });
         }
     }
 }

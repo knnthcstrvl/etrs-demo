@@ -1,0 +1,61 @@
+@page "/employees"
+@using Financial.Data
+@using Financial.Model.Dtr
+@using Microsoft.EntityFrameworkCore
+@inject ProcurementDbContext Db
+
+<PageTitle>Employees</PageTitle>
+
+<section class="panel-card">
+    <div class="panel-heading">
+        <div>
+            <h1>Employees</h1>
+            <p class="mb-0 text-muted">Employee roster mapped to the new `employees` table.</p>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>ID Number</th>
+                    <th>Name</th>
+                    <th>Division / Unit</th>
+                    <th>Designation</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var employee in employees)
+                {
+                    <tr>
+                        <td>@employee.IdNumber</td>
+                        <td>@FormatName(employee.LastName, employee.FirstName, employee.MiddleName)</td>
+                        <td>@employee.DivisionCenterUnit</td>
+                        <td>@employee.Designation</td>
+                        <td><span class="status-badge @(employee.Status == "Active" ? "status-ok" : "status-warning")">@employee.Status</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private List<Employee> employees = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        employees = await Db.Employees
+            .AsNoTracking()
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .ToListAsync();
+    }
+
+    private static string FormatName(string lastName, string firstName, string middleName)
+    {
+        var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
+        return $"{lastName}, {firstName}{middleInitial}";
+    }
+}

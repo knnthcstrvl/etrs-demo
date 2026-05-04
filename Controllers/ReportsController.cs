@@ -9,10 +9,12 @@ namespace Financial.Controllers
     public class ReportsController : ControllerBase
     {
         private readonly IReportingService _service;
+        private readonly IWebHostEnvironment _env;
 
         public ReportsController(IReportingService service)
         {
             _service = service;
+            _env = null!;
         }
 
         [HttpGet("procurement-aging")]

@@ -13,19 +13,32 @@ namespace Financial.Model.Dtr
         public int? BiometricDeviceId { get; set; }
         public BiometricDevice? BiometricDevice { get; set; }
 
-        public DateTime LogTime { get; set; }
-
-        [MaxLength(20)]
-        public string LogType { get; set; } = string.Empty;
-
         [MaxLength(30)]
-        public string Source { get; set; } = "Biometric";
+        public string IdNumber { get; set; } = string.Empty;
 
-        [MaxLength(30)]
-        public string VerificationMode { get; set; } = string.Empty;
+        [MaxLength(100)]
+        public string LastName { get; set; } = string.Empty;
 
-        public bool IsSynced { get; set; } = true;
+        [MaxLength(100)]
+        public string FirstName { get; set; } = string.Empty;
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        [MaxLength(100)]
+        public string MiddleName { get; set; } = string.Empty;
+
+        [MaxLength(150)]
+        public string DivisionCenterUnit { get; set; } = string.Empty;
+
+        [MaxLength(150)]
+        public string Designation { get; set; } = string.Empty;
+
+        public DateTime? TimeInAm { get; set; }
+        public DateTime? TimeOutAm { get; set; }
+        public DateTime? TimeInPm { get; set; }
+        public DateTime? TimeOutPm { get; set; }
+
+        [MaxLength(50)]
+        public string Tardiness { get; set; } = string.Empty;
+
+        public DateTime AttendanceDate { get; set; } = DateTime.Today;
     }
 }

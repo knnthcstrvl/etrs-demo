@@ -17,6 +17,29 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<Compile Remove="bin\**\*.cs" />
+		<Compile Remove="obj\**\*.cs" />
+		<Compile Remove="artifacts\**\*.cs" />
+		<Compile Remove="build-temp\**\*.cs" />
+		<Compile Remove="build-verify\**\*.cs" />
+		<EmbeddedResource Remove="bin\**" />
+		<EmbeddedResource Remove="obj\**" />
+		<EmbeddedResource Remove="artifacts\**" />
+		<EmbeddedResource Remove="build-temp\**" />
+		<EmbeddedResource Remove="build-verify\**" />
+		<Content Remove="bin\**" />
+		<Content Remove="obj\**" />
+		<Content Remove="artifacts\**" />
+		<Content Remove="build-temp\**" />
+		<Content Remove="build-verify\**" />
+		<None Remove="bin\**" />
+		<None Remove="obj\**" />
+		<None Remove="artifacts\**" />
+		<None Remove="build-temp\**" />
+		<None Remove="build-verify\**" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
 		<PackageReference Include="Mapster" Version="7.4.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
@@ -50,6 +73,7 @@
 		<PackageReference Include="Syncfusion.Blazor.SfPdfViewer" Version="32.1.20" />
 		<PackageReference Include="Syncfusion.Blazor.Spinner" Version="32.1.20" />
 		<PackageReference Include="Syncfusion.Blazor.Themes" Version="32.1.20" />
+        <PackageReference Include="QuestPDF" Version="2024.3.0" />
 	</ItemGroup>
 
 	<PropertyGroup>

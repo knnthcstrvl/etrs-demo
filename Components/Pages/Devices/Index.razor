@@ -1,0 +1,52 @@
+@page "/devices"
+@using Financial.Data
+@using Financial.Model.Dtr
+@using Microsoft.EntityFrameworkCore
+@inject ProcurementDbContext Db
+
+<PageTitle>Devices</PageTitle>
+
+<section class="panel-card">
+    <div class="panel-heading">
+        <div>
+            <h1>Biometric Devices</h1>
+            <p class="mb-0 text-muted">Device inventory from the new `biometric_devices` table.</p>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Device Name</th>
+                    <th>Serial Number</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var device in devices)
+                {
+                    <tr>
+                        <td>@device.DeviceName</td>
+                        <td>@device.SerialNumber</td>
+                        <td>@device.Location</td>
+                        <td><span class="status-badge @(device.Status == "Active" ? "status-ok" : "status-warning")">@device.Status</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private List<BiometricDevice> devices = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        devices = await Db.BiometricDevices
+            .AsNoTracking()
+            .OrderBy(d => d.DeviceName)
+            .ToListAsync();
+    }
+}

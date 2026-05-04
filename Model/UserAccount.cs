@@ -1,20 +1,42 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Financial.Model
 {
     public class UserAccount
     {
         [Key]
-        public Guid AccountId { get; set; }
-        public string Email { get; set; } = string.Empty;
-        public string FirstName { get; set; } = string.Empty;
-        public string LastName { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public string Role { get; set; } = "User";
-        public string Office { get; set; } = string.Empty;
-        public string RefreshToken { get; set; } = string.Empty;
-        public DateTime DateCreated { get; set; } = DateTime.Now;
-        public bool IsActive { get; set; } = true;
+        public int UserAccountId { get; set; }
 
+        [MaxLength(100)]
+        public string LastName { get; set; } = string.Empty;
+
+        [MaxLength(100)]
+        public string FirstName { get; set; } = string.Empty;
+
+        [MaxLength(100)]
+        public string MiddleName { get; set; } = string.Empty;
+
+        [MaxLength(150)]
+        public string Email { get; set; } = string.Empty;
+
+        [MaxLength(100)]
+        public string Username { get; set; } = string.Empty;
+
+        public string Password { get; set; } = string.Empty;
+
+        [MaxLength(50)]
+        public string Role { get; set; } = "User";
+
+        [MaxLength(150)]
+        public string DivisionCenterUnit { get; set; } = string.Empty;
+
+        [MaxLength(150)]
+        public string Designation { get; set; } = string.Empty;
+
+        public string RememberToken { get; set; } = string.Empty;
+
+        public bool IsActive { get; set; } = true;
+        public DateTime DateCreated { get; set; } = DateTime.UtcNow;
+        public DateTime? DateUpdated { get; set; }
     }
 }

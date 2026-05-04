@@ -1,0 +1,374 @@
+@page "/attendance-logs"
+@using Financial.Data
+@using Financial.Model.Dtr
+@using Microsoft.EntityFrameworkCore
+@inject ProcurementDbContext Db
+
+@rendermode InteractiveServer
+
+<div class="dashboard-shell app-content">
+    <div class="panel-heading">
+        <div>
+            <h1>Attendance Logs</h1>
+            <span>Onsite and work-from-home records</span>
+        </div>
+    </div>
+
+    <div class="metric-grid" style="margin-top:1rem;display:flex;gap:0;">
+        <div class="metric-card">
+            <span class="metric-label">Onsite</span>
+            <strong>@onsiteLogs.Count</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">WFH</span>
+            <strong>@wfhLogs.Count</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Employees</span>
+            <strong>@employeeCount</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Today</span>
+            <strong>@(onsiteLogs.Count(l => l.AttendanceDate == DateTime.Today) + wfhLogs.Count(l => l.AttendanceDate == DateTime.Today))</strong>
+        </div>
+    </div>
+
+    <div style="margin-top:1rem;">
+        <div style="display:flex;justify-content:flex-start;align-items:center;margin-bottom:0.6rem;gap:0.5rem;">
+            <button class='btn @(viewMode=="onsite"?"btn-primary":"btn-outline-secondary")' @onclick='() => viewMode = "onsite"'>Onsite (Biometric)</button>
+            <button class='btn @(viewMode=="wfh"?"btn-primary":"btn-outline-secondary")' @onclick='() => viewMode = "wfh"'>WFH (ETR)</button>
+        </div>
+
+        <div class="panel-card attendance-table-card">
+            @if (viewMode == "onsite")
+            {
+                <table class="table attendance-table attendance-table-onsite">
+                    <thead style="background:var(--finance-surface-soft);border-bottom:1px solid var(--finance-border);">
+                        <tr>
+                            <th>ID Number</th>
+                            <th>Employee</th>
+                            <th>Division / Unit</th>
+                            <th>Designation</th>
+                            <th>AM</th>
+                            <th>PM</th>
+                            <th>Tardiness</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in onsiteLogs)
+                        {
+                            <tr>
+                                <td>@log.IdNumber</td>
+                                <td>@FormatName(log.LastName, log.FirstName, log.MiddleName)</td>
+                                <td>@log.DivisionCenterUnit</td>
+                                <td>@log.Designation</td>
+                                <td class="time-cell">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</td>
+                                <td class="time-cell">@FormatTimeRange(log.TimeInPm, log.TimeOutPm)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.Tardiness) ? "-" : log.Tardiness)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <table class="table attendance-table attendance-table-wfh">
+                    <thead style="background:var(--finance-surface-soft);border-bottom:1px solid var(--finance-border);">
+                        <tr>
+                            <th>ID Number</th>
+                            <th>Employee</th>
+                            <th>Division / Unit</th>
+                            <th>Designation</th>
+                            <th>Target</th>
+                            <th>Accomplishment</th>
+                            <th>MOV</th>
+                            <th>Time In</th>
+                            <th>Time Out</th>
+                            <th>Tardiness</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in wfhLogs)
+                        {
+                            <tr>
+                                <td>@log.IdNumber</td>
+                                <td>@FormatName(log.LastName, log.FirstName, log.MiddleName)</td>
+                                <td>@log.DivisionCenterUnit</td>
+                                <td>@log.Designation</td>
+                                <td>@DisplayValue(log.Target)</td>
+                                <td>@DisplayValue(log.Accomplishment)</td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(log.Mov))
+                                    {
+                                        <span>-</span>
+                                    }
+                                    else
+                                    {
+                                        <a href="@log.Mov" target="_blank">View File</a>
+                                    }
+                                </td>
+                                <td class="time-cell">@FormatTime(log.TimeIn)</td>
+                                <td class="time-cell">@FormatTime(log.TimeOut)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.Tardiness) ? "-" : log.Tardiness)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .attendance-table-card {
+        padding: 1rem;
+        overflow-x: auto;
+    }
+
+    .attendance-table {
+        width: 100%;
+        margin: 0;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+
+    .attendance-table thead {
+        background: var(--finance-surface-soft);
+        border-bottom: 1px solid var(--finance-border);
+    }
+
+    .attendance-table th,
+    .attendance-table td {
+        padding: 0.85rem 0.75rem;
+        vertical-align: top;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+
+    .attendance-table tbody tr {
+        border-bottom: 1px solid var(--finance-border-soft);
+    }
+
+    .attendance-table .time-cell {
+        white-space: pre-line;
+        overflow-wrap: normal;
+        word-break: normal;
+    }
+
+    .attendance-table-wfh th:nth-child(1),
+    .attendance-table-wfh td:nth-child(1) { width: 8%; }
+
+    .attendance-table-wfh th:nth-child(2),
+    .attendance-table-wfh td:nth-child(2) { width: 12%; }
+
+    .attendance-table-wfh th:nth-child(3),
+    .attendance-table-wfh td:nth-child(3) { width: 13%; }
+
+    .attendance-table-wfh th:nth-child(4),
+    .attendance-table-wfh td:nth-child(4) { width: 10%; }
+
+    .attendance-table-wfh th:nth-child(5),
+    .attendance-table-wfh td:nth-child(5) { width: 18%; }
+
+    .attendance-table-wfh th:nth-child(6),
+    .attendance-table-wfh td:nth-child(6) { width: 18%; }
+
+    .attendance-table-wfh th:nth-child(7),
+    .attendance-table-wfh td:nth-child(7) { width: 7%; }
+
+    .attendance-table-wfh th:nth-child(8),
+    .attendance-table-wfh td:nth-child(8) { width: 7%; }
+
+    .attendance-table-wfh th:nth-child(9),
+    .attendance-table-wfh td:nth-child(9) { width: 7%; }
+
+    .attendance-table-wfh th:nth-child(10),
+    .attendance-table-wfh td:nth-child(10) { width: 10%; }
+
+    .attendance-table-onsite th:nth-child(1),
+    .attendance-table-onsite td:nth-child(1) { width: 12%; }
+
+    .attendance-table-onsite th:nth-child(2),
+    .attendance-table-onsite td:nth-child(2) { width: 16%; }
+
+    .attendance-table-onsite th:nth-child(3),
+    .attendance-table-onsite td:nth-child(3) { width: 22%; }
+
+    .attendance-table-onsite th:nth-child(4),
+    .attendance-table-onsite td:nth-child(4) { width: 16%; }
+
+    .attendance-table-onsite th:nth-child(5),
+    .attendance-table-onsite td:nth-child(5) { width: 14%; }
+
+    .attendance-table-onsite th:nth-child(6),
+    .attendance-table-onsite td:nth-child(6) { width: 14%; }
+
+    .attendance-table-onsite th:nth-child(7),
+    .attendance-table-onsite td:nth-child(7) { width: 12%; }
+</style>
+
+@code {
+    private string viewMode = "onsite";
+    private int employeeCount;
+    private List<AttendanceLog> onsiteLogs = new();
+    private List<AttendanceLogWfh> wfhLogs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        employeeCount = await Db.Employees.CountAsync();
+
+        onsiteLogs = await Db.AttendanceLogs
+            .AsNoTracking()
+            .OrderByDescending(l => l.AttendanceDate)
+            .ThenBy(l => l.LastName)
+            .ThenBy(l => l.FirstName)
+            .ToListAsync();
+
+        wfhLogs = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .OrderByDescending(l => l.AttendanceDate)
+            .ThenBy(l => l.LastName)
+            .ThenBy(l => l.FirstName)
+            .ToListAsync();
+
+        // Compute tardiness/absent labels in-memory according to rules
+        foreach (var log in wfhLogs)
+        {
+            log.Tardiness = ComputeTardinessForWfh(log);
+        }
+
+        foreach (var log in onsiteLogs)
+        {
+            log.Tardiness = ComputeTardinessForOnsite(log);
+        }
+    }
+
+    private static string FormatName(string lastName, string firstName, string middleName)
+    {
+        var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
+        return $"{lastName}, {firstName}{middleInitial}";
+    }
+
+    private static string FormatTime(DateTime? value) => value?.ToString("MMM dd, yyyy\nhh:mm tt") ?? "-";
+
+    private static string FormatTimeRange(DateTime? start, DateTime? end)
+        => $"{(start?.ToString("hh:mm tt") ?? "-")} / {(end?.ToString("hh:mm tt") ?? "-")}";
+
+    private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    // --- Tardiness calculation helpers ---
+    private static string ComputeTardinessForWfh(AttendanceLogWfh log)
+    {
+        // Strict WFH rules: missing TimeIn or TimeOut => Absent
+        if (!log.TimeIn.HasValue || !log.TimeOut.HasValue)
+        {
+            return "Absent";
+        }
+
+        var date = log.AttendanceDate.Date;
+        var timeIn = log.TimeIn.Value;
+
+        // Only consider morning in window for tardiness
+        var sevenAm = date.AddHours(7);
+        var eightAm = date.AddHours(8);
+
+        // Any log before 7:00 treated as 7:00
+        if (timeIn < sevenAm) timeIn = sevenAm;
+
+        // If within flexible window 7:00 - 8:00 => not late
+        if (timeIn >= sevenAm && timeIn <= eightAm)
+        {
+            return string.Empty; // show as '-' in UI
+        }
+
+        // Late if strictly after 8:00:00
+        if (timeIn > eightAm)
+        {
+            var diff = timeIn - eightAm;
+            return FormatLateSpan(diff);
+        }
+
+        return string.Empty;
+    }
+
+    private static string ComputeTardinessForOnsite(AttendanceLog log)
+    {
+        // Determine morning in candidate
+        var date = log.AttendanceDate.Date;
+
+        var timeInAm = log.TimeInAm;
+        var timeInPm = log.TimeInPm;
+
+        // Absent if no in times recorded for the day
+        if (!timeInAm.HasValue && !timeInPm.HasValue)
+        {
+            return "Absent";
+        }
+
+        // Half-Day AM: TimeInAm exists and TimeOutAm recorded between 12:00 and 13:00
+        if (timeInAm.HasValue && log.TimeOutAm.HasValue)
+        {
+            var outAm = log.TimeOutAm.Value.TimeOfDay;
+            if (outAm >= TimeSpan.FromHours(12) && outAm <= TimeSpan.FromHours(13))
+            {
+                return "Half-Day (AM)";
+            }
+        }
+
+        // Half-Day PM: TimeInPm at or after 13:00 and TimeOutPm at 17:00
+        if (timeInPm.HasValue && log.TimeOutPm.HasValue)
+        {
+            var inPm = timeInPm.Value.TimeOfDay;
+            var outPm = log.TimeOutPm.Value.TimeOfDay;
+            if (inPm >= TimeSpan.FromHours(13) && outPm == TimeSpan.FromHours(17))
+            {
+                return "Half-Day (PM)";
+            }
+        }
+
+        // Use AM time if available for tardiness calculation, otherwise use first available timeIn
+        var timeIn = timeInAm ?? timeInPm.Value;
+
+        var sevenAm = date.AddHours(7);
+        var eightAm = date.AddHours(8);
+
+        if (timeIn < sevenAm) timeIn = sevenAm;
+
+        if (timeIn >= sevenAm && timeIn <= eightAm)
+        {
+            return string.Empty;
+        }
+
+        if (timeIn > eightAm)
+        {
+            var diff = timeIn - eightAm;
+            return FormatLateSpan(diff);
+        }
+
+        return string.Empty;
+    }
+
+    private static string FormatLateSpan(TimeSpan diff)
+    {
+        // Round up seconds to minutes (any seconds > 0 counts as next minute)
+        var totalMinutes = (int)Math.Ceiling(diff.TotalSeconds / 60.0);
+        if (totalMinutes <= 0) totalMinutes = 1;
+
+        if (totalMinutes < 60)
+        {
+            return totalMinutes == 1 ? "1min late" : $"{totalMinutes}mins late";
+        }
+
+        var hours = totalMinutes / 60;
+        var minutes = totalMinutes % 60;
+
+        var hourPart = hours == 1 ? "1hr" : $"{hours}hrs";
+        if (minutes == 0)
+            return $"{hourPart} late";
+
+        var minutePart = minutes == 1 ? "1min" : $"{minutes}mins";
+        return $"{hourPart} and {minutePart} late";
+    }
+
+}
