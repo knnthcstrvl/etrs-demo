@@ -3,75 +3,74 @@
 @inject NavigationManager NavManager
 @inject Financial.Services.IToastService ToastService
 
-<aside class="finance-sidebar-shell @(IsOpen ? "is-open" : "is-collapsed")" aria-label="main navigation menu">
-    <div class="finance-sidebar">
-        <div class="finance-sidebar-top">
-            <div class="finance-profile-card">
-                <img class="finance-profile-avatar" src="/images/user-profile.jpg" alt="user profile picture" />
+<aside class="etrs-sidebar-shell @(IsOpen ? "is-open" : "is-collapsed")" aria-label="main navigation menu">
+    <div class="etrs-sidebar">
+        <div class="etrs-sidebar-top">
+            <div class="etrs-profile-card">
+                <img class="etrs-profile-avatar" src="/images/user-profile.jpg" alt="user profile picture" />
 
                 @if (IsOpen)
                 {
-                    <div class="finance-profile-meta">
+                    <div class="etrs-profile-meta">
                         <strong>System Administrator</strong>
                         <span>admin&#64;local</span>
                     </div>
                 }
 
                 <button type="button"
-                        class="finance-sidebar-toggle"
+                        class="etrs-sidebar-toggle"
                         @onclick="ToggleSidebar"
                         aria-label="Toggle sidebar">
                     <i class="fa-solid @(IsOpen ? "fa-angle-left" : "fa-angle-right")" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
-
-        <nav class="finance-sidebar-nav">
-            <div class="finance-nav-group">
+        <nav class="etrs-sidebar-nav">
+            <div class="etrs-nav-group">
                 @foreach (var item in MainItems)
                 {
                     <NavLink href="@item.Url"
                              Match="@item.Match"
-                             class="finance-nav-link"
+                             class="etrs-nav-link"
                              title="@item.Label">
-                        <span class="finance-nav-icon" aria-hidden="true">
+                        <span class="etrs-nav-icon" aria-hidden="true">
                             <i class="@item.Icon"></i>
                         </span>
                         @if (IsOpen)
                         {
-                            <span class="finance-nav-label">@item.Label</span>
+                            <span class="etrs-nav-label">@item.Label</span>
                         }
                     </NavLink>
                 }
             </div>
         </nav>
 
-        <div class="finance-sidebar-divider finance-sidebar-divider-bottom"></div>
-        <div class="finance-sidebar-bottom">
-            <div class="finance-settings-wrap">
+        <div class="etrs-sidebar-divider etrs-sidebar-divider-bottom"></div>
+        <div class="etrs-sidebar-bottom">
+            <div class="etrs-settings-wrap">
                 <button type="button"
-                        class="finance-nav-link finance-nav-button finance-settings-link"
+                        class="etrs-nav-link etrs-nav-button etrs-settings-link"
                         title="@SettingsItem.Label">
-                    <span class="finance-nav-icon" aria-hidden="true">
+                    <span class="etrs-nav-icon" aria-hidden="true">
                         <i class="@SettingsItem.Icon"></i>
                     </span>
                     @if (IsOpen)
                     {
-                        <span class="finance-nav-label">@SettingsItem.Label</span>
+                        <span class="etrs-nav-label">@SettingsItem.Label</span>
                     }
                 </button>
 
                 <!-- Logout button placed under settings -->
                 <button type="button"
-                        class="finance-nav-link finance-nav-button logout-button"
+                        class="etrs-nav-link etrs-nav-button logout-button"
                         @onclick="Logout"
                         title="Logout">
-                    <span class="finance-nav-icon" aria-hidden="true">
+                    <span class="etrs-nav-icon" aria-hidden="true">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </span>
                     @if (IsOpen)
                     {
-                        <span class="finance-nav-label">Logout</span>
+                        <span class="etrs-nav-label">Logout</span>
                     }
                 </button>
             </div>

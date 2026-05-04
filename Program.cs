@@ -55,12 +55,12 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "DTR Monitoring API",
+        Title = "ETRS API",
         Version = "v1",
-        Description = "Daily time record monitoring with biometric attendance sample data",
+        Description = "Electronic Time Recording System (ETRS) API with sample attendance data",
         Contact = new OpenApiContact
         {
-            Name = "DTR Monitoring Team"
+            Name = "ETRS Team"
         }
     });
 });
@@ -104,7 +104,7 @@ else
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "DTR Monitoring API v1");
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "ETRS API v1");
     c.DisplayRequestDuration();
 });
 

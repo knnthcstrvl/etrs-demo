@@ -13,11 +13,11 @@
 
 @rendermode InteractiveServer
 
-<PageTitle>Electronic Daily Time Record - Work From Home</PageTitle>
+<PageTitle>ETRS - Work From Home</PageTitle>
 
 <div class="etr-shell">
     <div class="etr-card">
-        <h1 class="etr-title">Electronic<br>Daily Time Record<br>Work From Home</h1>
+        <h1 class="etr-title">ETRS<br>Work From Home</h1>
 
         <div class="etr-form-wrap">
             <p class="etr-sub">Log your WFH attendance using your employee ID number. Time in records target, while time out records accomplishment and optional MOV upload.</p>
@@ -83,9 +83,7 @@
                 <div class="@GetSectionClass("IN")" aria-hidden="@(entryModel.LogType != "IN")">
                 <div class="form-row">
                         <label class="required-star">Target</label>
-                        <div class="full-bleed">
-                            <InputTextArea @bind-Value="entryModel.Target" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
-                        </div>
+                        <InputTextArea @bind-Value="entryModel.Target" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
                         <ValidationMessage For="() => entryModel.Target" />
                     </div>
 
@@ -95,9 +93,7 @@
                 <div class="@GetSectionClass("OUT")" aria-hidden="@(entryModel.LogType != "OUT")">
                     <div class="form-row">
                         <label class="required-star">Accomplishment</label>
-                        <div class="full-bleed">
-                            <InputTextArea @bind-Value="entryModel.Accomplishment" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
-                        </div>
+                        <InputTextArea @bind-Value="entryModel.Accomplishment" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
                         <ValidationMessage For="() => entryModel.Accomplishment" />
                     </div>
 
@@ -204,23 +200,15 @@
         font-size: 0.9rem;
     }
 
-    .full-bleed {
-        display: block;
-        width: 100%;
-        box-sizing: border-box;
+    .etr-textarea {
+        min-height: 110px;
+        line-height: 1.5;
+        resize: vertical;
     }
 
-    .full-bleed .etr-textarea {
-        min-height: 110px;
-        padding: 0.75rem;
-        line-height: 1.5;
-        border-radius: 10px;
-        width: 100%;
-        box-sizing: border-box;
-        margin: 0;
-        background: #ffffff;
-        display: block;
-        resize: vertical;
+    .focus-yellow:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(235, 202, 74, 0.6);
     }
 
     .employee-search-wrap {
@@ -317,14 +305,14 @@
     }
 
     .transition-panel {
-        overflow: hidden;
-        max-height: 0;
-        opacity: 0;
-        transform: translateY(10px);
-        pointer-events: none;
-        transition: max-height 0.3s ease, opacity 0.25s ease, transform 0.25s ease, margin-bottom 0.3s ease;
-        margin-bottom: 0;
-    }
+    overflow: visible;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    transition: max-height 0.3s ease, opacity 0.25s ease, transform 0.25s ease, margin-bottom 0.3s ease;
+    margin-bottom: 0;
+}
 
     .transition-panel.active {
         max-height: 320px;
