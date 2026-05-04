@@ -6,8 +6,8 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
 		<UseAppHost>false</UseAppHost>
-		<AssemblyName>ETRS</AssemblyName>
-		<RootNamespace>ETRS</RootNamespace>
+       <AssemblyName>Financial</AssemblyName>
+		<RootNamespace>Financial</RootNamespace>
 	</PropertyGroup>
 
 	<ItemGroup>
