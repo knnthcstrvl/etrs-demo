@@ -21,7 +21,7 @@
 
         <div class="etr-form-wrap">
             <p class="etr-sub">Log your WFH attendance using your employee ID number. Time in records target, while time out records accomplishment and optional MOV upload.</p>
-            <EditForm Model="entryModel" OnValidSubmit="HandleValidSubmit">
+            <EditForm Model="entryModel" OnSubmit="HandleSubmit">
                 <DataAnnotationsValidator />
 
                 <div class="form-row">
@@ -77,14 +77,13 @@
                             }
                         </div>
                     </div>
-                    <ValidationMessage For="() => entryModel.IdNumber" />
+
                 </div>
 
                 <div class="@GetSectionClass("IN")" aria-hidden="@(entryModel.LogType != "IN")">
                 <div class="form-row">
                         <label class="required-star">Target</label>
                         <InputTextArea @bind-Value="entryModel.Target" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
-                        <ValidationMessage For="() => entryModel.Target" />
                     </div>
 
                     <div class="section-spacer" aria-hidden="true"></div>
@@ -94,7 +93,6 @@
                     <div class="form-row">
                         <label class="required-star">Accomplishment</label>
                         <InputTextArea @bind-Value="entryModel.Accomplishment" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
-                        <ValidationMessage For="() => entryModel.Accomplishment" />
                     </div>
 
                     <div class="form-row">
@@ -108,7 +106,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="etr-submit" disabled="@IsSubmitDisabled">
+                    <button type="submit" class="etr-submit" disabled="@isSubmitting">
                         @if (isSubmitting)
                         {
                             <span class="spinner" aria-hidden="true"></span><span>Submitting&#8230;</span>
@@ -497,7 +495,45 @@
         }
     }
 
-    private bool IsSubmitDisabled => isSubmitting || selectedEmployee is null || !string.Equals(entryModel.IdNumber.Trim(), selectedEmployee.IdNumber, StringComparison.OrdinalIgnoreCase);
+    private bool IsSubmitDisabled => isSubmitting;
+
+    private async Task HandleSubmit(EditContext editContext)
+    {
+        // Run data annotation / IValidatableObject validation
+        var valid = editContext?.Validate() ?? true;
+
+        if (!valid)
+        {
+            var messages = editContext.GetValidationMessages().ToList();
+            foreach (var m in messages)
+            {
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = "Validation",
+                    Message = m,
+                    Duration = 5000
+                });
+            }
+            return;
+        }
+
+        // Ensure selected employee matches entered id
+        if (selectedEmployee is null || !string.Equals(selectedEmployee.IdNumber, entryModel.IdNumber.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Select employee",
+                Message = "Choose an employee from the search results before submitting.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        // Proceed with actual submit logic
+        await HandleValidSubmit();
+    }
 
     private async Task HandleValidSubmit()
     {
@@ -613,6 +649,23 @@
         }
 
         await SearchEmployeesAsync(employeeSearchText);
+    }
+
+    // Show validation and other messages in toast when appropriate
+    private void ShowValidationMessages(EditContext? ctx)
+    {
+        if (ctx is null) return;
+        var messages = ctx.GetValidationMessages().ToList();
+        foreach (var m in messages)
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Validation",
+                Message = m,
+                Duration = 5000
+            });
+        }
     }
 
     private async Task HandleIdInputFocus(FocusEventArgs _)
