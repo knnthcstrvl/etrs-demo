@@ -1,8 +1,13 @@
 @rendermode InteractiveServer
+@implements IDisposable
 @inject Financial.State.CustomAuthenticationStateProvider AuthStateProvider
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
 @inject NavigationManager NavManager
 @inject IJSRuntime JS
 @inject Financial.Services.IToastService ToastService
+@inject Financial.Data.ProcurementDbContext Db
+@inject Financial.Services.CurrentUserService CurrentUser
 
 <aside class="etrs-sidebar-shell @(IsOpen ? "is-open" : "is-collapsed")" aria-label="main navigation menu" @onclick="CloseProfileMenu">
         <div class="etrs-sidebar">
@@ -23,7 +28,7 @@
         </div>
         <nav class="etrs-sidebar-nav">
             <div class="etrs-nav-group">
-                @foreach (var item in MainItems)
+                @foreach (var item in GetVisibleItems())
                 {
                     <NavLink href="@item.Url"
                              Match="@item.Match"
@@ -66,7 +71,7 @@
                             </button>
 
                             <button type="button" class="etrs-nav-link etrs-nav-button logout-button" @onclick="Logout" title="Logout">
-                                <span class="etrs-nav-icon" aria-hidden="true"><i class="fa-solid fa-right-from-bracket"></i></span>
+                                <span class="etrs-nav-icon" aria-hidden="true"><i class="fa-solid fa-arrow-right-from-bracket"></i></span>
                                 <span class="etrs-nav-label">Logout</span>
                             </button>
                         </div>
@@ -84,14 +89,16 @@
     [Parameter]
     public EventCallback<bool> IsOpenChanged { get; set; }
 
-        private readonly List<MenuItem> MainItems = new()
+    private readonly List<MenuItem> AllItems = new()
     {
-        new() { Label = "Dashboard", Url = "/dashboard", Icon = "fa-solid fa-house", Match = NavLinkMatch.All },
-        new() { Label = "Attendance Logs", Url = "/attendance-logs", Icon = "fa-solid fa-clock", Match = NavLinkMatch.Prefix },
+        new() { Label = "Dashboard", Url = "/dashboard", Icon = "fa-solid fa-chart-column", Match = NavLinkMatch.All },
+        new() { Label = "Attendance Logs", Url = "/attendance-logs", Icon = "fa-regular fa-clock", Match = NavLinkMatch.Prefix },
         new() { Label = "Employees", Url = "/employees", Icon = "fa-regular fa-circle-user", Match = NavLinkMatch.Prefix },
-        new() { Label = "Exceptions", Url = "/exceptions", Icon = "fa-solid fa-triangle-exclamation", Match = NavLinkMatch.Prefix },
-        new() { Label = "Users", Url = "/users", Icon = "fa-solid fa-users", Match = NavLinkMatch.Prefix }
+        new() { Label = "Exceptions", Url = "/exceptions", Icon = "fa-regular fa-address-card", Match = NavLinkMatch.Prefix },
+        new() { Label = "Users", Url = "/users", Icon = "fa-regular fa-user", Match = NavLinkMatch.Prefix }
     };
+
+    // Visible items will be computed on render from CurrentUser
 
     private readonly MenuItem SettingsItem = new()
     {
@@ -151,5 +158,58 @@
 
         // navigate to login and force reload
         NavManager.NavigateTo("/login", true);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        // initialize and subscribe once
+        await CurrentUser.InitializeAsync();
+        CurrentUser.OnChanged += CurrentUserChangedHandler;
+    }
+
+    private void CurrentUserChangedHandler()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private IEnumerable<MenuItem> GetVisibleItems()
+    {
+        // Always show Dashboard for authenticated users
+        var list = new List<MenuItem>();
+        list.Add(AllItems.First(i => i.Label == "Dashboard"));
+
+        // Admin sees all
+        if (string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return AllItems;
+        }
+
+        if (CurrentUser.HasAccess("Export") || CurrentUser.HasAccess("View") || CurrentUser.HasAccess("Edit") || CurrentUser.HasAccess("Import"))
+        {
+            list.Add(AllItems.First(i => i.Label == "Attendance Logs"));
+        }
+
+        if (CurrentUser.HasAccess("View") || CurrentUser.HasAccess("Edit") || CurrentUser.HasAccess("Import") || CurrentUser.HasAccess("Export"))
+        {
+            list.Add(AllItems.First(i => i.Label == "Employees"));
+        }
+
+        if (CurrentUser.HasAccess("Edit"))
+        {
+            list.Add(AllItems.First(i => i.Label == "Exceptions"));
+        }
+
+        if (CurrentUser.HasAccess("Add") || CurrentUser.HasAccess("Edit") || CurrentUser.HasAccess("Delete"))
+        {
+            list.Add(AllItems.First(i => i.Label == "Users"));
+        }
+
+        return list;
+    }
+
+    public void Dispose()
+    {
+        try { CurrentUser.OnChanged -= CurrentUserChangedHandler; } catch { }
     }
 }

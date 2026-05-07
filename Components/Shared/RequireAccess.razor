@@ -1,0 +1,86 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject Financial.Data.ProcurementDbContext Db
+@code {
+    [Parameter] public string[] RequiredAccess { get; set; } = Array.Empty<string>();
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool initialized;
+    private bool authorized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        initialized = false;
+        try
+        {
+            var state = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = state.User;
+            if (user?.Identity is null || !user.Identity.IsAuthenticated)
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            var role = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
+            var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? string.Empty;
+
+            if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                authorized = true;
+                initialized = true;
+                return;
+            }
+
+            var account = await Db.UserAccounts.FirstOrDefaultAsync(u => u.Email == email);
+            if (account is null)
+            {
+                authorized = false;
+                initialized = true;
+                Nav.NavigateTo("/dashboard");
+                return;
+            }
+
+            var accessSet = new HashSet<string>((account.AccessLevel ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.OrdinalIgnoreCase);
+
+            if (RequiredAccess == null || RequiredAccess.Length == 0)
+            {
+                // If no requirements defined, allow access
+                authorized = true;
+            }
+            else
+            {
+                authorized = RequiredAccess.Any(r => accessSet.Contains(r));
+            }
+
+            if (!authorized)
+            {
+                // redirect to dashboard if not authorized
+                Nav.NavigateTo("/dashboard");
+            }
+        }
+        catch
+        {
+            authorized = false;
+            Nav.NavigateTo("/dashboard");
+        }
+        finally
+        {
+            initialized = true;
+        }
+    }
+}
+
+@if (!initialized)
+{
+    <div />
+}
+else if (authorized)
+{
+    @ChildContent
+}
+else
+{
+    <div />
+}

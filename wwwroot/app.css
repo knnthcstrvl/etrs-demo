@@ -368,6 +368,66 @@ h1:focus {
     line-height: 1;
 }
 
+/* modal card style matching design */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-card {
+    background: var(--etrs-surface);
+    border-radius: 12px;
+    width: 640px; /* reduced width */
+    max-width: calc(100% - 48px);
+    box-shadow: var(--etrs-shadow);
+    overflow: hidden;
+    max-height: 90vh; /* cover 90% of screen height */
+}
+
+.modal-card-large { width: 700px; }
+
+.modal-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 20px;
+    border-bottom: 1px solid var(--etrs-border-soft);
+    background: linear-gradient(180deg, #fff, #fafafa);
+}
+
+.modal-card-title { margin: 0; font-size: 1.25rem; }
+.modal-card-subtitle { font-size: 0.9rem; color: var(--etrs-text-muted); }
+.modal-card-close { border: 0; background: transparent; font-size: 1.1rem; }
+
+.modal-card-body { padding: 18px 20px; overflow-y: auto; max-height: calc(90vh - 160px); }
+.modal-card-footer { padding: 14px 20px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--etrs-border-soft); }
+
+.user-form { display: grid; gap: 10px; }
+.form-row { display: flex; flex-direction: column; }
+.name-row { display: flex; gap: 10px; }
+.name-row .form-row { flex: 1; }
+.form-row-inline { display: flex; align-items: center; gap: 10px; }
+.form-row label { font-size: 0.85rem; color: var(--etrs-text-muted); margin-bottom: 6px; }
+.form-control { padding: 10px 12px; border: 1px solid var(--etrs-border); border-radius: 6px; }
+.access-row .access-checks { display: flex; gap: 14px; flex-wrap: wrap; }
+.access-row label { display: inline-flex; gap: 6px; align-items: center; }
+
+/* access selector styles */
+.access-select { position: relative; }
+.access-pills { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 6px; border: 1px solid var(--etrs-border); border-radius: 8px; cursor: pointer; }
+.access-placeholder { color: var(--etrs-text-muted); }
+.access-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--etrs-surface-soft); border-radius: 999px; font-size: 0.9rem; }
+.access-remove { border: 0; background: transparent; cursor: pointer; font-size: 0.75rem; }
+.access-caret { margin-left: auto; color: var(--etrs-text-muted); padding-left: 8px; }
+.access-dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--etrs-surface); border: 1px solid var(--etrs-border-soft); box-shadow: 0 8px 24px rgba(16,24,40,0.08); z-index: 2100; border-radius: 8px; padding: 8px; }
+.access-option { display: block; padding: 8px; cursor: pointer; }
+.access-option input { margin-right: 8px; }
+
 .finance-sidebar-nav {
     display: flex;
     flex: 1;

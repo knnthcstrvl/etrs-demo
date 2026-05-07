@@ -1,13 +1,16 @@
 @page "/employees"
+@using Components.Shared
 @using Financial.Data
 @using Financial.Model.Dtr
 @using System.Text
 @using Microsoft.EntityFrameworkCore
 @inject ProcurementDbContext Db
 @inject IJSRuntime JS
+@inject Financial.Services.CurrentUserService CurrentUser
 
 <PageTitle>Employees</PageTitle>
 
+<RequireAccess RequiredAccess='@(new string[] { "View", "Edit", "Import", "Export" })'>
 <div class="dashboard-shell">
     <div class="panel-heading attendance-logs-heading">
         <div>
@@ -15,10 +18,11 @@
         </div>
         <div class="attendance-logs-header-actions">
             <InputFile id="employees-import-input" OnChange="ImportEmployeesAsync" accept=".csv" style="display:none;" />
-            <label for="employees-import-input" class="btn btn-outline-secondary mb-0">Import</label>
-            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="ExportEmployeesAsync">Export</button>
+            <label for="employees-import-input" class="btn btn-outline-secondary mb-0 @(CurrentUser.HasAccess("Import") ? "" : "disabled")">Import</label>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="ExportEmployeesAsync" disabled="@(!CurrentUser.HasAccess("Export"))">Export</button>
         </div>
     </div>
+
 
     <div class="metric-grid dashboard-metrics attendance-logs-metrics">
         <div class="metric-card">
@@ -40,6 +44,48 @@
     </div>
 
     <div class="panel-card attendance-table-card">
+        @if (showEmployeeModal)
+        {
+            <div class="modal-overlay">
+                <div class="modal-card">
+                    <h3>@(isEditingEmployee ? "Edit Employee" : "Add Employee")</h3>
+                    <div class="form-grid">
+                        <div>
+                            <label>ID Number</label>
+                            <input class="form-control" @bind="employeeForm.IdNumber" />
+                        </div>
+                        <div>
+                            <label>Last Name</label>
+                            <input class="form-control" @bind="employeeForm.LastName" />
+                        </div>
+                        <div>
+                            <label>First Name</label>
+                            <input class="form-control" @bind="employeeForm.FirstName" />
+                        </div>
+                        <div>
+                            <label>Middle Name</label>
+                            <input class="form-control" @bind="employeeForm.MiddleName" />
+                        </div>
+                        <div>
+                            <label>Division / Unit</label>
+                            <input class="form-control" @bind="employeeForm.DivisionCenterUnit" />
+                        </div>
+                        <div>
+                            <label>Designation</label>
+                            <input class="form-control" @bind="employeeForm.Designation" />
+                        </div>
+                        <div>
+                            <label>Status</label>
+                            <input class="form-control" @bind="employeeForm.Status" />
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" @onclick="CloseEmployeeModal">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SaveEmployeeAsync">Save</button>
+                    </div>
+                </div>
+            </div>
+        }
         <table class="table attendance-table">
             <thead>
                 <tr>
@@ -48,6 +94,7 @@
                     <th>Division / Unit</th>
                     <th>Designation</th>
                     <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -59,6 +106,9 @@
                         <td><span class="cell-ellipsis" title="@DisplayValue(employee.DivisionCenterUnit)">@DisplayValue(employee.DivisionCenterUnit)</span></td>
                         <td><span class="cell-ellipsis" title="@DisplayValue(employee.Designation)">@DisplayValue(employee.Designation)</span></td>
                         <td><span class="status-badge @(employee.Status == "Active" ? "status-ok" : "status-warning")">@employee.Status</span></td>
+                        <td>
+                            <button class="btn btn-link" @onclick="() => OpenEditEmployeeModal(employee)">Edit</button>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -82,7 +132,8 @@
             <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeEmployeePage(employeePage + 1)" disabled="@(employeePage >= EmployeeTotalPages)">&#8250;</button>
         </div>
     </div>
-</div>
+    </div>
+</RequireAccess>
 
 @code {
     private const int PageSize = 10;
@@ -130,6 +181,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await CurrentUser.InitializeAsync();
         await LoadEmployeesAsync();
     }
 
@@ -477,5 +529,54 @@
             Title = title,
             Message = message
         });
+    }
+
+    // employee edit modal state
+    private bool showEmployeeModal;
+    private bool isEditingEmployee;
+    private Employee employeeForm = new();
+
+    private void OpenEditEmployeeModal(Employee employee)
+    {
+        isEditingEmployee = true;
+        employeeForm = new Employee
+        {
+            EmployeeId = employee.EmployeeId,
+            IdNumber = employee.IdNumber,
+            LastName = employee.LastName,
+            FirstName = employee.FirstName,
+            MiddleName = employee.MiddleName,
+            DivisionCenterUnit = employee.DivisionCenterUnit,
+            Designation = employee.Designation,
+            Status = employee.Status
+        };
+        showEmployeeModal = true;
+    }
+
+    private void CloseEmployeeModal()
+    {
+        showEmployeeModal = false;
+    }
+
+    private async Task SaveEmployeeAsync()
+    {
+        if (isEditingEmployee)
+        {
+            var existing = await Db.Employees.FindAsync(employeeForm.EmployeeId);
+            if (existing is not null)
+            {
+                existing.IdNumber = employeeForm.IdNumber;
+                existing.LastName = employeeForm.LastName;
+                existing.FirstName = employeeForm.FirstName;
+                existing.MiddleName = employeeForm.MiddleName;
+                existing.DivisionCenterUnit = employeeForm.DivisionCenterUnit;
+                existing.Designation = employeeForm.Designation;
+                existing.Status = employeeForm.Status;
+                await Db.SaveChangesAsync();
+                await LoadEmployeesAsync();
+            }
+        }
+
+        showEmployeeModal = false;
     }
 }

@@ -1,0 +1,85 @@
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+
+@code {
+    [Parameter]
+    public RouteData RouteData { get; set; } = default!;
+
+    [Parameter]
+    public Type? DefaultLayout { get; set; }
+
+    private AuthenticationState? _authState;
+    private bool _initialized;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _authState = await AuthStateProvider.GetAuthenticationStateAsync();
+
+        var user = _authState?.User;
+        var pageType = RouteData?.PageType;
+
+        // If user is authenticated and tries to open login page -> redirect to dashboard (client-side)
+        if (user?.Identity?.IsAuthenticated == true && IsLoginPage(pageType))
+        {
+            NavManager.NavigateTo("/dashboard");
+            return;
+        }
+
+        // If user is not authenticated and the page is not AllowAnonymous and not login page -> redirect to login
+        if (user?.Identity?.IsAuthenticated != true && !PageAllowsAnonymous(pageType) && !IsLoginPage(pageType))
+        {
+            NavManager.NavigateTo("/login", true);
+            return;
+        }
+
+        _initialized = true;
+    }
+
+    private bool PageAllowsAnonymous(Type? pageType)
+    {
+        if (pageType == null) return false;
+        return pageType.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), true).Any();
+    }
+
+    private bool IsLoginPage(Type? pageType) => string.Equals(pageType?.Name, "LoginPage", StringComparison.Ordinal);
+}
+
+@if (!_initialized)
+{
+    <div>Loading...</div>
+}
+else
+{
+    var user = _authState!.User;
+    var pageType = RouteData.PageType;
+
+    if (user.Identity?.IsAuthenticated == true)
+    {
+        // Prevent authenticated users from accessing the login page
+        if (IsLoginPage(pageType))
+        {
+            NavManager.NavigateTo("/dashboard");
+        }
+        else
+        {
+            <RouteView RouteData="RouteData" DefaultLayout="DefaultLayout" />
+        }
+    }
+    else
+    {
+        // If the page explicitly allows anonymous access, render it; otherwise show login
+        if (PageAllowsAnonymous(pageType) || IsLoginPage(pageType))
+        {
+            <RouteView RouteData="RouteData" DefaultLayout="DefaultLayout" />
+        }
+        else
+        {
+            <LayoutView Layout="typeof(Components.Layout.BlankLayout)">
+                <Components.Pages.LoginPage />
+            </LayoutView>
+        }
+    }
+}

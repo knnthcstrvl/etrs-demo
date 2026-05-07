@@ -3,6 +3,7 @@
 @using Financial.DTO.Auth
 @using Syncfusion.Blazor.Notifications
 @inject Financial.Services.IToastService ToastService
+@inject Financial.Services.CurrentUserService CurrentUser
 
 @rendermode InteractiveServer
 
@@ -155,9 +156,9 @@
 
         if (user.Identity?.IsAuthenticated == true)
         {
-            // already authenticated - redirect to dashboard
+            // already authenticated - redirect to dashboard (client-side)
             _constants.JWTToken = user.Claims.FirstOrDefault(_ => _.Type == "Jwt")?.Value!;
-            NavManager.NavigateTo("/dashboard", true);
+            NavManager.NavigateTo("/dashboard");
             return;
         }
 
@@ -184,10 +185,12 @@
 
             AuthStateProvider.UpdateAuthenticationState(response.JWTToken, _loginDto.RememberMe);
             _constants.JWTToken = response.JWTToken;
+            // ensure CurrentUserService refreshes immediately so UI (sidebar/menu) updates
+            try { await CurrentUser.InitializeAsync(); } catch { }
             StateHasChanged();
 
             ToastService.Show(new Models.ToastMessage { Type = Models.ToastType.Success, Title = "Success", Message = "You are logged in.", Duration = 3000 });
-            NavManager.NavigateTo("/dashboard", forceLoad: true);
+            NavManager.NavigateTo("/dashboard");
         }
         catch (Exception ex)
         {

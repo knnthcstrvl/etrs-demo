@@ -3,6 +3,7 @@
 @using Financial.Model
 @using Microsoft.EntityFrameworkCore
 @inject ProcurementDbContext Db
+@inject Financial.Services.CurrentUserService CurrentUser
 
 <PageTitle>Users</PageTitle>
 
@@ -10,6 +11,9 @@
     <div class="panel-heading attendance-logs-heading">
         <div>
             <h1 class="attendance-logs-title">System Users</h1>
+        </div>
+        <div class="attendance-logs-header-actions">
+            <button type="button" class="btn btn-primary" @onclick="OpenAddUserModal" disabled="@(!CurrentUser.HasAccess("Add"))">Add User</button>
         </div>
     </div>
 
@@ -33,6 +37,105 @@
     </div>
 
     <div class="panel-card attendance-table-card">
+        @if (showUserModal)
+        {
+            <div class="modal-overlay">
+                <div class="modal-card modal-card-large">
+                    <div class="modal-card-header">
+                        <div>
+                            <h3 class="modal-card-title">@(isEditingUser ? "Edit User" : "Add User")</h3>
+                            <div class="modal-card-subtitle">Enter user information and access rights</div>
+                        </div>
+                        <button class="modal-card-close btn-link" @onclick="CloseUserModal">✕</button>
+                    </div>
+
+                    <div class="modal-card-body">
+                        <div class="user-form">
+                            <div class="name-row">
+                                <div class="form-row">
+                                    <label>Last Name</label>
+                                    <input class="form-control" @bind="userForm.LastName" />
+                                </div>
+                                <div class="form-row">
+                                    <label>First Name</label>
+                                    <input class="form-control" @bind="userForm.FirstName" />
+                                </div>
+                                <div class="form-row">
+                                    <label>Middle Name</label>
+                                    <input class="form-control" @bind="userForm.MiddleName" />
+                                </div>
+                            </div>
+                            <div class="name-row">
+                                <div class="form-row">
+                                    <label>Username</label>
+                                    <input class="form-control" @bind="userForm.Username" />
+                                </div>
+                                <div class="form-row">
+                                    <label>Email</label>
+                                    <input class="form-control" @bind="userForm.Email" />
+                                </div>
+                            </div>
+                            <div class="name-row">
+                                <div class="form-row">
+                                    <label>Role</label>
+                                    <input class="form-control" @bind="userForm.Role" />
+                                </div>
+                                <div class="form-row">
+                                    <label>Access</label>
+                                    <div class="access-select" @onclick:stopPropagation="true">
+                                        <div class="access-pills" @onclick="ToggleAccessDropdown">
+                                            @if (selectedAccess.Count == 0)
+                                            {
+                                                <span class="access-placeholder">Select access</span>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var a in selectedAccess)
+                                                {
+                                                    <span class="access-pill">@a <button type="button" class="access-remove" @onclick="(() => RemoveAccess(a))">✕</button></span>
+                                                }
+                                            }
+                                            <span class="access-caret">▾</span>
+                                        </div>
+                                        @if (showAccessDropdown)
+                                        {
+                                            <div class="access-dropdown">
+                                                @foreach (var option in accessOptions)
+                                                {
+                                                    <label class="access-option"><input type="checkbox" checked="@selectedAccess.Contains(option)" @onchange="(() => ToggleAccess(option))" /> @option</label>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <label>Division / Unit</label>
+                                <input class="form-control" @bind="userForm.DivisionCenterUnit" />
+                            </div>
+                            <div class="form-row">
+                                <label>Designation</label>
+                                <input class="form-control" @bind="userForm.Designation" />
+                            </div>
+
+                            <div class="form-row form-row-inline">
+                                <label>Active</label>
+                                <input type="checkbox" class="form-check-input" @bind="userForm.IsActive" />
+                            </div>
+
+                            <div class="form-row access-row" style="display:none;"> <!-- kept for compatibility but hidden -->
+                                <label>Access Level (legacy)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-card-footer">
+                        <button class="btn btn-outline-secondary" @onclick="CloseUserModal">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SaveUserAsync">Save</button>
+                    </div>
+                </div>
+            </div>
+        }
         <table class="table attendance-table">
             <thead>
                 <tr>
@@ -44,6 +147,7 @@
                     <th>Designation</th>
                     <th>Status</th>
                     <th>Created</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -58,6 +162,9 @@
                         <td><span class="cell-ellipsis" title="@DisplayValue(user.Designation)">@DisplayValue(user.Designation)</span></td>
                         <td><span class="status-badge @(user.IsActive ? "status-ok" : "status-danger")">@(user.IsActive ? "Active" : "Inactive")</span></td>
                         <td><span class="cell-ellipsis" title="@FormatDate(user.DateCreated)">@FormatDate(user.DateCreated)</span></td>
+                        <td>
+                            <button class="btn btn-link" @onclick="() => OpenEditUserModal(user)" disabled="@(!CurrentUser.HasAccess("Edit"))">Edit</button>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -99,6 +206,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await CurrentUser.InitializeAsync();
         users = await Db.UserAccounts
             .AsNoTracking()
             .OrderBy(u => u.LastName)
@@ -168,4 +276,124 @@
     private static string FormatDate(DateTime value) => value.ToString("MMM dd, yyyy");
 
     private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    // modal state
+    private bool showUserModal;
+    private bool isEditingUser;
+    private UserAccount userForm = new();
+
+    private bool accessAdd;
+    private bool accessEdit;
+    private bool accessDelete;
+    private bool accessImport;
+    private bool accessExport;
+    private List<string> accessOptions = new() { "Add", "Edit", "Delete", "Import", "Export", "View" };
+    private HashSet<string> selectedAccess = new(StringComparer.OrdinalIgnoreCase);
+    private bool showAccessDropdown;
+
+    private void OpenAddUserModal()
+    {
+        isEditingUser = false;
+        userForm = new UserAccount();
+        accessAdd = accessEdit = accessDelete = accessImport = accessExport = false;
+        showUserModal = true;
+    }
+
+    private void OpenEditUserModal(UserAccount user)
+    {
+        isEditingUser = true;
+        userForm = new UserAccount
+        {
+            UserAccountId = user.UserAccountId,
+            LastName = user.LastName,
+            FirstName = user.FirstName,
+            MiddleName = user.MiddleName,
+            Username = user.Username,
+            Email = user.Email,
+            Role = user.Role,
+            DivisionCenterUnit = user.DivisionCenterUnit,
+            Designation = user.Designation,
+            IsActive = user.IsActive,
+            AccessLevel = user.AccessLevel
+        };
+
+        var tokens = (user.AccessLevel ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        selectedAccess = new HashSet<string>(tokens, StringComparer.OrdinalIgnoreCase);
+        accessAdd = selectedAccess.Contains("Add");
+        accessEdit = selectedAccess.Contains("Edit");
+        accessDelete = selectedAccess.Contains("Delete");
+        accessImport = selectedAccess.Contains("Import");
+        accessExport = selectedAccess.Contains("Export");
+
+        showUserModal = true;
+    }
+
+    private void CloseUserModal()
+    {
+        showUserModal = false;
+        showAccessDropdown = false;
+    }
+
+    private async Task SaveUserAsync()
+    {
+        // persist selectedAccess
+        userForm.AccessLevel = string.Join(",", selectedAccess);
+
+        if (isEditingUser)
+        {
+            var existing = await Db.UserAccounts.FindAsync(userForm.UserAccountId);
+            if (existing is not null)
+            {
+                existing.LastName = userForm.LastName;
+                existing.FirstName = userForm.FirstName;
+                existing.MiddleName = userForm.MiddleName;
+                existing.Username = userForm.Username;
+                existing.Email = userForm.Email;
+                existing.Role = userForm.Role;
+                existing.DivisionCenterUnit = userForm.DivisionCenterUnit;
+                existing.Designation = userForm.Designation;
+                existing.IsActive = userForm.IsActive;
+                existing.AccessLevel = userForm.AccessLevel;
+                existing.DateUpdated = DateTime.UtcNow;
+                await Db.SaveChangesAsync();
+            }
+        }
+        else
+        {
+            // basic password for new users
+            if (string.IsNullOrWhiteSpace(userForm.Password))
+            {
+                userForm.Password = BCrypt.Net.BCrypt.HashPassword("Password@123");
+            }
+            userForm.DateCreated = DateTime.UtcNow;
+            await Db.UserAccounts.AddAsync(userForm);
+            await Db.SaveChangesAsync();
+        }
+
+        await OnInitializedAsync();
+        showUserModal = false;
+    }
+
+    private void ToggleAccessDropdown()
+    {
+        showAccessDropdown = !showAccessDropdown;
+    }
+
+    private void ToggleAccess(string option)
+    {
+        if (selectedAccess.Contains(option)) selectedAccess.Remove(option);
+        else selectedAccess.Add(option);
+        // keep legacy booleans for compatibility
+        accessAdd = selectedAccess.Contains("Add");
+        accessEdit = selectedAccess.Contains("Edit");
+        accessDelete = selectedAccess.Contains("Delete");
+        accessImport = selectedAccess.Contains("Import");
+        accessExport = selectedAccess.Contains("Export");
+    }
+
+    private void RemoveAccess(string option)
+    {
+        if (selectedAccess.Contains(option)) selectedAccess.Remove(option);
+        ToggleAccessDropdown();
+    }
 }

@@ -33,6 +33,10 @@ namespace Financial.Model
         [MaxLength(150)]
         public string Designation { get; set; } = string.Empty;
 
+        [MaxLength(200)]
+        // AccessLevel stores comma separated access rights (eg: "Add,Edit,Export")
+        public string AccessLevel { get; set; } = string.Empty;
+
         public string RememberToken { get; set; } = string.Empty;
 
         public bool IsActive { get; set; } = true;

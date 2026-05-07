@@ -22,6 +22,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<ProcurementDbContext>(options =>
     options.UseSqlServer(connectionString));
+// Provide factory to create DbContext instances for long-lived services
+builder.Services.AddDbContextFactory<ProcurementDbContext>(
+    options => options.UseSqlServer(connectionString),
+    ServiceLifetime.Scoped);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -79,6 +83,8 @@ builder.Services.AddScoped<IUserAccountRepository, UserAccountRepository>();
 builder.Services.AddScoped<IConstantState, ConstantState>();
 builder.Services.AddScoped<CustomAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
+// Current user helper
+builder.Services.AddScoped<Financial.Services.CurrentUserService>();
 builder.Services.AddScoped(sp => new HttpClient());
 // Toast notifications (scoped so JS interop can be used per-circuit)
 builder.Services.AddScoped<Financial.Services.IToastService, Financial.Services.ToastService>();
