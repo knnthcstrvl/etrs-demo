@@ -1,0 +1,39 @@
+/* Top navbar styling to match the provided admin panel design */
+:root {
+  --nav-bg: #ffffff;
+  --nav-border: rgba(0,0,0,0.06);
+}
+
+section > div.border {
+  background: var(--nav-bg) !important;
+  border-radius: 10px;
+  margin: 8px 12px;
+  box-shadow: 0 6px 18px rgba(22,22,32,0.05);
+}
+
+section .d-flex.align-items-center {
+  padding: 10px 16px;
+}
+
+section img {
+  height: 28px;
+  width: auto;
+}
+
+section h5 {
+  margin: 0;
+  padding-left: 6px;
+  font-weight: 700;
+}
+
+/* hide buttons on small screens like the example */
+@media (max-width: 991px) {
+  section .d-flex.ps-3.d-none.d-lg-block { display: none !important; }
+}
+
+/* add subtle input/search style if enabled */
+.e-input-group .e-input {
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: #fff;
+}

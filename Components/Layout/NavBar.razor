@@ -5,7 +5,7 @@
 @rendermode InteractiveServer
 
 <section>
-    <div class="border border-light-subtle bg-body-tertiary">
+    <div class="etrs-admin-navbar border border-light-subtle bg-body-tertiary">
         <div class="d-flex align-items-center justify-content-between ps-4 pe-2 pe-lg-4 py-1">
             <div class="d-flex align-items-center">
                 <img class="me-2" src="@Assets["assets/images/common/brand-logos/svg/vector.svg"]" alt="company logo" />
@@ -39,9 +39,30 @@
                     </DropDownMenuItems>
                 </SfDropDownButton>
                 <div class="border-end border-secondary-subtle d-none d-sm-block" style="height: 24px;"></div>
-                <span class="e-avatar e-avatar-small e-avatar-circle ms-3">
-                    <img src="assets/images/common/avatar/avatar-3.jpg" alt="profile picture" />
-                </span>
+                <div class="dropdown ms-3">
+                    <button class="btn dropdown-toggle p-0 border-0 bg-transparent" type="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="e-avatar e-avatar-small e-avatar-circle">
+                            <img src="assets/images/common/avatar/avatar-3.jpg" alt="profile picture" />
+                        </span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end profile-dropdown p-2" aria-labelledby="profileDropdown">
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center rounded mb-1" href="#">
+                                <img src="assets/images/common/avatar/avatar-3.jpg" class="rounded-circle me-2" style="width:40px;height:40px;object-fit:cover" />
+                                <div>
+                                    <div class="fw-bold">Caitlyn King</div>
+                                    <div class="text-muted small">caitlyn@untitledui.com</div>
+                                </div>
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li><a class="dropdown-item" href="#">My profile <span class="text-muted small">@@caitlyn_king</span></a></li>
+                        <li><a class="dropdown-item" href="#">Account settings</a></li>
+                        <li><a class="dropdown-item" href="#">Sign out</a></li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li><div class="dropdown-item text-muted small">Untitled UI <span class="float-end">v4.0</span></div></li>
+                    </ul>
+                </div>
                 <div class="border-end border-secondary-subtle d-block d-lg-none ms-3" style="height: 24px;"></div>
                 <span id="menu" class="d-block d-lg-none">
                     <SfMenu TValue="MenuItem" CssClass="bg-body-tertiary" HamburgerMode="true" ShowItemOnClick="true" Title="">

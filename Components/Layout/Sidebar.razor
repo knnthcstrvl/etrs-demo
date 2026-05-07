@@ -1,20 +1,16 @@
 @rendermode InteractiveServer
 @inject Financial.State.CustomAuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavManager
+@inject IJSRuntime JS
 @inject Financial.Services.IToastService ToastService
 
-<aside class="etrs-sidebar-shell @(IsOpen ? "is-open" : "is-collapsed")" aria-label="main navigation menu">
-    <div class="etrs-sidebar">
-        <div class="etrs-sidebar-top">
-            <div class="etrs-profile-card">
-                <img class="etrs-profile-avatar" src="/images/user-profile.jpg" alt="user profile picture" />
-
+<aside class="etrs-sidebar-shell @(IsOpen ? "is-open" : "is-collapsed")" aria-label="main navigation menu" @onclick="CloseProfileMenu">
+        <div class="etrs-sidebar">
+    <div class="etrs-sidebar-top">
+            <div class="etrs-sidebar-top-actions">
                 @if (IsOpen)
                 {
-                    <div class="etrs-profile-meta">
-                        <strong>System Administrator</strong>
-                        <span>admin&#64;local</span>
-                    </div>
+                    <span class="etrs-sidebar-logo">ETRS</span>
                 }
 
                 <button type="button"
@@ -46,33 +42,36 @@
         </nav>
 
         <div class="etrs-sidebar-divider etrs-sidebar-divider-bottom"></div>
-        <div class="etrs-sidebar-bottom">
-            <div class="etrs-settings-wrap">
-                <button type="button"
-                        class="etrs-nav-link etrs-nav-button etrs-settings-link"
-                        title="@SettingsItem.Label">
-                    <span class="etrs-nav-icon" aria-hidden="true">
-                        <i class="@SettingsItem.Icon"></i>
-                    </span>
-                    @if (IsOpen)
-                    {
-                        <span class="etrs-nav-label">@SettingsItem.Label</span>
-                    }
-                </button>
+        <div class="etrs-sidebar-bottom" style="position:relative;">
+            <div class="etrs-profile-card etrs-profile-card-bottom">
+                <img class="etrs-profile-avatar" src="/images/user-profile.jpg" alt="user profile picture" />
 
-                <!-- Logout button placed under settings -->
-                <button type="button"
-                        class="etrs-nav-link etrs-nav-button logout-button"
-                        @onclick="Logout"
-                        title="Logout">
-                    <span class="etrs-nav-icon" aria-hidden="true">
-                        <i class="fa-solid fa-right-from-bracket"></i>
-                    </span>
-                    @if (IsOpen)
-                    {
-                        <span class="etrs-nav-label">Logout</span>
-                    }
-                </button>
+                @if (IsOpen)
+                {
+                    <div class="etrs-profile-meta">
+                        <strong>System Administrator</strong>
+                        <span>admin&#64;local</span>
+                    </div>
+
+                    <div class="etrs-profile-actions-wrap">
+                        <button type="button" class="etrs-profile-actions" title="More" @onclick="ToggleProfileMenu" @onclick:stopPropagation @ref="_profileBtn">
+                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                        </button>
+
+                        <!-- Always render overlay so ElementReference is available to JS; hide when closed -->
+                        <div class="etrs-profile-overlay @(IsProfileMenuOpen ? "" : "d-none")" @onclick:stopPropagation @ref="_profileOverlay" role="menu" aria-hidden="@(!IsProfileMenuOpen)">
+                            <button type="button" class="etrs-nav-link etrs-nav-button etrs-settings-link" @onclick="OpenSettings" title="@SettingsItem.Label">
+                                <span class="etrs-nav-icon" aria-hidden="true"><i class="@SettingsItem.Icon"></i></span>
+                                <span class="etrs-nav-label">@SettingsItem.Label</span>
+                            </button>
+
+                            <button type="button" class="etrs-nav-link etrs-nav-button logout-button" @onclick="Logout" title="Logout">
+                                <span class="etrs-nav-icon" aria-hidden="true"><i class="fa-solid fa-right-from-bracket"></i></span>
+                                <span class="etrs-nav-label">Logout</span>
+                            </button>
+                        </div>
+                    </div>
+                }
             </div>
         </div>
     </div>
@@ -90,7 +89,6 @@
         new() { Label = "Dashboard", Url = "/dashboard", Icon = "fa-solid fa-house", Match = NavLinkMatch.All },
         new() { Label = "Attendance Logs", Url = "/attendance-logs", Icon = "fa-solid fa-clock", Match = NavLinkMatch.Prefix },
         new() { Label = "Employees", Url = "/employees", Icon = "fa-regular fa-circle-user", Match = NavLinkMatch.Prefix },
-        new() { Label = "Devices", Url = "/devices", Icon = "fa-solid fa-tablet-screen-button", Match = NavLinkMatch.Prefix },
         new() { Label = "Exceptions", Url = "/exceptions", Icon = "fa-solid fa-triangle-exclamation", Match = NavLinkMatch.Prefix },
         new() { Label = "Users", Url = "/users", Icon = "fa-solid fa-users", Match = NavLinkMatch.Prefix }
     };
@@ -113,6 +111,28 @@
     {
         IsOpen = !IsOpen;
         await IsOpenChanged.InvokeAsync(IsOpen);
+    }
+
+    private bool IsProfileMenuOpen { get; set; }
+    private ElementReference _profileOverlay;
+    private ElementReference _profileBtn;
+
+    private void ToggleProfileMenu()
+    {
+        IsProfileMenuOpen = !IsProfileMenuOpen;
+        _ = JS.InvokeVoidAsync("etrsSidebar.showProfileOverlay", _profileBtn, _profileOverlay, IsProfileMenuOpen);
+    }
+
+    private void CloseProfileMenu()
+    {
+        IsProfileMenuOpen = false;
+    }
+
+    private void OpenSettings()
+    {
+        // navigate to settings page
+        NavManager.NavigateTo("/settings");
+        IsProfileMenuOpen = false;
     }
 
     private void Logout()

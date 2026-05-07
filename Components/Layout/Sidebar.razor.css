@@ -1,0 +1,171 @@
+/* Sidebar styling to match the provided admin panel design */
+:root {
+  --sidebar-collapsed-width: 64px;
+  --sidebar-expanded-width: 280px;
+  --sidebar-bg: #f4f4f7;
+  --panel-bg: #f4f4f7;
+  --muted-text: #5f6672;
+  --sidebar-title: #1f2430;
+  --sidebar-icon-bg: #e1e4ea;
+  --sidebar-frame-border: #d8dbe1;
+  --etrs-top-row-height: 74px;
+}
+
+.etrs-sidebar-shell {
+  display: flex;
+  align-items: stretch;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  flex-shrink: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background: var(--sidebar-bg);
+  transition: width .22s ease, padding .22s ease;
+  box-shadow: none;
+}
+
+.etrs-sidebar-shell.is-collapsed {
+  width: var(--sidebar-collapsed-width);
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.etrs-sidebar-shell.is-open {
+  width: var(--sidebar-expanded-width);
+}
+
+.etrs-sidebar {
+  background: var(--panel-bg);
+  border-radius: 0; /* remove rounded corners */
+  border-right: 1px solid var(--sidebar-frame-border);
+  width: 100%;
+  box-shadow: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: visible; /* allow overlays to escape */
+}
+
+.etrs-sidebar-top {
+  display: flex;
+  align-items: center;
+  min-height: var(--etrs-top-row-height);
+  padding: 0 12px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--sidebar-frame-border);
+}
+
+.etrs-sidebar-top-actions {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+  gap: 10px;
+}
+
+.etrs-profile-card { display:flex; align-items:center; gap:12px; }
+
+.etrs-profile-card-bottom { padding: 12px; }
+
+.etrs-profile-avatar { width: 40px; height: 40px; border-radius: 10px; object-fit:cover; border:1px solid rgba(0,0,0,0.04); background: transparent; }
+
+.etrs-profile-meta { display:flex; flex-direction:column; color:var(--muted-text); }
+
+.etrs-profile-actions { background:transparent; border:0; margin-left:8px; color:var(--muted-text); padding:6px; cursor:pointer; }
+
+.etrs-profile-actions-wrap { position: relative; }
+
+/* allow overlay to escape the bottom container (so it can float outside the sidebar) */
+.etrs-sidebar-bottom { overflow: visible; }
+
+.etrs-profile-overlay {
+  position: absolute; /* will be switched to fixed when moved to body */
+  background: var(--panel-bg);
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 2147483647;
+  min-width: 220px; /* a bit wider to accommodate labels when positioned outside */
+}
+
+.etrs-sidebar-nav { padding: 8px 6px; }
+.etrs-nav-group { display:flex; flex-direction:column; gap:4px; padding:8px 6px; }
+
+.etrs-nav-link { display:flex; align-items:center; gap:12px; padding:10px 12px; color:var(--muted-text); text-decoration:none; border-radius:8px; transition:background-color .12s ease, color .12s ease; }
+
+.etrs-nav-link:hover { background:#eceff4; color:var(--sidebar-title); }
+.etrs-nav-link.active {
+  background: #e6eaef;
+  color: var(--sidebar-title);
+  font-weight: 600;
+}
+.etrs-nav-icon { width:36px; text-align:center; font-size:18px; color:var(--muted-text); }
+.etrs-nav-label { white-space:nowrap; }
+
+/* Hide labels when collapsed and center icons */
+.etrs-sidebar-shell.is-collapsed .etrs-nav-label,
+.etrs-sidebar-shell.is-collapsed .etrs-profile-meta,
+.etrs-sidebar-shell.is-collapsed .etrs-settings-link .etrs-nav-label,
+.etrs-sidebar-shell.is-collapsed .logout-button .etrs-nav-label { display:none; }
+
+.etrs-sidebar-shell.is-collapsed .etrs-nav-link { justify-content:center; padding:12px 0; }
+
+.etrs-sidebar-divider { height:1px; background:var(--sidebar-frame-border); margin:10px 6px; }
+.etrs-sidebar-bottom { margin-top:auto; padding:12px 8px; position:relative; border-top: 1px solid var(--sidebar-frame-border); }
+
+.etrs-settings-wrap { display:flex; flex-direction:column; gap:6px; }
+.etrs-nav-button { display:flex; align-items:center; gap:12px; border:none; background:transparent; color:var(--muted-text); padding:8px 12px; border-radius:8px; }
+.logout-button .etrs-nav-icon i { color:#cd5b4a; }
+
+.etrs-sidebar-shell.is-collapsed .etrs-profile-overlay { display:none !important; }
+
+.etrs-sidebar-logo,
+.etrs-nav-link.active .etrs-nav-label,
+.etrs-profile-meta strong {
+  color: var(--sidebar-title);
+}
+
+.etrs-sidebar-toggle,
+.etrs-profile-actions {
+  background: var(--sidebar-icon-bg);
+  color: var(--sidebar-title);
+}
+
+.etrs-sidebar-shell.is-open .etrs-sidebar-nav,
+.etrs-sidebar-shell.is-open .etrs-nav-group,
+.etrs-sidebar-shell.is-open .etrs-sidebar-bottom {
+  align-items: center;
+}
+
+.etrs-sidebar-shell.is-open .etrs-nav-link,
+.etrs-sidebar-shell.is-open .etrs-nav-button,
+.etrs-sidebar-shell.is-open .etrs-profile-card-bottom {
+  width: min(100%, 240px);
+}
+
+.etrs-sidebar-shell.is-open .etrs-profile-card-bottom {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  column-gap: 12px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.etrs-sidebar-shell.is-open .etrs-profile-avatar {
+  justify-self: center;
+}
+
+.etrs-sidebar-shell.is-open .etrs-profile-meta {
+  min-width: 0;
+}
+
+.etrs-sidebar-shell.is-open .etrs-profile-actions-wrap {
+  justify-self: end;
+}

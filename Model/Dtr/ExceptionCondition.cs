@@ -17,5 +17,7 @@ namespace Financial.Model.Dtr
 
         public DateTime DateCreated { get; set; } = DateTime.UtcNow;
         public DateTime? DateUpdated { get; set; }
+
+        public ICollection<AttendanceLogWfh> AttendanceLogsWfh { get; set; } = new List<AttendanceLogWfh>();
     }
 }

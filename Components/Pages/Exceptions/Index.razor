@@ -3,54 +3,159 @@
 @using Financial.Model.Dtr
 @using Microsoft.EntityFrameworkCore
 @inject ProcurementDbContext Db
+@inject IToastService ToastService
 
 <PageTitle>Exceptions</PageTitle>
 
-<section class="panel-card">
-    <div class="panel-heading">
+<div class="dashboard-shell">
+    <div class="panel-heading attendance-logs-heading">
         <div>
-            <h1>Exception Conditions</h1>
-            <p class="mb-0 text-muted">Reserved table for future exception rules. No seeded data is included.</p>
+            <h1 class="attendance-logs-title">WFH Exceptions</h1>
+            <p class="mb-0 text-muted">Tag all active employees as WFH, then override employees with daily exceptions.</p>
         </div>
     </div>
 
-    @if (conditions.Count == 0)
-    {
-        <div class="empty-state">
-            <strong>No exception conditions yet.</strong>
-            <p class="mb-0 text-muted">The `exceptions_conditions` table is available but intentionally empty.</p>
+    <div class="metric-grid dashboard-metrics attendance-logs-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Active Employees</span>
+            <strong>@activeEmployeeCount</strong>
         </div>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table align-middle">
+        <div class="metric-card">
+            <span class="metric-label">Tagged WFH</span>
+            <strong>@wfhTaggedCount</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Exceptions</span>
+            <strong>@exceptionTaggedCount</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Conditions</span>
+            <strong>@conditions.Count</strong>
+        </div>
+    </div>
+
+    <div class="panel-card attendance-table-card mb-3">
+        <div class="exceptions-toolbar">
+            <div class="exceptions-toolbar-field">
+                <label for="exceptions-date">Attendance Date</label>
+                <InputDate id="exceptions-date" @bind-Value="selectedDate" class="form-control" />
+            </div>
+            <button type="button" class="btn btn-primary" @onclick="TagAllEmployeesAsync" disabled="@isBusy">Tag All Active Employees as WFH</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="LoadPageDataAsync" disabled="@isBusy">Refresh</button>
+        </div>
+    </div>
+
+    <div class="panel-card attendance-table-card">
+        @if (rows.Count == 0)
+        {
+            <div class="empty-state">
+                <strong>No active employees found.</strong>
+                <p class="mb-0 text-muted">Import employees first before applying WFH tags.</p>
+            </div>
+        }
+        else
+        {
+            <table class="table attendance-table">
                 <thead>
                     <tr>
-                        <th>Condition</th>
-                        <th>Description</th>
-                        <th>Status</th>
-                        <th>Created</th>
+                        <th>ID Number</th>
+                        <th>Employee</th>
+                        <th>Division / Unit</th>
+                        <th>Designation</th>
+                        <th>Current Tag</th>
+                        <th>Exception Setup</th>
+                        <th>Updated</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var condition in conditions)
+                    @foreach (var row in PagedRows)
                     {
                         <tr>
-                            <td>@condition.ConditionName</td>
-                            <td>@condition.Description</td>
-                            <td><span class="status-badge @(condition.IsActive ? "status-ok" : "status-warning")">@(condition.IsActive ? "Active" : "Inactive")</span></td>
-                            <td>@condition.DateCreated.ToString("MMM dd, yyyy")</td>
+                            <td><span class="cell-ellipsis" title="@DisplayValue(row.IdNumber)">@DisplayValue(row.IdNumber)</span></td>
+                            <td><span class="cell-ellipsis" title="@row.EmployeeName">@row.EmployeeName</span></td>
+                            <td><span class="cell-ellipsis" title="@DisplayValue(row.DivisionCenterUnit)">@DisplayValue(row.DivisionCenterUnit)</span></td>
+                            <td><span class="cell-ellipsis" title="@DisplayValue(row.Designation)">@DisplayValue(row.Designation)</span></td>
+                            <td>
+                                <span class="status-badge @(row.IsException ? "status-warning" : "status-ok")">@row.CurrentArrangement</span>
+                            </td>
+                            <td>
+                                <select class="form-select form-select-sm" value="@row.SelectedOption" @onchange="e => row.SelectedOption = e.Value?.ToString() ?? WfhOptionValue" disabled="@isBusy">
+                                    <option value="@WfhOptionValue">WFH</option>
+                                    @foreach (var condition in conditions.Where(c => c.IsActive))
+                                    {
+                                        <option value="@condition.ExceptionConditionId">@condition.ConditionName</option>
+                                    }
+                                </select>
+                            </td>
+                            <td><span class="cell-ellipsis" title="@FormatDateTime(row.TagUpdatedAt)">@FormatDateTime(row.TagUpdatedAt)</span></td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveRowAsync(row)" disabled="@isBusy">Save</button>
+                            </td>
                         </tr>
                     }
                 </tbody>
             </table>
+        }
+    </div>
+
+    <div class="table-footer">
+        <div class="table-entries">@GetEntriesText(rows.Count, rowPage)</div>
+        <div class="table-pagination">
+            <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangePage(rowPage - 1)" disabled="@(rowPage <= 1)">&#8249;</button>
+            @foreach (var pageItem in BuildPageItems(TotalPages, rowPage))
+            {
+                if (pageItem.HasValue)
+                {
+                    <button type="button" class="table-page-btn @(pageItem.Value == rowPage ? "active" : null)" @onclick="() => ChangePage(pageItem.Value)">@pageItem.Value</button>
+                }
+                else
+                {
+                    <span class="table-page-ellipsis">...</span>
+                }
+            }
+            <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangePage(rowPage + 1)" disabled="@(rowPage >= TotalPages)">&#8250;</button>
         </div>
+    </div>
+</div>
+
+<style>
+    .exceptions-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: end;
     }
-</section>
+
+    .exceptions-toolbar-field {
+        min-width: 14rem;
+    }
+
+    .exceptions-toolbar-field label {
+        display: block;
+        margin-bottom: 0.35rem;
+        font-weight: 600;
+    }
+</style>
 
 @code {
+    private const int PageSize = 10;
+    private const string WfhOptionValue = "WFH";
+
+    private readonly List<EmployeeTagRow> rows = new();
     private List<ExceptionCondition> conditions = new();
+    private DateTime selectedDate = DateTime.Today;
+    private int activeEmployeeCount;
+    private int wfhTaggedCount;
+    private int exceptionTaggedCount;
+    private int rowPage = 1;
+    private bool isBusy;
+
+    private IEnumerable<EmployeeTagRow> PagedRows => rows
+        .Skip((rowPage - 1) * PageSize)
+        .Take(PageSize);
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(rows.Count / (double)PageSize));
 
     protected override async Task OnInitializedAsync()
     {
@@ -58,5 +163,292 @@
             .AsNoTracking()
             .OrderBy(c => c.ConditionName)
             .ToListAsync();
+
+        await LoadPageDataAsync();
+    }
+
+    private async Task LoadPageDataAsync()
+    {
+        isBusy = true;
+
+        try
+        {
+            rows.Clear();
+
+            var attendanceDate = selectedDate.Date;
+            var employees = await Db.Employees
+                .AsNoTracking()
+                .Where(e => string.Equals(e.Status, "Active"))
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .ToListAsync();
+
+            var logs = await Db.AttendanceLogsWfh
+                .AsNoTracking()
+                .Include(l => l.ExceptionCondition)
+                .Where(l => l.AttendanceDate == attendanceDate)
+                .ToListAsync();
+
+            var logsByEmployeeId = logs.ToDictionary(l => l.EmployeeId);
+
+            foreach (var employee in employees)
+            {
+                logsByEmployeeId.TryGetValue(employee.EmployeeId, out var log);
+                var arrangement = ResolveArrangement(log);
+
+                rows.Add(new EmployeeTagRow
+                {
+                    EmployeeId = employee.EmployeeId,
+                    IdNumber = employee.IdNumber,
+                    EmployeeName = FormatName(employee.LastName, employee.FirstName, employee.MiddleName),
+                    DivisionCenterUnit = employee.DivisionCenterUnit,
+                    Designation = employee.Designation,
+                    CurrentArrangement = arrangement,
+                    SelectedOption = log?.ExceptionConditionId?.ToString() ?? WfhOptionValue,
+                    TagUpdatedAt = log?.TagUpdatedAt,
+                    IsException = !string.Equals(arrangement, WfhOptionValue, StringComparison.OrdinalIgnoreCase)
+                });
+            }
+
+            activeEmployeeCount = employees.Count;
+            wfhTaggedCount = logs.Count(l => string.Equals(l.WorkArrangement, WfhOptionValue, StringComparison.OrdinalIgnoreCase));
+            exceptionTaggedCount = logs.Count(l => !string.Equals(l.WorkArrangement, WfhOptionValue, StringComparison.OrdinalIgnoreCase));
+            rowPage = Math.Clamp(rowPage, 1, TotalPages);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task TagAllEmployeesAsync()
+    {
+        isBusy = true;
+
+        try
+        {
+            var attendanceDate = selectedDate.Date;
+            var now = DateTime.Now;
+            var employees = await Db.Employees
+                .Where(e => string.Equals(e.Status, "Active"))
+                .ToListAsync();
+
+            var logs = await Db.AttendanceLogsWfh
+                .Where(l => l.AttendanceDate == attendanceDate)
+                .ToListAsync();
+
+            var logsByEmployeeId = logs.ToDictionary(l => l.EmployeeId);
+
+            foreach (var employee in employees)
+            {
+                if (!logsByEmployeeId.TryGetValue(employee.EmployeeId, out var log))
+                {
+                    log = new AttendanceLogWfh
+                    {
+                        EmployeeId = employee.EmployeeId,
+                        AttendanceDate = attendanceDate,
+                        IdNumber = employee.IdNumber,
+                        LastName = employee.LastName,
+                        FirstName = employee.FirstName,
+                        MiddleName = employee.MiddleName,
+                        DivisionCenterUnit = employee.DivisionCenterUnit,
+                        Designation = employee.Designation
+                    };
+
+                    Db.AttendanceLogsWfh.Add(log);
+                }
+
+                log.IdNumber = employee.IdNumber;
+                log.LastName = employee.LastName;
+                log.FirstName = employee.FirstName;
+                log.MiddleName = employee.MiddleName;
+                log.DivisionCenterUnit = employee.DivisionCenterUnit;
+                log.Designation = employee.Designation;
+                log.WorkArrangement = WfhOptionValue;
+                log.ExceptionConditionId = null;
+                log.TagUpdatedAt = now;
+            }
+
+            await Db.SaveChangesAsync();
+            ShowToast(ToastType.Success, "WFH tags updated", $"All active employees were tagged as WFH for {attendanceDate:MMM dd, yyyy}.");
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Tagging failed", ex.Message);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+
+        await LoadPageDataAsync();
+    }
+
+    private async Task SaveRowAsync(EmployeeTagRow row)
+    {
+        isBusy = true;
+
+        try
+        {
+            var attendanceDate = selectedDate.Date;
+            var employee = await Db.Employees.FirstOrDefaultAsync(e => e.EmployeeId == row.EmployeeId);
+            if (employee is null)
+            {
+                ShowToast(ToastType.Warning, "Employee not found", "The employee record no longer exists.");
+                return;
+            }
+
+            var log = await Db.AttendanceLogsWfh.FirstOrDefaultAsync(l => l.EmployeeId == row.EmployeeId && l.AttendanceDate == attendanceDate);
+            if (log is null)
+            {
+                log = new AttendanceLogWfh
+                {
+                    EmployeeId = employee.EmployeeId,
+                    AttendanceDate = attendanceDate
+                };
+                Db.AttendanceLogsWfh.Add(log);
+            }
+
+            log.IdNumber = employee.IdNumber;
+            log.LastName = employee.LastName;
+            log.FirstName = employee.FirstName;
+            log.MiddleName = employee.MiddleName;
+            log.DivisionCenterUnit = employee.DivisionCenterUnit;
+            log.Designation = employee.Designation;
+            log.TagUpdatedAt = DateTime.Now;
+
+            if (string.Equals(row.SelectedOption, WfhOptionValue, StringComparison.OrdinalIgnoreCase))
+            {
+                log.WorkArrangement = WfhOptionValue;
+                log.ExceptionConditionId = null;
+            }
+            else if (int.TryParse(row.SelectedOption, out var exceptionConditionId))
+            {
+                var condition = await Db.ExceptionConditions.FirstOrDefaultAsync(c => c.ExceptionConditionId == exceptionConditionId && c.IsActive);
+                if (condition is null)
+                {
+                    ShowToast(ToastType.Warning, "Condition not found", "The selected exception condition is no longer available.");
+                    return;
+                }
+
+                log.WorkArrangement = condition.ConditionName;
+                log.ExceptionConditionId = condition.ExceptionConditionId;
+            }
+            else
+            {
+                ShowToast(ToastType.Warning, "Invalid selection", "Choose a valid WFH exception option.");
+                return;
+            }
+
+            await Db.SaveChangesAsync();
+            ShowToast(ToastType.Success, "Employee tag saved", $"{employee.FirstName} {employee.LastName} was tagged as {log.WorkArrangement}.");
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Save failed", ex.Message);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+
+        await LoadPageDataAsync();
+    }
+
+    private void ChangePage(int page)
+    {
+        rowPage = Math.Clamp(page, 1, TotalPages);
+    }
+
+    private static string ResolveArrangement(AttendanceLogWfh? log)
+    {
+        if (log is null)
+        {
+            return "Not Tagged";
+        }
+
+        if (!string.IsNullOrWhiteSpace(log.ExceptionCondition?.ConditionName))
+        {
+            return log.ExceptionCondition.ConditionName;
+        }
+
+        return string.IsNullOrWhiteSpace(log.WorkArrangement) ? WfhOptionValue : log.WorkArrangement;
+    }
+
+    private static string FormatName(string lastName, string firstName, string middleName)
+    {
+        var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
+        return $"{lastName}, {firstName}{middleInitial}";
+    }
+
+    private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatDateTime(DateTime? value) => value?.ToString("MMM dd, yyyy hh:mm tt") ?? "-";
+
+    private static string GetEntriesText(int totalCount, int currentPage)
+    {
+        if (totalCount == 0)
+        {
+            return "Showing 0 to 0 of 0 entries";
+        }
+
+        var start = ((currentPage - 1) * PageSize) + 1;
+        var end = Math.Min(currentPage * PageSize, totalCount);
+        return $"Showing {start} to {end} of {totalCount} entries";
+    }
+
+    private static IEnumerable<int?> BuildPageItems(int totalPages, int currentPage)
+    {
+        if (totalPages <= 7)
+        {
+            for (var page = 1; page <= totalPages; page++)
+            {
+                yield return page;
+            }
+
+            yield break;
+        }
+
+        yield return 1;
+
+        if (currentPage > 3)
+        {
+            yield return null;
+        }
+
+        for (var page = Math.Max(2, currentPage - 1); page <= Math.Min(totalPages - 1, currentPage + 1); page++)
+        {
+            yield return page;
+        }
+
+        if (currentPage < totalPages - 2)
+        {
+            yield return null;
+        }
+
+        yield return totalPages;
+    }
+
+    private void ShowToast(ToastType type, string title, string message)
+    {
+        ToastService.Show(new ToastMessage
+        {
+            Type = type,
+            Title = title,
+            Message = message
+        });
+    }
+
+    private sealed class EmployeeTagRow
+    {
+        public int EmployeeId { get; set; }
+        public string IdNumber { get; set; } = string.Empty;
+        public string EmployeeName { get; set; } = string.Empty;
+        public string DivisionCenterUnit { get; set; } = string.Empty;
+        public string Designation { get; set; } = string.Empty;
+        public string CurrentArrangement { get; set; } = "Not Tagged";
+        public string SelectedOption { get; set; } = WfhOptionValue;
+        public DateTime? TagUpdatedAt { get; set; }
+        public bool IsException { get; set; }
     }
 }

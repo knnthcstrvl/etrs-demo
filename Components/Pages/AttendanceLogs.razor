@@ -3,33 +3,34 @@
 @using Financial.Model.Dtr
 @using Microsoft.EntityFrameworkCore
 @inject ProcurementDbContext Db
+@inject IJSRuntime JS
 
 @rendermode InteractiveServer
 
-<div class="dashboard-shell app-content">
-    <div class="panel-heading">
+<div class="dashboard-shell">
+    <div class="panel-heading attendance-logs-heading">
         <div>
-            <h1>Attendance Logs</h1>
-            <span>Onsite and work-from-home records</span>
+            <h1 class="attendance-logs-title">Attendance Logs</h1>
         </div>
+        <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="ExportAttendanceLogsAsync">Export</button>
     </div>
 
-    <div class="metric-grid" style="margin-top:1rem;display:flex;gap:0;">
+    <div class="metric-grid dashboard-metrics attendance-logs-metrics">
         <div class="metric-card">
             <span class="metric-label">Onsite</span>
             <strong>@onsiteLogs.Count</strong>
         </div>
         <div class="metric-card">
-            <span class="metric-label">WFH</span>
-            <strong>@wfhLogs.Count</strong>
+            <span class="metric-label">WFH Tagged</span>
+            <strong>@wfhTaggedCount</strong>
         </div>
         <div class="metric-card">
             <span class="metric-label">Employees</span>
             <strong>@employeeCount</strong>
         </div>
         <div class="metric-card">
-            <span class="metric-label">Today</span>
-            <strong>@(onsiteLogs.Count(l => l.AttendanceDate == DateTime.Today) + wfhLogs.Count(l => l.AttendanceDate == DateTime.Today))</strong>
+            <span class="metric-label">Exceptions Today</span>
+            <strong>@exceptionTodayCount</strong>
         </div>
     </div>
 
@@ -55,16 +56,16 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var log in onsiteLogs)
+                        @foreach (var log in PagedOnsiteLogs)
                         {
                             <tr>
-                                <td>@log.IdNumber</td>
-                                <td>@FormatName(log.LastName, log.FirstName, log.MiddleName)</td>
-                                <td>@log.DivisionCenterUnit</td>
-                                <td>@log.Designation</td>
-                                <td class="time-cell">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</td>
-                                <td class="time-cell">@FormatTimeRange(log.TimeInPm, log.TimeOutPm)</td>
-                                <td>@(string.IsNullOrWhiteSpace(log.Tardiness) ? "-" : log.Tardiness)</td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.IdNumber)">@DisplayValue(log.IdNumber)</span></td>
+                                <td><span class="cell-ellipsis" title="@FormatName(log.LastName, log.FirstName, log.MiddleName)">@FormatName(log.LastName, log.FirstName, log.MiddleName)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.DivisionCenterUnit)">@DisplayValue(log.DivisionCenterUnit)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.Designation)">@DisplayValue(log.Designation)</span></td>
+                                <td class="time-cell"><span class="cell-ellipsis" title="@FormatTimeRange(log.TimeInAm, log.TimeOutAm)">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</span></td>
+                                <td class="time-cell"><span class="cell-ellipsis" title="@FormatTimeRange(log.TimeInPm, log.TimeOutPm)">@FormatTimeRange(log.TimeInPm, log.TimeOutPm)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.Tardiness)">@DisplayValue(log.Tardiness)</span></td>
                             </tr>
                         }
                     </tbody>
@@ -82,54 +83,110 @@
                             <th>Target</th>
                             <th>Accomplishment</th>
                             <th>MOV</th>
+                            <th>Arrangement</th>
+                            <th>Status</th>
                             <th>Time In</th>
                             <th>Time Out</th>
                             <th>Tardiness</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var log in wfhLogs)
+                        @foreach (var log in PagedWfhLogs)
                         {
                             <tr>
-                                <td>@log.IdNumber</td>
-                                <td>@FormatName(log.LastName, log.FirstName, log.MiddleName)</td>
-                                <td>@log.DivisionCenterUnit</td>
-                                <td>@log.Designation</td>
-                                <td>@DisplayValue(log.Target)</td>
-                                <td>@DisplayValue(log.Accomplishment)</td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.IdNumber)">@DisplayValue(log.IdNumber)</span></td>
+                                <td><span class="cell-ellipsis" title="@FormatName(log.LastName, log.FirstName, log.MiddleName)">@FormatName(log.LastName, log.FirstName, log.MiddleName)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.DivisionCenterUnit)">@DisplayValue(log.DivisionCenterUnit)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.Designation)">@DisplayValue(log.Designation)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.Target)">@DisplayValue(log.Target)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.Accomplishment)">@DisplayValue(log.Accomplishment)</span></td>
                                 <td>
                                     @if (string.IsNullOrWhiteSpace(log.Mov))
                                     {
-                                        <span>-</span>
+                                        <span class="cell-ellipsis" title="-">-</span>
                                     }
                                     else
                                     {
-                                        <a href="@log.Mov" target="_blank">View File</a>
+                                        <a class="cell-ellipsis" href="@log.Mov" target="_blank" title="@log.Mov">View File</a>
                                     }
                                 </td>
-                                <td class="time-cell">@FormatTime(log.TimeIn)</td>
-                                <td class="time-cell">@FormatTime(log.TimeOut)</td>
-                                <td>@(string.IsNullOrWhiteSpace(log.Tardiness) ? "-" : log.Tardiness)</td>
+                                <td><span class="cell-ellipsis" title="@GetWorkArrangement(log)">@GetWorkArrangement(log)</span></td>
+                                <td><span class="cell-ellipsis" title="@GetWfhAttendanceStatus(log)">@GetWfhAttendanceStatus(log)</span></td>
+                                <td class="time-cell"><span class="cell-ellipsis" title="@FormatTime(log.TimeIn)">@FormatTime(log.TimeIn)</span></td>
+                                <td class="time-cell"><span class="cell-ellipsis" title="@FormatTime(log.TimeOut)">@FormatTime(log.TimeOut)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayValue(log.Tardiness)">@DisplayValue(log.Tardiness)</span></td>
                             </tr>
                         }
                     </tbody>
                 </table>
             }
         </div>
+        @if (viewMode == "onsite")
+        {
+            <div class="table-footer">
+                <div class="table-entries">@GetEntriesText(onsiteLogs.Count, onsitePage)</div>
+                <div class="table-pagination">
+                    <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeOnsitePage(onsitePage - 1)" disabled="@(onsitePage <= 1)">&#8249;</button>
+                    @foreach (var pageItem in BuildPageItems(OnsiteTotalPages, onsitePage))
+                    {
+                        if (pageItem.HasValue)
+                        {
+                            <button type="button" class="table-page-btn @(pageItem.Value == onsitePage ? "active" : null)" @onclick="() => ChangeOnsitePage(pageItem.Value)">@pageItem.Value</button>
+                        }
+                        else
+                        {
+                            <span class="table-page-ellipsis">...</span>
+                        }
+                    }
+                    <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeOnsitePage(onsitePage + 1)" disabled="@(onsitePage >= OnsiteTotalPages)">&#8250;</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="table-footer">
+                <div class="table-entries">@GetEntriesText(wfhLogs.Count, wfhPage)</div>
+                <div class="table-pagination">
+                    <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeWfhPage(wfhPage - 1)" disabled="@(wfhPage <= 1)">&#8249;</button>
+                    @foreach (var pageItem in BuildPageItems(WfhTotalPages, wfhPage))
+                    {
+                        if (pageItem.HasValue)
+                        {
+                            <button type="button" class="table-page-btn @(pageItem.Value == wfhPage ? "active" : null)" @onclick="() => ChangeWfhPage(pageItem.Value)">@pageItem.Value</button>
+                        }
+                        else
+                        {
+                            <span class="table-page-ellipsis">...</span>
+                        }
+                    }
+                    <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeWfhPage(wfhPage + 1)" disabled="@(wfhPage >= WfhTotalPages)">&#8250;</button>
+                </div>
+            </div>
+        }
     </div>
 </div>
 
 <style>
+    .attendance-logs-title {
+        font-size: 1.45rem;
+    }
+
+    .attendance-logs-export-btn {
+        align-self: center;
+        white-space: nowrap;
+    }
+
     .attendance-table-card {
         padding: 1rem;
         overflow-x: auto;
     }
 
     .attendance-table {
-        width: 100%;
+        width: max-content;
+        min-width: 100%;
         margin: 0;
         border-collapse: collapse;
-        table-layout: fixed;
+        table-layout: auto;
     }
 
     .attendance-table thead {
@@ -141,9 +198,19 @@
     .attendance-table td {
         padding: 0.85rem 0.75rem;
         vertical-align: top;
-        white-space: normal;
-        word-break: break-word;
-        overflow-wrap: anywhere;
+        white-space: nowrap;
+    }
+
+    .attendance-table th {
+        min-width: 8rem;
+    }
+
+    .attendance-table .cell-ellipsis {
+        display: block;
+        max-width: 18rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .attendance-table tbody tr {
@@ -151,68 +218,35 @@
     }
 
     .attendance-table .time-cell {
-        white-space: pre-line;
-        overflow-wrap: normal;
-        word-break: normal;
+        min-width: 10rem;
     }
 
-    .attendance-table-wfh th:nth-child(1),
-    .attendance-table-wfh td:nth-child(1) { width: 8%; }
-
-    .attendance-table-wfh th:nth-child(2),
-    .attendance-table-wfh td:nth-child(2) { width: 12%; }
-
-    .attendance-table-wfh th:nth-child(3),
-    .attendance-table-wfh td:nth-child(3) { width: 13%; }
-
-    .attendance-table-wfh th:nth-child(4),
-    .attendance-table-wfh td:nth-child(4) { width: 10%; }
-
-    .attendance-table-wfh th:nth-child(5),
-    .attendance-table-wfh td:nth-child(5) { width: 18%; }
-
-    .attendance-table-wfh th:nth-child(6),
-    .attendance-table-wfh td:nth-child(6) { width: 18%; }
-
-    .attendance-table-wfh th:nth-child(7),
-    .attendance-table-wfh td:nth-child(7) { width: 7%; }
-
-    .attendance-table-wfh th:nth-child(8),
-    .attendance-table-wfh td:nth-child(8) { width: 7%; }
-
-    .attendance-table-wfh th:nth-child(9),
-    .attendance-table-wfh td:nth-child(9) { width: 7%; }
-
-    .attendance-table-wfh th:nth-child(10),
-    .attendance-table-wfh td:nth-child(10) { width: 10%; }
-
-    .attendance-table-onsite th:nth-child(1),
-    .attendance-table-onsite td:nth-child(1) { width: 12%; }
-
-    .attendance-table-onsite th:nth-child(2),
-    .attendance-table-onsite td:nth-child(2) { width: 16%; }
-
-    .attendance-table-onsite th:nth-child(3),
-    .attendance-table-onsite td:nth-child(3) { width: 22%; }
-
-    .attendance-table-onsite th:nth-child(4),
-    .attendance-table-onsite td:nth-child(4) { width: 16%; }
-
-    .attendance-table-onsite th:nth-child(5),
-    .attendance-table-onsite td:nth-child(5) { width: 14%; }
-
-    .attendance-table-onsite th:nth-child(6),
-    .attendance-table-onsite td:nth-child(6) { width: 14%; }
-
-    .attendance-table-onsite th:nth-child(7),
-    .attendance-table-onsite td:nth-child(7) { width: 12%; }
+    .attendance-table .time-cell .cell-ellipsis {
+        max-width: 11rem;
+    }
 </style>
 
 @code {
+    private const int PageSize = 10;
     private string viewMode = "onsite";
     private int employeeCount;
+    private int wfhTaggedCount;
+    private int exceptionTodayCount;
     private List<AttendanceLog> onsiteLogs = new();
     private List<AttendanceLogWfh> wfhLogs = new();
+    private int onsitePage = 1;
+    private int wfhPage = 1;
+
+    private IEnumerable<AttendanceLog> PagedOnsiteLogs => onsiteLogs
+        .Skip((onsitePage - 1) * PageSize)
+        .Take(PageSize);
+
+    private IEnumerable<AttendanceLogWfh> PagedWfhLogs => wfhLogs
+        .Skip((wfhPage - 1) * PageSize)
+        .Take(PageSize);
+
+    private int OnsiteTotalPages => Math.Max(1, (int)Math.Ceiling(onsiteLogs.Count / (double)PageSize));
+    private int WfhTotalPages => Math.Max(1, (int)Math.Ceiling(wfhLogs.Count / (double)PageSize));
 
     protected override async Task OnInitializedAsync()
     {
@@ -227,10 +261,16 @@
 
         wfhLogs = await Db.AttendanceLogsWfh
             .AsNoTracking()
+            .Include(l => l.ExceptionCondition)
             .OrderByDescending(l => l.AttendanceDate)
             .ThenBy(l => l.LastName)
             .ThenBy(l => l.FirstName)
             .ToListAsync();
+
+        wfhTaggedCount = wfhLogs.Count(l => string.Equals(GetWorkArrangement(l), "WFH", StringComparison.OrdinalIgnoreCase));
+        exceptionTodayCount = wfhLogs.Count(l =>
+            l.AttendanceDate == DateTime.Today &&
+            !string.Equals(GetWorkArrangement(l), "WFH", StringComparison.OrdinalIgnoreCase));
 
         // Compute tardiness/absent labels in-memory according to rules
         foreach (var log in wfhLogs)
@@ -255,15 +295,99 @@
     private static string FormatTimeRange(DateTime? start, DateTime? end)
         => $"{(start?.ToString("hh:mm tt") ?? "-")} / {(end?.ToString("hh:mm tt") ?? "-")}";
 
+    private void ChangeOnsitePage(int page)
+    {
+        onsitePage = Math.Clamp(page, 1, OnsiteTotalPages);
+    }
+
+    private void ChangeWfhPage(int page)
+    {
+        wfhPage = Math.Clamp(page, 1, WfhTotalPages);
+    }
+
+    private static string GetEntriesText(int totalCount, int currentPage)
+    {
+        if (totalCount == 0)
+        {
+            return "Showing 0 to 0 of 0 entries";
+        }
+
+        var start = ((currentPage - 1) * PageSize) + 1;
+        var end = Math.Min(currentPage * PageSize, totalCount);
+        return $"Showing {start} to {end} of {totalCount} entries";
+    }
+
+    private static IEnumerable<int?> BuildPageItems(int totalPages, int currentPage)
+    {
+        if (totalPages <= 7)
+        {
+            for (var page = 1; page <= totalPages; page++)
+            {
+                yield return page;
+            }
+
+            yield break;
+        }
+
+        yield return 1;
+
+        if (currentPage > 3)
+        {
+            yield return null;
+        }
+
+        for (var page = Math.Max(2, currentPage - 1); page <= Math.Min(totalPages - 1, currentPage + 1); page++)
+        {
+            yield return page;
+        }
+
+        if (currentPage < totalPages - 2)
+        {
+            yield return null;
+        }
+
+        yield return totalPages;
+    }
+
     private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string GetWorkArrangement(AttendanceLogWfh log)
+        => !string.IsNullOrWhiteSpace(log.ExceptionCondition?.ConditionName)
+            ? log.ExceptionCondition.ConditionName
+            : string.IsNullOrWhiteSpace(log.WorkArrangement) ? "WFH" : log.WorkArrangement;
+
+    private static string GetWfhAttendanceStatus(AttendanceLogWfh log)
+    {
+        var arrangement = GetWorkArrangement(log);
+        if (!string.Equals(arrangement, "WFH", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Exception";
+        }
+
+        if (!log.TimeIn.HasValue && !log.TimeOut.HasValue)
+        {
+            return "Tagged";
+        }
+
+        if (!log.TimeIn.HasValue || !log.TimeOut.HasValue)
+        {
+            return "Incomplete";
+        }
+
+        return "Submitted";
+    }
 
     // --- Tardiness calculation helpers ---
     private static string ComputeTardinessForWfh(AttendanceLogWfh log)
     {
-        // Strict WFH rules: missing TimeIn or TimeOut => Absent
+        if (!string.Equals(GetWorkArrangement(log), "WFH", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
         if (!log.TimeIn.HasValue || !log.TimeOut.HasValue)
         {
-            return "Absent";
+            return string.Empty;
         }
 
         var date = log.AttendanceDate.Date;
@@ -328,7 +452,7 @@
         }
 
         // Use AM time if available for tardiness calculation, otherwise use first available timeIn
-        var timeIn = timeInAm ?? timeInPm.Value;
+        var timeIn = timeInAm ?? timeInPm!.Value;
 
         var sevenAm = date.AddHours(7);
         var eightAm = date.AddHours(8);
@@ -369,6 +493,130 @@
 
         var minutePart = minutes == 1 ? "1min" : $"{minutes}mins";
         return $"{hourPart} and {minutePart} late";
+    }
+
+    private async Task ExportAttendanceLogsAsync()
+    {
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+        var onsiteCsv = BuildOnsiteCsv();
+        var wfhCsv = BuildWfhCsv();
+
+        await JS.InvokeVoidAsync("attendanceLogs.downloadCsv", $"attendance_logs_onsite_{timestamp}.csv", onsiteCsv);
+        await JS.InvokeVoidAsync("attendanceLogs.downloadCsv", $"attendance_logs_wfh_{timestamp}.csv", wfhCsv);
+    }
+
+    private string BuildOnsiteCsv()
+    {
+        var rows = new List<string>
+        {
+            string.Join(",", new[]
+            {
+                "AttendanceLogId",
+                "EmployeeId",
+                "BiometricDeviceId",
+                "IdNumber",
+                "LastName",
+                "FirstName",
+                "MiddleName",
+                "DivisionCenterUnit",
+                "Designation",
+                "TimeInAm",
+                "TimeOutAm",
+                "TimeInPm",
+                "TimeOutPm",
+                "Tardiness",
+                "AttendanceDate"
+            })
+        };
+
+        rows.AddRange(onsiteLogs.Select(log => string.Join(",", new[]
+        {
+            CsvValue(log.AttendanceLogId),
+            CsvValue(log.EmployeeId),
+            CsvValue(log.BiometricDeviceId),
+            CsvValue(log.IdNumber),
+            CsvValue(log.LastName),
+            CsvValue(log.FirstName),
+            CsvValue(log.MiddleName),
+            CsvValue(log.DivisionCenterUnit),
+            CsvValue(log.Designation),
+            CsvValue(log.TimeInAm),
+            CsvValue(log.TimeOutAm),
+            CsvValue(log.TimeInPm),
+            CsvValue(log.TimeOutPm),
+            CsvValue(log.Tardiness),
+            CsvValue(log.AttendanceDate)
+        })));
+
+        return string.Join(Environment.NewLine, rows);
+    }
+
+    private string BuildWfhCsv()
+    {
+        var rows = new List<string>
+        {
+            string.Join(",", new[]
+            {
+                "AttendanceLogWfhId",
+                "EmployeeId",
+                "IdNumber",
+                "LastName",
+                "FirstName",
+                "MiddleName",
+                "DivisionCenterUnit",
+                "Designation",
+                "Target",
+                "Accomplishment",
+                "Mov",
+                "WorkArrangement",
+                "AttendanceStatus",
+                "TimeIn",
+                "TimeOut",
+                "Tardiness",
+                "AttendanceDate"
+            })
+        };
+
+        rows.AddRange(wfhLogs.Select(log => string.Join(",", new[]
+        {
+            CsvValue(log.AttendanceLogWfhId),
+            CsvValue(log.EmployeeId),
+            CsvValue(log.IdNumber),
+            CsvValue(log.LastName),
+            CsvValue(log.FirstName),
+            CsvValue(log.MiddleName),
+            CsvValue(log.DivisionCenterUnit),
+            CsvValue(log.Designation),
+            CsvValue(log.Target),
+            CsvValue(log.Accomplishment),
+            CsvValue(log.Mov),
+            CsvValue(GetWorkArrangement(log)),
+            CsvValue(GetWfhAttendanceStatus(log)),
+            CsvValue(log.TimeIn),
+            CsvValue(log.TimeOut),
+            CsvValue(log.Tardiness),
+            CsvValue(log.AttendanceDate)
+        })));
+
+        return string.Join(Environment.NewLine, rows);
+    }
+
+    private static string CsvValue(object? value)
+    {
+        if (value is null)
+        {
+            return "\"\"";
+        }
+
+        var text = value switch
+        {
+            DateTime dateTime => dateTime.ToString("yyyy-MM-dd HH:mm:ss"),
+            DateTimeOffset dateTimeOffset => dateTimeOffset.ToString("yyyy-MM-dd HH:mm:ss zzz"),
+            _ => value.ToString() ?? string.Empty
+        };
+
+        return $"\"{text.Replace("\"", "\"\"")}\"";
     }
 
 }

@@ -9,15 +9,19 @@
 @inject IToastService ToastService
 @inject IWebHostEnvironment Environment
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject IJSRuntime JS
 @layout BlankLayout
 
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 
 <PageTitle>ETRS - Work From Home</PageTitle>
 
 <div class="etr-shell">
+    <img class="corner-logo logo-left" src="/images/bswm-light.png" alt="bswm" />
+    <img class="corner-logo logo-right" src="/images/bagong-pilipinas.png" alt="bagong-pilipinas" />
     <div class="etr-card">
-        <h1 class="etr-title">ETRS<br>Work From Home</h1>
+        <h1 class="etr-title">Electronic Time Record<br>Work From Home</h1>
 
         <div class="etr-form-wrap">
             <p class="etr-sub">Log your WFH attendance using your employee ID number. Time in records target, while time out records accomplishment and optional MOV upload.</p>
@@ -43,7 +47,7 @@
 
                 <div class="form-row">
                     <label class="required-star">ID Number</label>
-                    <div class="employee-search-wrap">
+                    <div class="employee-search-wrap" @ref="employeeSearchWrapRef">
                         <div class="employee-search-input-wrap">
                             <input
                                 value="@employeeSearchText"
@@ -124,6 +128,7 @@
 
 <style>
     .etr-shell {
+        position: relative;
         min-height: 100vh;
         display: flex;
         align-items: center;
@@ -133,6 +138,35 @@
         background-size: cover;
         background-repeat: no-repeat;
         padding: 2rem;
+    }
+
+    .corner-logo {
+        position: absolute;
+        top: 1.25rem;
+        /* increased default width to make images bigger */
+        width: 220px;
+        /* allow a larger relative size on small viewports */
+        max-width: 36%;
+        height: auto;
+        object-fit: contain;
+        z-index: 30;
+    }
+
+    .logo-left { left: 1.25rem; }
+    .logo-right { right: 1.25rem; }
+
+    @@media (max-width: 1024px) {
+        /* reduce image size for tablet view */
+        .corner-logo { width: 160px; top: 1rem; max-width: 30%; }
+        .logo-left { left: 1rem; }
+        .logo-right { right: 1rem; }
+    }
+
+    @@media (max-width: 640px) {
+        /* make images smaller on mobile while keeping them responsive */
+        .corner-logo { width: 120px; top: 0.6rem; }
+        .logo-left { left: 0.5rem; }
+        .logo-right { right: 0.5rem; }
     }
 
     .etr-card {
@@ -461,6 +495,9 @@
     private Employee? selectedEmployee;
     private bool showEmployeeResults;
     private string employeeSearchText = string.Empty;
+    private ElementReference employeeSearchWrapRef;
+    private DotNetObjectReference<EtrWorkFromHome>? dotNetRef;
+    private bool pendingRegisterOutsideClick;
 
     private class EtrEntryModel
         : IValidatableObject
@@ -558,7 +595,9 @@
 
             var today = DateTime.Today;
             var now = DateTime.Now;
-            var log = await Db.AttendanceLogsWfh.FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == today);
+            var log = await Db.AttendanceLogsWfh
+                .Include(l => l.ExceptionCondition)
+                .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == today);
 
             if (log is null)
             {
@@ -571,9 +610,27 @@
                     FirstName = employee.FirstName,
                     MiddleName = employee.MiddleName,
                     DivisionCenterUnit = employee.DivisionCenterUnit,
-                    Designation = employee.Designation
+                    Designation = employee.Designation,
+                    WorkArrangement = "WFH",
+                    TagUpdatedAt = now
                 };
                 Db.AttendanceLogsWfh.Add(log);
+            }
+
+            if (!string.Equals(log.WorkArrangement, "WFH", StringComparison.OrdinalIgnoreCase))
+            {
+                var arrangementLabel = string.IsNullOrWhiteSpace(log.ExceptionCondition?.ConditionName)
+                    ? log.WorkArrangement
+                    : log.ExceptionCondition.ConditionName;
+
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = "WFH blocked",
+                    Message = $"{employee.FirstName} {employee.LastName} is tagged as {arrangementLabel} for today and cannot submit a WFH log.",
+                    Duration = 5000
+                });
+                return;
             }
 
             if (entryModel.LogType == "IN")
@@ -673,6 +730,16 @@
         await SearchEmployeesAsync(selectedEmployee is null ? employeeSearchText : entryModel.IdNumber);
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await UnregisterOutsideClickAsync();
+        }
+        catch { }
+        dotNetRef?.Dispose();
+    }
+
     private async Task HandleMovSelected(InputFileChangeEventArgs e)
     {
         entryModel.MovFile = e.File;
@@ -694,13 +761,17 @@
     private async Task SearchEmployeesAsync(string? searchText)
     {
         var query = (searchText ?? string.Empty).Trim();
-        showEmployeeResults = query.Length >= 3;
+        var shouldShow = query.Length >= 3;
+        showEmployeeResults = shouldShow;
 
         if (!showEmployeeResults)
         {
             employeeSearchResults.Clear();
             return;
         }
+
+        // Defer registering the outside click handler until after render
+        pendingRegisterOutsideClick = shouldShow;
 
         employeeSearchResults = await Db.Employees
             .AsNoTracking()
@@ -710,13 +781,50 @@
             .Take(12)
             .ToListAsync();
     }
-
-    private void SelectEmployee(Employee employee)
+    private async Task SelectEmployee(Employee employee)
     {
         selectedEmployee = employee;
         entryModel.IdNumber = employee.IdNumber;
         employeeSearchText = $"{employee.IdNumber} - {FormatEmployeeName(employee)}";
         showEmployeeResults = false;
+        await UnregisterOutsideClickAsync();
+    }
+
+    [JSInvokable]
+    public Task HideEmployeeResults()
+    {
+        if (!showEmployeeResults) return Task.CompletedTask;
+        showEmployeeResults = false;
+        StateHasChanged();
+        return UnregisterOutsideClickAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (pendingRegisterOutsideClick && showEmployeeResults)
+        {
+            pendingRegisterOutsideClick = false;
+            await RegisterOutsideClickAsync();
+        }
+    }
+
+    private async Task RegisterOutsideClickAsync()
+    {
+        try
+        {
+            dotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("etrWorkFromHome.registerOutsideClick", employeeSearchWrapRef, dotNetRef);
+        }
+        catch { }
+    }
+
+    private async Task UnregisterOutsideClickAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("etrWorkFromHome.unregisterOutsideClick", employeeSearchWrapRef);
+        }
+        catch { }
     }
 
     private static string FormatEmployeeName(Employee employee)

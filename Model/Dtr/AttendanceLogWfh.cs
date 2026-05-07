@@ -41,6 +41,14 @@ namespace Financial.Model.Dtr
         [MaxLength(50)]
         public string Tardiness { get; set; } = string.Empty;
 
+        [MaxLength(100)]
+        public string WorkArrangement { get; set; } = "WFH";
+
+        public int? ExceptionConditionId { get; set; }
+        public ExceptionCondition? ExceptionCondition { get; set; }
+
+        public DateTime? TagUpdatedAt { get; set; }
+
         public DateTime AttendanceDate { get; set; } = DateTime.Today;
     }
 }

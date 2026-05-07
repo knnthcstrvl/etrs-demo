@@ -7,7 +7,7 @@
 <div class="toast-wrapper" aria-live="polite" aria-atomic="true">
     @foreach (var t in _toasts)
     {
-        <div class="toast-item @GetTypeClass(t.Type)" id="toast-@t.Id">
+        <div class="toast-item @GetTypeClass(t.Type) @(GetToastStateClass(t.Id))" id="toast-@t.Id">
             <div class="toast-left">
                 <div class="toast-icon">@GetIcon(t.Type)</div>
             </div>
@@ -22,7 +22,10 @@
 
 @code {
     private readonly List<ToastMessage> _toasts = new();
-    private const int MaxVisible = 1; // show only one toast at a time
+    // track visible / leaving states for CSS transitions
+    private readonly HashSet<string> _visible = new();
+    private readonly HashSet<string> _leaving = new();
+    private const int MaxVisible = 5; // allow multiple toasts to be visible and stack under each other
 
     protected override void OnInitialized()
     {
@@ -56,6 +59,13 @@
             }
 
             _toasts.Add(message);
+            // ensure enter animation: mark not visible initially, then set visible after render
+            _ = Task.Run(async () => {
+                // small delay to allow element to be added to DOM and painted
+                await Task.Delay(50);
+                _visible.Add(message.Id);
+                try { InvokeAsync(StateHasChanged); } catch { }
+            });
             // write a debug message to the browser console to help troubleshooting
             try { JS.InvokeVoidAsync("console.log", "ToastContainer: show", message.Title, message.Message); } catch { }
             StateHasChanged();
@@ -75,12 +85,29 @@
 
     private void Hide(string id)
     {
+        // if already leaving or not present, ignore
+        if (_leaving.Contains(id)) return;
+
         var existing = _toasts.Find(t => t.Id == id);
-        if (existing != null)
-        {
-            _toasts.Remove(existing);
-            InvokeAsync(StateHasChanged);
-        }
+        if (existing is null) return;
+
+        // start leave transition by removing visible flag and adding leaving flag
+        _visible.Remove(id);
+        _leaving.Add(id);
+        InvokeAsync(StateHasChanged);
+
+        // after CSS transition completes, remove from list
+        _ = Task.Run(async () => {
+            await Task.Delay(300); // match CSS animation duration
+            try
+            {
+                _toasts.RemoveAll(t => t.Id == id);
+                _leaving.Remove(id);
+                _visible.Remove(id);
+                InvokeAsync(StateHasChanged);
+            }
+            catch { }
+        });
     }
 
     private void Close(string id) => Hide(id);
@@ -98,6 +125,13 @@
         ToastType.Warning => "toast-warning",
         _ => "toast-info",
     };
+
+    private string GetToastStateClass(string id)
+    {
+        if (_leaving.Contains(id)) return "toast-leaving";
+        if (_visible.Contains(id)) return "toast-visible";
+        return "toast-entering";
+    }
 
     private static MarkupString GetIcon(ToastType type)
     {

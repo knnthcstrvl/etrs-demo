@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Financial</name>
+    </assembly>
+    <members>
+        <member name="M:Financial.Controllers.ProcurementController.Upsert(Financial.DTO.ProcurementCreateUpdateDto)">
+            <summary>
+            Create or update procurement details
+            </summary>
+        </member>
+        <member name="M:Financial.Controllers.ProcurementController.Get(System.Int32)">
+            <summary>
+            Get procurement details by transaction
+            </summary>
+        </member>
+        <member name="P:Financial.Models.ToastMessage.Duration">
+            <summary>
+            Duration in milliseconds (0 = sticky)
+            </summary>
+        </member>
+        <member name="T:Program">
+            <summary>
+            Auto-generated public partial Program class for top-level statement apps.
+            </summary>
+        </member>
+    </members>
+</doc>

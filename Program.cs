@@ -135,6 +135,7 @@ using (var scope = app.Services.CreateScope())
         await DatabaseSchemaUpdater.EnsureAttendanceLogWfhColumnsAsync(db);
         await UserAccountSeeder.SeedAdminAsync(db);
         await EmployeeSeeder.SeedAsync(db);
+        await ExceptionConditionSeeder.SeedAsync(db);
     }
     catch (Exception ex)
     {

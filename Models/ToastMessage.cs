@@ -19,6 +19,6 @@ namespace Financial.Models
         /// <summary>
         /// Duration in milliseconds (0 = sticky)
         /// </summary>
-        public int Duration { get; set; } = 20000;
+        public int Duration { get; set; } = 15000;
     }
 }

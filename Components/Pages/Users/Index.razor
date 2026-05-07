@@ -6,16 +6,34 @@
 
 <PageTitle>Users</PageTitle>
 
-<section class="panel-card">
-    <div class="panel-heading">
+<div class="dashboard-shell">
+    <div class="panel-heading attendance-logs-heading">
         <div>
-            <h1>System Users</h1>
-            <p class="mb-0 text-muted">Application users stored in the new `users` table.</p>
+            <h1 class="attendance-logs-title">System Users</h1>
         </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table align-middle">
+    <div class="metric-grid dashboard-metrics attendance-logs-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Users</span>
+            <strong>@users.Count</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Active</span>
+            <strong>@activeUsers</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Inactive</span>
+            <strong>@inactiveUsers</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Admins</span>
+            <strong>@adminUsers</strong>
+        </div>
+    </div>
+
+    <div class="panel-card attendance-table-card">
+        <table class="table attendance-table">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -29,26 +47,55 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var user in users)
+                @foreach (var user in PagedUsers)
                 {
                     <tr>
-                        <td>@FormatName(user.LastName, user.FirstName, user.MiddleName)</td>
-                        <td>@user.Username</td>
-                        <td>@user.Email</td>
-                        <td>@user.Role</td>
-                        <td>@user.DivisionCenterUnit</td>
-                        <td>@user.Designation</td>
+                        <td><span class="cell-ellipsis" title="@FormatName(user.LastName, user.FirstName, user.MiddleName)">@FormatName(user.LastName, user.FirstName, user.MiddleName)</span></td>
+                        <td><span class="cell-ellipsis" title="@DisplayValue(user.Username)">@DisplayValue(user.Username)</span></td>
+                        <td><span class="cell-ellipsis" title="@DisplayValue(user.Email)">@DisplayValue(user.Email)</span></td>
+                        <td><span class="cell-ellipsis" title="@DisplayValue(user.Role)">@DisplayValue(user.Role)</span></td>
+                        <td><span class="cell-ellipsis" title="@DisplayValue(user.DivisionCenterUnit)">@DisplayValue(user.DivisionCenterUnit)</span></td>
+                        <td><span class="cell-ellipsis" title="@DisplayValue(user.Designation)">@DisplayValue(user.Designation)</span></td>
                         <td><span class="status-badge @(user.IsActive ? "status-ok" : "status-danger")">@(user.IsActive ? "Active" : "Inactive")</span></td>
-                        <td>@user.DateCreated.ToString("MMM dd, yyyy")</td>
+                        <td><span class="cell-ellipsis" title="@FormatDate(user.DateCreated)">@FormatDate(user.DateCreated)</span></td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
-</section>
+    <div class="table-footer">
+        <div class="table-entries">@GetEntriesText(users.Count, userPage)</div>
+        <div class="table-pagination">
+            <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeUserPage(userPage - 1)" disabled="@(userPage <= 1)">&#8249;</button>
+            @foreach (var pageItem in BuildPageItems(UserTotalPages, userPage))
+            {
+                if (pageItem.HasValue)
+                {
+                    <button type="button" class="table-page-btn @(pageItem.Value == userPage ? "active" : null)" @onclick="() => ChangeUserPage(pageItem.Value)">@pageItem.Value</button>
+                }
+                else
+                {
+                    <span class="table-page-ellipsis">...</span>
+                }
+            }
+            <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeUserPage(userPage + 1)" disabled="@(userPage >= UserTotalPages)">&#8250;</button>
+        </div>
+    </div>
+</div>
 
 @code {
+    private const int PageSize = 10;
     private List<UserAccount> users = new();
+    private int activeUsers;
+    private int inactiveUsers;
+    private int adminUsers;
+    private int userPage = 1;
+
+    private IEnumerable<UserAccount> PagedUsers => users
+        .Skip((userPage - 1) * PageSize)
+        .Take(PageSize);
+
+    private int UserTotalPages => Math.Max(1, (int)Math.Ceiling(users.Count / (double)PageSize));
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,6 +104,10 @@
             .OrderBy(u => u.LastName)
             .ThenBy(u => u.FirstName)
             .ToListAsync();
+
+        activeUsers = users.Count(u => u.IsActive);
+        inactiveUsers = users.Count - activeUsers;
+        adminUsers = users.Count(u => string.Equals(u.Role, "Admin", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string FormatName(string lastName, string firstName, string middleName)
@@ -64,4 +115,57 @@
         var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
         return $"{lastName}, {firstName}{middleInitial}";
     }
+
+    private void ChangeUserPage(int page)
+    {
+        userPage = Math.Clamp(page, 1, UserTotalPages);
+    }
+
+    private static string GetEntriesText(int totalCount, int currentPage)
+    {
+        if (totalCount == 0)
+        {
+            return "Showing 0 to 0 of 0 entries";
+        }
+
+        var start = ((currentPage - 1) * PageSize) + 1;
+        var end = Math.Min(currentPage * PageSize, totalCount);
+        return $"Showing {start} to {end} of {totalCount} entries";
+    }
+
+    private static IEnumerable<int?> BuildPageItems(int totalPages, int currentPage)
+    {
+        if (totalPages <= 7)
+        {
+            for (var page = 1; page <= totalPages; page++)
+            {
+                yield return page;
+            }
+
+            yield break;
+        }
+
+        yield return 1;
+
+        if (currentPage > 3)
+        {
+            yield return null;
+        }
+
+        for (var page = Math.Max(2, currentPage - 1); page <= Math.Min(totalPages - 1, currentPage + 1); page++)
+        {
+            yield return page;
+        }
+
+        if (currentPage < totalPages - 2)
+        {
+            yield return null;
+        }
+
+        yield return totalPages;
+    }
+
+    private static string FormatDate(DateTime value) => value.ToString("MMM dd, yyyy");
+
+    private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
 }

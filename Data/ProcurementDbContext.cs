@@ -127,6 +127,12 @@ namespace Financial.Data
                 .HasForeignKey(l => l.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<AttendanceLogWfh>()
+                .HasOne(l => l.ExceptionCondition)
+                .WithMany(c => c.AttendanceLogsWfh)
+                .HasForeignKey(l => l.ExceptionConditionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<AttendanceLog>()
                 .HasIndex(l => new { l.EmployeeId, l.AttendanceDate });
 

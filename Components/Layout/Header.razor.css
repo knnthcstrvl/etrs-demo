@@ -1,0 +1,65 @@
+.finance-header {
+    --etrs-frame-border: #d8dbe1;
+    --etrs-top-row-height: 74px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    min-height: var(--etrs-top-row-height);
+    margin: 0 0 1.5rem;
+    padding: 0 1.5rem;
+    box-sizing: border-box;
+    background: #fff;
+    border-bottom: 1px solid var(--etrs-frame-border);
+}
+
+.finance-header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+}
+
+.finance-header-search {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    justify-content: flex-start;
+    width: 100%;
+    max-width: 960px;
+    margin: 0;
+}
+
+.finance-search-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-size: 0.95rem;
+    flex: 0 0 auto;
+}
+
+.finance-search-input {
+    width: min(100%, 680px);
+    border: 0;
+    outline: none;
+    background: transparent;
+    padding: 0;
+    color: #6b7280;
+    box-shadow: none;
+}
+
+.finance-search-input::-webkit-search-decoration,
+.finance-search-input::-webkit-search-cancel-button,
+.finance-search-input::-webkit-search-results-button,
+.finance-search-input::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+}
+
+@media (max-width: 991.98px) {
+    .finance-header {
+        margin: 0 0 1rem;
+        padding: 0 1rem;
+    }
+}

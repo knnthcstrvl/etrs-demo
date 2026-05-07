@@ -1,21 +1,46 @@
 @page "/employees"
 @using Financial.Data
 @using Financial.Model.Dtr
+@using System.Text
 @using Microsoft.EntityFrameworkCore
 @inject ProcurementDbContext Db
+@inject IJSRuntime JS
 
 <PageTitle>Employees</PageTitle>
 
-<section class="panel-card">
-    <div class="panel-heading">
+<div class="dashboard-shell">
+    <div class="panel-heading attendance-logs-heading">
         <div>
-            <h1>Employees</h1>
-            <p class="mb-0 text-muted">Employee roster mapped to the new `employees` table.</p>
+            <h1 class="attendance-logs-title">Employees</h1>
+        </div>
+        <div class="attendance-logs-header-actions">
+            <InputFile id="employees-import-input" OnChange="ImportEmployeesAsync" accept=".csv" style="display:none;" />
+            <label for="employees-import-input" class="btn btn-outline-secondary mb-0">Import</label>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="ExportEmployeesAsync">Export</button>
         </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table align-middle">
+    <div class="metric-grid dashboard-metrics attendance-logs-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Employees</span>
+            <strong>@employees.Count</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Active</span>
+            <strong>@activeEmployees</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Inactive</span>
+            <strong>@inactiveEmployees</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Divisions</span>
+            <strong>@divisionCount</strong>
+        </div>
+    </div>
+
+    <div class="panel-card attendance-table-card">
+        <table class="table attendance-table">
             <thead>
                 <tr>
                     <th>ID Number</th>
@@ -26,36 +51,431 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var employee in employees)
+                @foreach (var employee in PagedEmployees)
                 {
                     <tr>
-                        <td>@employee.IdNumber</td>
-                        <td>@FormatName(employee.LastName, employee.FirstName, employee.MiddleName)</td>
-                        <td>@employee.DivisionCenterUnit</td>
-                        <td>@employee.Designation</td>
+                        <td><span class="cell-ellipsis" title="@DisplayValue(employee.IdNumber)">@DisplayValue(employee.IdNumber)</span></td>
+                        <td><span class="cell-ellipsis" title="@FormatName(employee.LastName, employee.FirstName, employee.MiddleName)">@FormatName(employee.LastName, employee.FirstName, employee.MiddleName)</span></td>
+                        <td><span class="cell-ellipsis" title="@DisplayValue(employee.DivisionCenterUnit)">@DisplayValue(employee.DivisionCenterUnit)</span></td>
+                        <td><span class="cell-ellipsis" title="@DisplayValue(employee.Designation)">@DisplayValue(employee.Designation)</span></td>
                         <td><span class="status-badge @(employee.Status == "Active" ? "status-ok" : "status-warning")">@employee.Status</span></td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
-</section>
+    <div class="table-footer">
+        <div class="table-entries">@GetEntriesText(employees.Count, employeePage)</div>
+        <div class="table-pagination">
+            <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeEmployeePage(employeePage - 1)" disabled="@(employeePage <= 1)">&#8249;</button>
+            @foreach (var pageItem in BuildPageItems(EmployeeTotalPages, employeePage))
+            {
+                if (pageItem.HasValue)
+                {
+                    <button type="button" class="table-page-btn @(pageItem.Value == employeePage ? "active" : null)" @onclick="() => ChangeEmployeePage(pageItem.Value)">@pageItem.Value</button>
+                }
+                else
+                {
+                    <span class="table-page-ellipsis">...</span>
+                }
+            }
+            <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeEmployeePage(employeePage + 1)" disabled="@(employeePage >= EmployeeTotalPages)">&#8250;</button>
+        </div>
+    </div>
+</div>
 
 @code {
+    private const int PageSize = 10;
+    private static readonly string[] EmployeeCsvHeaders =
+    {
+        "IdNumber",
+        "LastName",
+        "FirstName",
+        "MiddleName",
+        "DivisionCenterUnit",
+        "Designation",
+        "Status"
+    };
+    private static readonly Dictionary<string, string> EmployeeHeaderAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["EmployeeId"] = "EmployeeId",
+        ["IdNumber"] = "IdNumber",
+        ["ID Number"] = "IdNumber",
+        ["Id Number"] = "IdNumber",
+        ["LastName"] = "LastName",
+        ["Last Name"] = "LastName",
+        ["FirstName"] = "FirstName",
+        ["First Name"] = "FirstName",
+        ["MiddleName"] = "MiddleName",
+        ["Middle Name"] = "MiddleName",
+        ["DivisionCenterUnit"] = "DivisionCenterUnit",
+        ["Division / Unit"] = "DivisionCenterUnit",
+        ["Division/Unit"] = "DivisionCenterUnit",
+        ["Division"] = "DivisionCenterUnit",
+        ["Designation"] = "Designation",
+        ["Status"] = "Status"
+    };
+
     private List<Employee> employees = new();
+    private int activeEmployees;
+    private int inactiveEmployees;
+    private int divisionCount;
+    private int employeePage = 1;
+
+    private IEnumerable<Employee> PagedEmployees => employees
+        .Skip((employeePage - 1) * PageSize)
+        .Take(PageSize);
+
+    private int EmployeeTotalPages => Math.Max(1, (int)Math.Ceiling(employees.Count / (double)PageSize));
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeesAsync();
+    }
+
+    private async Task LoadEmployeesAsync()
     {
         employees = await Db.Employees
             .AsNoTracking()
             .OrderBy(e => e.LastName)
             .ThenBy(e => e.FirstName)
             .ToListAsync();
+
+        activeEmployees = employees.Count(e => string.Equals(e.Status, "Active", StringComparison.OrdinalIgnoreCase));
+        inactiveEmployees = employees.Count - activeEmployees;
+        divisionCount = employees
+            .Select(e => e.DivisionCenterUnit)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        employeePage = Math.Clamp(employeePage, 1, EmployeeTotalPages);
     }
 
     private static string FormatName(string lastName, string firstName, string middleName)
     {
         var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
         return $"{lastName}, {firstName}{middleInitial}";
+    }
+
+    private void ChangeEmployeePage(int page)
+    {
+        employeePage = Math.Clamp(page, 1, EmployeeTotalPages);
+    }
+
+    private static string GetEntriesText(int totalCount, int currentPage)
+    {
+        if (totalCount == 0)
+        {
+            return "Showing 0 to 0 of 0 entries";
+        }
+
+        var start = ((currentPage - 1) * PageSize) + 1;
+        var end = Math.Min(currentPage * PageSize, totalCount);
+        return $"Showing {start} to {end} of {totalCount} entries";
+    }
+
+    private static IEnumerable<int?> BuildPageItems(int totalPages, int currentPage)
+    {
+        if (totalPages <= 7)
+        {
+            for (var page = 1; page <= totalPages; page++)
+            {
+                yield return page;
+            }
+
+            yield break;
+        }
+
+        yield return 1;
+
+        if (currentPage > 3)
+        {
+            yield return null;
+        }
+
+        for (var page = Math.Max(2, currentPage - 1); page <= Math.Min(totalPages - 1, currentPage + 1); page++)
+        {
+            yield return page;
+        }
+
+        if (currentPage < totalPages - 2)
+        {
+            yield return null;
+        }
+
+        yield return totalPages;
+    }
+
+    private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private async Task ExportEmployeesAsync()
+    {
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        await JS.InvokeVoidAsync("attendanceLogs.downloadCsv", $"employees_{timestamp}.csv", BuildEmployeesCsv());
+    }
+
+    private string BuildEmployeesCsv()
+    {
+        var rows = new List<string>
+        {
+            string.Join(",", EmployeeCsvHeaders)
+        };
+
+        rows.AddRange(employees.Select(employee => string.Join(",", new[]
+        {
+            CsvValue(employee.IdNumber),
+            CsvValue(employee.LastName),
+            CsvValue(employee.FirstName),
+            CsvValue(employee.MiddleName),
+            CsvValue(employee.DivisionCenterUnit),
+            CsvValue(employee.Designation),
+            CsvValue(employee.Status)
+        })));
+
+        return string.Join(Environment.NewLine, rows);
+    }
+
+    private async Task ImportEmployeesAsync(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            var content = await reader.ReadToEndAsync();
+            var rows = ParseCsv(content);
+
+            if (rows.Count <= 1)
+            {
+                ShowToast(ToastType.Warning, "Import skipped", "The selected CSV file does not contain any employee rows.");
+                return;
+            }
+
+            var headers = rows[0]
+                .Select(header => (header ?? string.Empty).Trim().TrimStart('\uFEFF'))
+                .ToList();
+
+            var headerMap = BuildHeaderMap(headers);
+            if (headerMap is null)
+            {
+                ShowToast(ToastType.Warning, "Import failed", "Invalid employee CSV format. Use the Employees export file as the template.");
+                return;
+            }
+
+            var existingEmployees = await Db.Employees.ToListAsync();
+            var employeesByIdNumber = existingEmployees
+                .Where(employee => !string.IsNullOrWhiteSpace(employee.IdNumber))
+                .ToDictionary(employee => employee.IdNumber, StringComparer.OrdinalIgnoreCase);
+
+            var inserted = 0;
+            var updated = 0;
+            var skipped = 0;
+
+            foreach (var row in rows.Skip(1))
+            {
+                var values = NormalizeRow(row, headers.Count);
+                if (values.All(string.IsNullOrWhiteSpace))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var idNumber = values[0];
+                Employee employee;
+
+                if (!string.IsNullOrWhiteSpace(idNumber) && employeesByIdNumber.TryGetValue(idNumber, out var existingEmployee))
+                {
+                    employee = existingEmployee;
+                    updated++;
+                }
+                else
+                {
+                    employee = new Employee();
+                    await Db.Employees.AddAsync(employee);
+
+                    if (!string.IsNullOrWhiteSpace(idNumber))
+                    {
+                        employeesByIdNumber[idNumber] = employee;
+                    }
+
+                    inserted++;
+                }
+
+                employee.IdNumber = GetMappedValue(values, headerMap, "IdNumber");
+                employee.LastName = GetMappedValue(values, headerMap, "LastName");
+                employee.FirstName = GetMappedValue(values, headerMap, "FirstName");
+                employee.MiddleName = GetMappedValue(values, headerMap, "MiddleName");
+                employee.DivisionCenterUnit = GetMappedValue(values, headerMap, "DivisionCenterUnit");
+                employee.Designation = GetMappedValue(values, headerMap, "Designation");
+                employee.Status = GetMappedValue(values, headerMap, "Status");
+            }
+
+            await Db.SaveChangesAsync();
+            await LoadEmployeesAsync();
+
+            ShowToast(
+                ToastType.Success,
+                "Employees imported",
+                $"Inserted: {inserted}, Updated: {updated}, Skipped: {skipped}.");
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Import failed", ex.Message);
+        }
+    }
+
+    private static Dictionary<string, int>? BuildHeaderMap(IReadOnlyList<string> headers)
+    {
+        var headerMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < headers.Count; i++)
+        {
+            var rawHeader = headers[i];
+            if (string.IsNullOrWhiteSpace(rawHeader))
+            {
+                continue;
+            }
+
+            if (!EmployeeHeaderAliases.TryGetValue(rawHeader, out var normalizedHeader))
+            {
+                continue;
+            }
+
+            if (!headerMap.ContainsKey(normalizedHeader))
+            {
+                headerMap[normalizedHeader] = i;
+            }
+        }
+
+        foreach (var requiredHeader in EmployeeCsvHeaders)
+        {
+            if (!headerMap.ContainsKey(requiredHeader))
+            {
+                return null;
+            }
+        }
+
+        return headerMap;
+    }
+
+    private static List<string> NormalizeRow(IReadOnlyList<string> row, int expectedCount)
+    {
+        var values = row.Take(expectedCount).Select(value => value ?? string.Empty).ToList();
+
+        while (values.Count < expectedCount)
+        {
+            values.Add(string.Empty);
+        }
+
+        return values;
+    }
+
+    private static List<List<string>> ParseCsv(string content)
+    {
+        var rows = new List<List<string>>();
+        var currentRow = new List<string>();
+        var currentValue = new StringBuilder();
+        var inQuotes = false;
+
+        for (var i = 0; i < content.Length; i++)
+        {
+            var ch = content[i];
+
+            if (inQuotes)
+            {
+                if (ch == '"')
+                {
+                    if (i + 1 < content.Length && content[i + 1] == '"')
+                    {
+                        currentValue.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = false;
+                    }
+                }
+                else
+                {
+                    currentValue.Append(ch);
+                }
+
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                inQuotes = true;
+                continue;
+            }
+
+            if (ch == ',')
+            {
+                currentRow.Add(currentValue.ToString());
+                currentValue.Clear();
+                continue;
+            }
+
+            if (ch == '\r')
+            {
+                continue;
+            }
+
+            if (ch == '\n')
+            {
+                currentRow.Add(currentValue.ToString());
+                currentValue.Clear();
+                rows.Add(currentRow);
+                currentRow = new List<string>();
+                continue;
+            }
+
+            currentValue.Append(ch);
+        }
+
+        if (currentValue.Length > 0 || currentRow.Count > 0)
+        {
+            currentRow.Add(currentValue.ToString());
+            rows.Add(currentRow);
+        }
+
+        return rows;
+    }
+
+    private static string CsvValue(string? value)
+    {
+        var text = value ?? string.Empty;
+        return $"\"{text.Replace("\"", "\"\"")}\"";
+    }
+
+    private static string GetMappedValue(IReadOnlyList<string> values, IReadOnlyDictionary<string, int> headerMap, string headerName)
+    {
+        if (!headerMap.TryGetValue(headerName, out var index))
+        {
+            return string.Empty;
+        }
+
+        if (index < 0 || index >= values.Count)
+        {
+            return string.Empty;
+        }
+
+        return values[index];
+    }
+
+    private void ShowToast(ToastType type, string title, string message)
+    {
+        ToastService.Show(new ToastMessage
+        {
+            Type = type,
+            Title = title,
+            Message = message
+        });
     }
 }

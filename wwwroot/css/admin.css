@@ -1,0 +1,284 @@
+/* Sidebar profile avatar styles - ensure avatar is constrained and circular */
+.etrs-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.etrs-profile-avatar {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  max-width: 48px;
+  max-height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+/* When sidebar is expanded, allow slightly larger avatar */
+.etrs-sidebar-shell.is-open .etrs-profile-avatar {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  max-width: 56px;
+  max-height: 56px;
+}
+
+/* Ensure profile metadata and toggle don't wrap awkwardly */
+.etrs-profile-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+/* make sure image never overflows its container */
+.etrs-profile-card img {
+  overflow: hidden;
+}
+
+/* Appended styles to ensure sidebar/nav visuals apply even without Blazor CSS isolation */
+:root {
+  --sidebar-collapsed-width: 64px;
+  --sidebar-expanded-width: 280px;
+  --sidebar-bg: #f4f4f7;
+  --panel-bg: #f4f4f7;
+  --muted-text: #5f6672;
+  --sidebar-title: #1f2430;
+  --sidebar-icon-bg: #e1e4ea;
+  --sidebar-frame-border: #d8dbe1;
+}
+
+.etrs-sidebar-shell {
+  display: flex;
+  align-items: stretch;
+  height: 100vh;
+  padding: 0;
+  box-sizing: border-box;
+  background: var(--sidebar-bg);
+  transition: width .22s ease, padding .22s ease;
+}
+
+.etrs-sidebar-shell.is-collapsed {
+  width: var(--sidebar-collapsed-width);
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.etrs-sidebar-shell.is-open {
+  width: var(--sidebar-expanded-width);
+}
+
+.etrs-sidebar {
+  background: var(--panel-bg);
+  border-radius: 0; /* remove rounded corners on sidebar */
+  border-right: 1px solid var(--sidebar-frame-border);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.etrs-sidebar-top {
+  padding: 10px 12px 6px 12px;
+  border-bottom: 1px solid var(--sidebar-frame-border);
+}
+
+.etrs-sidebar-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.etrs-sidebar-logo {
+  font-weight: 700;
+  font-size: 1.55rem;
+  letter-spacing: 0.02em;
+  color: var(--sidebar-title);
+}
+
+.etrs-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.etrs-profile-avatar {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  max-width: 40px;
+  max-height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(0,0,0,0.04);
+  background: transparent;
+}
+
+.etrs-profile-meta {
+  display: flex;
+  flex-direction: column;
+  color: var(--muted-text);
+}
+
+.etrs-sidebar-toggle {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  padding: 6px;
+  cursor: pointer;
+}
+
+.etrs-sidebar-nav { padding: 8px 6px; }
+.etrs-nav-group { display:flex; flex-direction:column; gap:4px; padding:8px 6px; }
+
+.etrs-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  color: var(--muted-text);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background-color .12s ease, color .12s ease;
+}
+
+.etrs-nav-link:hover { background:#eceff4; color:var(--sidebar-title); }
+.etrs-nav-link.active {
+  background: #e6eaef;
+  color: var(--sidebar-title);
+  font-weight: 600;
+}
+.etrs-nav-icon { width:36px; text-align:center; font-size:18px; color:var(--muted-text); }
+.etrs-nav-label { white-space:nowrap; }
+
+/* Hide labels when collapsed and center icons */
+.etrs-sidebar-shell.is-collapsed .etrs-nav-label,
+.etrs-sidebar-shell.is-collapsed .etrs-profile-meta,
+.etrs-sidebar-shell.is-collapsed .etrs-settings-link .etrs-nav-label,
+.etrs-sidebar-shell.is-collapsed .logout-button .etrs-nav-label { display:none; }
+
+.etrs-sidebar-shell.is-collapsed .etrs-nav-link { justify-content:center; padding:12px 0; }
+
+.etrs-sidebar-divider { height:1px; background:var(--sidebar-frame-border); margin:10px 6px; }
+.etrs-sidebar-bottom { margin-top:auto; padding:12px 8px; border-top: 1px solid var(--sidebar-frame-border); }
+
+.etrs-profile-actions {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--muted-text) !important;
+}
+
+.etrs-settings-wrap { display:flex; flex-direction:column; gap:6px; }
+.etrs-nav-button { display:flex; align-items:center; gap:12px; border:none; background:transparent; color:var(--muted-text); padding:8px 12px; border-radius:8px; }
+.logout-button .etrs-nav-icon i { color:#cd5b4a; }
+
+/* Top navbar fallback styles */
+.etrs-admin-navbar,
+section > div.border {
+  background: #ffffff !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--sidebar-frame-border) !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+section .d-flex.align-items-center { padding: 10px 16px; }
+section img { height:28px; width:auto; }
+section h5 { margin:0; padding-left:6px; font-weight:700; }
+
+@media (max-width:991px) { section .d-flex.ps-3.d-none.d-lg-block { display:none !important; } }
+
+/* High-specificity overrides to ensure sidebar/nav visuals apply */
+body .etrs-sidebar-shell {
+  display: flex !important;
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  height: 100vh !important;
+  width: var(--sidebar-expanded-width) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: var(--sidebar-bg) !important;
+  z-index: 1 !important;
+}
+
+body .etrs-sidebar-shell.is-collapsed {
+  width: var(--sidebar-collapsed-width) !important;
+}
+body .etrs-sidebar {
+  background: var(--panel-bg) !important;
+  border-radius: 0 !important; /* remove rounded corners on sidebar */
+  border-right: 1px solid var(--sidebar-frame-border) !important;
+  box-shadow: none !important;
+}
+
+body .etrs-profile-avatar {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  background: transparent !important;
+}
+
+body .etrs-nav-link { display:flex !important; }
+body .etrs-sidebar-nav { display:block !important; }
+
+/* remove debug outline */
+body .etrs-sidebar { outline: none; }
+
+body .etrs-sidebar-toggle,
+body .etrs-profile-actions {
+  background: var(--sidebar-icon-bg) !important;
+  color: var(--sidebar-title) !important;
+}
+
+body .etrs-profile-meta strong,
+body .etrs-nav-link.active .etrs-nav-label {
+  color: var(--sidebar-title) !important;
+}
+
+body .etrs-sidebar-shell.is-open .etrs-sidebar-nav,
+body .etrs-sidebar-shell.is-open .etrs-nav-group,
+body .etrs-sidebar-shell.is-open .etrs-sidebar-bottom {
+  align-items: center !important;
+}
+
+body .etrs-sidebar-shell.is-open .etrs-nav-link,
+body .etrs-sidebar-shell.is-open .etrs-nav-button,
+body .etrs-sidebar-shell.is-open .etrs-profile-card-bottom {
+  width: min(100%, 240px) !important;
+}
+
+body .etrs-sidebar-shell.is-open .etrs-profile-card-bottom {
+  display: grid !important;
+  grid-template-columns: 40px 1fr auto !important;
+  align-items: center !important;
+  column-gap: 12px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+body .etrs-sidebar-shell.is-open .etrs-profile-avatar {
+  justify-self: center !important;
+}
+
+body .etrs-sidebar-shell.is-open .etrs-profile-meta {
+  min-width: 0 !important;
+}
+
+body .etrs-sidebar-shell.is-open .etrs-profile-actions-wrap {
+  justify-self: end !important;
+}
+
+/* End overrides */

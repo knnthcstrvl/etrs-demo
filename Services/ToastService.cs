@@ -32,6 +32,11 @@ namespace Financial.Services
 
         public void Show(ToastMessage message)
         {
+            // enforce global default duration of 15s for non-sticky toasts
+            if (message.Duration != 0)
+            {
+                message.Duration = 15000;
+            }
             lock (_lock)
             {
                 // prevent duplicate messages with same type/title/text already queued
