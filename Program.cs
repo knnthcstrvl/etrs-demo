@@ -133,13 +133,12 @@ using (var scope = app.Services.CreateScope())
         // Ensure EF migrations are applied
         await db.Database.MigrateAsync();
 
-        // Run seeders (one file per table)
+        // Run only critical seeders on startup. Other seeders are disabled to
+        // avoid inserting demo/legacy data in production. Keep UserAccount seeding.
         await Financial.Data.Seeders.UserAccountSeeder.SeedAdminAsync(db);
-        await Financial.Data.Seeders.EmployeeSeeder.SeedAsync(db);
-        await Financial.Data.Seeders.ExceptionConditionSeeder.SeedAsync(db);
-        await Financial.Data.Seeders.BiometricDeviceSeeder.SeedAsync(db);
-        await Financial.Data.Seeders.AttendanceLogSeeder.SeedAsync(db);
-        await Financial.Data.Seeders.AttendanceLogWfhSeeder.SeedAsync(db);
+        // EmployeeSeeder, ExceptionConditionSeeder, BiometricDeviceSeeder,
+        // AttendanceLogSeeder and AttendanceLogWfhSeeder are intentionally
+        // disabled. Run them manually if needed.
     }
     catch (Exception ex)
     {
