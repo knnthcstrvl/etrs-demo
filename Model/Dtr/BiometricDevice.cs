@@ -7,17 +7,17 @@ namespace Financial.Model.Dtr
         [Key]
         public int BiometricDeviceId { get; set; }
 
-        [MaxLength(150)]
+        [Required, MaxLength(150)]
         public string DeviceName { get; set; } = string.Empty;
 
-        [MaxLength(100)]
-        public string SerialNumber { get; set; } = string.Empty;
-
-        [MaxLength(150)]
+        [Required, MaxLength(150)]
         public string Location { get; set; } = string.Empty;
 
-        [MaxLength(40)]
-        public string Status { get; set; } = "Active";
+        [Required, MaxLength(100)]
+        public string SerialNumber { get; set; } = string.Empty;
+
+        [Required, MaxLength(40)]
+        public string Status { get; set; } = string.Empty;
 
         public ICollection<AttendanceLog> AttendanceLogs { get; set; } = new List<AttendanceLog>();
     }

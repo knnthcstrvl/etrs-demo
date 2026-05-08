@@ -2,7 +2,7 @@
 @using Microsoft.EntityFrameworkCore
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
-@inject Financial.Data.ProcurementDbContext Db
+@inject Financial.Data.EtrsDbContext Db
 @code {
     [Parameter] public string[] RequiredAccess { get; set; } = Array.Empty<string>();
     [Parameter] public RenderFragment? ChildContent { get; set; }

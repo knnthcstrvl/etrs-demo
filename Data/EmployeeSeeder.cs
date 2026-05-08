@@ -5,7 +5,7 @@ namespace Financial.Data
 {
     public static class EmployeeSeeder
     {
-        public static async Task SeedAsync(ProcurementDbContext db)
+        public static async Task SeedAsync(EtrsDbContext db)
         {
             if (await db.Employees.AnyAsync())
             {

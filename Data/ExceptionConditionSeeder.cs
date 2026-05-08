@@ -5,7 +5,7 @@ namespace Financial.Data
 {
     public static class ExceptionConditionSeeder
     {
-        public static async Task SeedAsync(ProcurementDbContext db)
+        public static async Task SeedAsync(EtrsDbContext db)
         {
             var defaults = new (string Name, string Description)[]
             {

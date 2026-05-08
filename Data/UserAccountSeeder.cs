@@ -5,7 +5,7 @@ namespace Financial.Data
 {
     public static class UserAccountSeeder
     {
-        public static async Task SeedAdminAsync(ProcurementDbContext db)
+        public static async Task SeedAdminAsync(EtrsDbContext db)
         {
             const string adminEmail = "admin@etrs.local";
             const string adminUsername = "admin";

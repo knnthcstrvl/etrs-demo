@@ -6,7 +6,7 @@
 @inject NavigationManager NavManager
 @inject IJSRuntime JS
 @inject Financial.Services.IToastService ToastService
-@inject Financial.Data.ProcurementDbContext Db
+@inject Financial.Data.EtrsDbContext Db
 @inject Financial.Services.CurrentUserService CurrentUser
 
 <aside class="etrs-sidebar-shell @(IsOpen ? "is-open" : "is-collapsed")" aria-label="main navigation menu" @onclick="CloseProfileMenu">

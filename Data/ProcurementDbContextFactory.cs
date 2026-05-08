@@ -4,9 +4,9 @@ using Microsoft.Extensions.Configuration;
 
 namespace Financial.Data
 {
-    public class ProcurementDbContextFactory : IDesignTimeDbContextFactory<ProcurementDbContext>
+    public class ProcurementDbContextFactory : IDesignTimeDbContextFactory<EtrsDbContext>
     {
-        public ProcurementDbContext CreateDbContext(string[] args)
+        public EtrsDbContext CreateDbContext(string[] args)
         {
             var basePath = Directory.GetCurrentDirectory();
 
@@ -16,10 +16,10 @@ namespace Financial.Data
                 .AddJsonFile("appsettings.Development.json", optional: true)
                 .Build();
 
-            var optionsBuilder = new DbContextOptionsBuilder<ProcurementDbContext>();
+            var optionsBuilder = new DbContextOptionsBuilder<EtrsDbContext>();
             optionsBuilder.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
 
-            return new ProcurementDbContext(optionsBuilder.Options);
+            return new EtrsDbContext(optionsBuilder.Options);
         }
     }
 }

@@ -1,97 +1,37 @@
 using Financial.Model;
 using Financial.Model.Dtr;
 using Financial.Model.Library;
-using Financial.Model.Modules;
-using Financial.Model.Trace;
+// Procurement and Trace models removed from this project; only DTR models are used here.
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using System.Linq;
 
 namespace Financial.Data
 {
-    public class ProcurementDbContext : DbContext
+    // Renamed to EtrsDbContext and trimmed to project-specific entities
+    public class EtrsDbContext : DbContext
     {
-        public ProcurementDbContext(DbContextOptions<ProcurementDbContext> options)
+        public EtrsDbContext(DbContextOptions<EtrsDbContext> options)
             : base(options)
         {
         }
 
-        public DbSet<Supplier> Suppliers { get; set; }
-        public DbSet<ProcurementMode> ProcurementModes { get; set; }
-        public DbSet<ProcurementType> ProcurementTypes { get; set; }
-        public DbSet<FundCluster> FundClusters { get; set; }
-        public DbSet<PaymentMode> PaymentModes { get; set; }
-        public DbSet<Transaction> Transactions { get; set; }
-        public DbSet<Procurement> Procurements { get; set; }
-        public DbSet<Budget> Budgets { get; set; }
-        public DbSet<Property> Properties { get; set; }
-        public DbSet<Accounting> Accountings { get; set; }
-        public DbSet<Cashier> Cashiers { get; set; }
-        public DbSet<Document> Documents { get; set; }
-        public DbSet<StatusHistory> StatusHistories { get; set; }
+        // Core / auth
         public DbSet<UserAccount> UserAccounts { get; set; }
+
+        // DTR (attendance)
         public DbSet<Employee> Employees { get; set; }
         public DbSet<BiometricDevice> BiometricDevices { get; set; }
         public DbSet<AttendanceLog> AttendanceLogs { get; set; }
         public DbSet<AttendanceLogWfh> AttendanceLogsWfh { get; set; }
         public DbSet<ExceptionCondition> ExceptionConditions { get; set; }
 
+        // Removed procurement/financial DbSet properties as these types belong to another project
+        // and were accidentally mixed into this repository. Keep only attendance/auth entities here.
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-
-            modelBuilder.Entity<Transaction>()
-                .HasIndex(t => t.PrNumber)
-                .IsUnique();
-
-            modelBuilder.Entity<Transaction>()
-                .HasOne(t => t.Supplier)
-                .WithMany(s => s.Transactions)
-                .HasForeignKey(t => t.SupplierId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<Transaction>()
-                .HasOne(t => t.Procurement)
-                .WithOne(p => p.Transaction)
-                .HasForeignKey<Procurement>(p => p.TransactionId);
-
-            modelBuilder.Entity<Transaction>()
-                .HasOne(t => t.Budget)
-                .WithOne(b => b.Transaction)
-                .HasForeignKey<Budget>(b => b.TransactionId);
-
-            modelBuilder.Entity<Transaction>()
-                .HasOne(t => t.Property)
-                .WithOne(p => p.Transaction)
-                .HasForeignKey<Property>(p => p.TransactionId);
-
-            modelBuilder.Entity<Transaction>()
-                .HasOne(t => t.Accounting)
-                .WithOne(a => a.Transaction)
-                .HasForeignKey<Accounting>(a => a.TransactionId);
-
-            modelBuilder.Entity<Transaction>()
-                .HasOne(t => t.Cashier)
-                .WithOne(c => c.Transaction)
-                .HasForeignKey<Cashier>(c => c.TransactionId);
-
-            modelBuilder.Entity<Supplier>()
-                .HasIndex(s => s.SupplierName)
-                .IsUnique();
-
-            modelBuilder.Entity<ProcurementMode>()
-                .HasIndex(m => m.ModeName)
-                .IsUnique();
-
-            modelBuilder.Entity<ProcurementType>()
-                .HasIndex(t => t.TypeName)
-                .IsUnique();
-
-            modelBuilder.Entity<FundCluster>()
-                .HasIndex(f => f.FundClusterName)
-                .IsUnique();
-
-            modelBuilder.Entity<PaymentMode>()
-                .HasIndex(p => p.PaymentModeName)
-                .IsUnique();
 
             modelBuilder.Entity<UserAccount>()
                 .HasIndex(u => u.Email)
@@ -138,6 +78,22 @@ namespace Financial.Data
 
             modelBuilder.Entity<AttendanceLogWfh>()
                 .HasIndex(l => new { l.EmployeeId, l.AttendanceDate });
+
+            // Ensure decimal properties have an explicit precision/scale to avoid
+            // SQL Server truncation warnings and EF warnings during migrations.
+            // Applies a default precision of (18,2) to all decimal properties.
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                var decimalProps = entityType.GetProperties()
+                    .Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?));
+
+                foreach (var prop in decimalProps)
+                {
+                    // Use SetPrecision/SetScale which maps to HasPrecision(precision, scale)
+                    prop.SetPrecision(18);
+                    prop.SetScale(2);
+                }
+            }
         }
     }
 }

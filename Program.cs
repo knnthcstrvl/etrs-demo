@@ -1,7 +1,7 @@
 using Financial;
 using Financial.Components;
 using Financial.Data;
-using Financial.Hubs;
+// Financial.Hubs removed
 using Financial.Repositories.Implement;
 using Financial.Repositories.Interface;
 using Financial.Services.Implements;
@@ -20,10 +20,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-builder.Services.AddDbContext<ProcurementDbContext>(options =>
+// Register EtrsDbContext (project-specific) instead of ProcurementDbContext
+builder.Services.AddDbContext<EtrsDbContext>(options =>
     options.UseSqlServer(connectionString));
 // Provide factory to create DbContext instances for long-lived services
-builder.Services.AddDbContextFactory<ProcurementDbContext>(
+builder.Services.AddDbContextFactory<EtrsDbContext>(
     options => options.UseSqlServer(connectionString),
     ServiceLifetime.Scoped);
 
@@ -69,15 +70,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-builder.Services.AddScoped<ITransactionService, TransactionService>();
-builder.Services.AddScoped<IProcurementService, ProcurementService>();
-builder.Services.AddScoped<IStatusHistoryService, StatusHistoryService>();
-builder.Services.AddScoped<IBudgetService, BudgetService>();
-builder.Services.AddScoped<IAccountingService, AccountingService>();
-builder.Services.AddScoped<ICashierService, CashierService>();
-builder.Services.AddScoped<IReportingService, ReportingService>();
-builder.Services.AddScoped<IDashboardService, DashboardService>();
-builder.Services.AddScoped<ISupplierServices, SupplierServices>();
+// Procurement/transaction services removed
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IUserAccountRepository, UserAccountRepository>();
 builder.Services.AddScoped<IConstantState, ConstantState>();
@@ -130,18 +123,23 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapHub<TransactionNotificationHub>("/transactionHub");
+// TransactionNotificationHub removed
 
 using (var scope = app.Services.CreateScope())
 {
     try
     {
-        var db = scope.ServiceProvider.GetRequiredService<ProcurementDbContext>();
-        db.Database.EnsureCreated();
-        await DatabaseSchemaUpdater.EnsureAttendanceLogWfhColumnsAsync(db);
-        await UserAccountSeeder.SeedAdminAsync(db);
-        await EmployeeSeeder.SeedAsync(db);
-        await ExceptionConditionSeeder.SeedAsync(db);
+        var db = scope.ServiceProvider.GetRequiredService<EtrsDbContext>();
+        // Ensure EF migrations are applied
+        await db.Database.MigrateAsync();
+
+        // Run seeders (one file per table)
+        await Financial.Data.Seeders.UserAccountSeeder.SeedAdminAsync(db);
+        await Financial.Data.Seeders.EmployeeSeeder.SeedAsync(db);
+        await Financial.Data.Seeders.ExceptionConditionSeeder.SeedAsync(db);
+        await Financial.Data.Seeders.BiometricDeviceSeeder.SeedAsync(db);
+        await Financial.Data.Seeders.AttendanceLogSeeder.SeedAsync(db);
+        await Financial.Data.Seeders.AttendanceLogWfhSeeder.SeedAsync(db);
     }
     catch (Exception ex)
     {

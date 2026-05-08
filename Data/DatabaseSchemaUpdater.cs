@@ -5,7 +5,7 @@ namespace Financial.Data
 {
     public static class DatabaseSchemaUpdater
     {
-        public static async Task EnsureAttendanceLogWfhColumnsAsync(ProcurementDbContext db)
+        public static async Task EnsureAttendanceLogWfhColumnsAsync(EtrsDbContext db)
         {
             var entityType = db.Model.FindEntityType(typeof(AttendanceLogWfh));
             var tableName = entityType?.GetTableName();
