@@ -29,26 +29,29 @@ namespace Financial.State
                 var token = await GetStoredTokenAsync();
 
                 if (string.IsNullOrWhiteSpace(token))
-                    return await Task.FromResult(new AuthenticationState(anonymous));
+                    return new AuthenticationState(anonymous);
 
                 var gatherClaims = DecryptJWTService.DecryptToken(token);
-                if (gatherClaims == null) return await Task.FromResult(new AuthenticationState(anonymous));
+                if (gatherClaims == null) return new AuthenticationState(anonymous);
 
-                var datetime = DateTimeOffset.FromUnixTimeSeconds(long.Parse(gatherClaims.Expiry));
-                if (datetime.UtcDateTime <= DateTime.UtcNow)
+                if (long.TryParse(gatherClaims.Expiry, out var expirySeconds))
                 {
-                    //await _accountService.RefreshToken(new UserSession()
-                    //{
-                    //    JWTToken = token.Value
-                    //});
+                    var datetime = DateTimeOffset.FromUnixTimeSeconds(expirySeconds);
+                    if (datetime.UtcDateTime <= DateTime.UtcNow)
+                    {
+                        //await _accountService.RefreshToken(new UserSession()
+                        //{
+                        //    JWTToken = token
+                        //});
+                    }
                 }
 
                 var claimsPrincipal = SetClaimPrincipal(gatherClaims);
-                return await Task.FromResult(new AuthenticationState(claimsPrincipal));
+                return new AuthenticationState(claimsPrincipal);
             }
-            catch (Exception ex)
+            catch
             {
-                return await Task.FromResult(new AuthenticationState(anonymous));
+                return new AuthenticationState(anonymous);
             }
         }
 
@@ -62,34 +65,33 @@ namespace Financial.State
 
                 var getUserClaims = DecryptJWTService.DecryptToken(jwtToken);
 
-                claimsPrincipal = SetClaimPrincipal(getUserClaims);
+                claimsPrincipal = getUserClaims is null ? anonymous : SetClaimPrincipal(getUserClaims);
                 NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(claimsPrincipal)));
             }
             else
             {
-                _constant.JWTToken = null!;
+                _constant.JWTToken = string.Empty;
                 await DeleteStoredTokensAsync();
+                NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(anonymous)));
             }
-            //NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(claimsPrincipal)));
         }
 
 
         public ClaimsPrincipal SetClaimPrincipal(CustomUserClaims claims)
         {
-            if (claims.Email is null) return new ClaimsPrincipal();
-            _constant.JWTToken = claims.Jwt;
+            if (string.IsNullOrWhiteSpace(claims.Email)) return new ClaimsPrincipal();
+            _constant.JWTToken = claims.Jwt ?? string.Empty;
 
             Console.WriteLine($"Email: {claims.Email} JWTToken:{_constant.JWTToken}");
-            //Console.WriteLine($"Email: {claims.Email}");
 
             return new ClaimsPrincipal(new ClaimsIdentity(
                 new List<Claim>
                 {
-                    new("FirstName", claims.FirstName!),
-                    new("LastName", claims.LastName!),
-                    new(ClaimTypes.Email, claims.Email!),
-                    new(ClaimTypes.Role, claims.Role!),
-                    new("Jwt", claims.Jwt!)
+                    new("FirstName", claims.FirstName ?? string.Empty),
+                    new("LastName", claims.LastName ?? string.Empty),
+                    new(ClaimTypes.Email, claims.Email),
+                    new(ClaimTypes.Role, claims.Role ?? string.Empty),
+                    new("Jwt", claims.Jwt ?? string.Empty)
                 }, "JwtAuth"));
         }
 

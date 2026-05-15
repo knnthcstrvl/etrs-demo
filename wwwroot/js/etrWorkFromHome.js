@@ -30,3 +30,24 @@ window.etrWorkFromHome = (function () {
         unregisterOutsideClick: unregisterOutsideClick
     };
 })();
+
+// helper to scroll an element by id into view if present
+window.etrWorkFromHome.scrollElementIntoView = function (id) {
+    try {
+        if (!id) return;
+        const el = document.getElementById(id);
+        if (el) {
+            // scroll the parent dropdown if necessary
+            const parent = el.closest('.dropdown-menu');
+            if (parent) {
+                const rect = el.getBoundingClientRect();
+                const parentRect = parent.getBoundingClientRect();
+                if (rect.top < parentRect.top || rect.bottom > parentRect.bottom) {
+                    // align to top
+                    parent.scrollTop = el.offsetTop - parent.offsetTop - 8;
+                }
+            }
+        }
+    }
+    catch { }
+};

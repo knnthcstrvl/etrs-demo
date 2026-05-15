@@ -16,7 +16,7 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
-<PageTitle>ETRS - Work From Home</PageTitle>
+<PageTitle>ETRS</PageTitle>
 
 <div class="etr-shell">
     <img class="corner-logo logo-left" src="/images/bswm-light.png" alt="bswm" />
@@ -26,19 +26,25 @@
 
         <div class="etr-form-wrap">
             <p class="etr-sub">Log your WFH attendance using your employee ID number. Time in records target, while time out records accomplishment and optional MOV upload.</p>
-            <EditForm Model="entryModel" OnSubmit="HandleSubmit">
+            <EditForm EditContext="editContext" OnSubmit="HandleSubmit">
                 <DataAnnotationsValidator />
 
                 <div class="form-row">
                     <label class="required-star">Attendance</label>
                     <div class="options-row">
-                        <button type="button" class="@GetOptionClass("IN")" @onclick='() => SelectLogType("IN")'>
+                        <button type="button"
+                                class="@GetOptionClass("IN")"
+                                @onclick='() => SelectLogType("IN")'
+                                >
                             <span class="option-indicator" aria-hidden="true"></span>
                             <div class="opt-title">IN</div>
                             <div class="opt-sub">Start of work</div>
                         </button>
 
-                        <button type="button" class="@GetOptionClass("OUT")" @onclick='() => SelectLogType("OUT")'>
+                        <button type="button"
+                                class="@GetOptionClass("OUT")"
+                                @onclick='() => SelectLogType("OUT")'
+                                >
                             <span class="option-indicator" aria-hidden="true"></span>
                             <div class="opt-title">OUT</div>
                             <div class="opt-sub">End of work</div>
@@ -54,7 +60,7 @@
                                 value="@employeeSearchText"
                                 @oninput="HandleIdInputChanged"
                                 @onfocus="HandleIdInputFocus"
-                                class="etr-input focus-yellow employee-search-input"
+                                class="etr-input employee-search-input field-control"
                                 disabled="@isSubmitting"
                                 autocomplete="off" />
                             <span class="employee-search-icon" aria-hidden="true">Search</span>
@@ -88,7 +94,10 @@
                 <div class="@GetSectionClass("IN")" aria-hidden="@(entryModel.LogType != "IN")">
                 <div class="form-row">
                         <label class="required-star">Target</label>
-                        <InputTextArea @bind-Value="entryModel.Target" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
+                        <textarea value="@entryModel.Target"
+                                  @oninput="HandleTargetInputChanged"
+                                  class="etr-textarea field-control"
+                                  disabled="@isSubmitting"></textarea>
                     </div>
 
                     <div class="section-spacer" aria-hidden="true"></div>
@@ -97,14 +106,20 @@
                 <div class="@GetSectionClass("OUT")" aria-hidden="@(entryModel.LogType != "OUT")">
                     <div class="form-row">
                         <label class="required-star">Accomplishment</label>
-                        <InputTextArea @bind-Value="entryModel.Accomplishment" class="etr-textarea focus-yellow" disabled="@isSubmitting" />
+                        <textarea value="@entryModel.Accomplishment"
+                                  @oninput="HandleAccomplishmentInputChanged"
+                                  class="etr-textarea field-control"
+                                  disabled="@isSubmitting"></textarea>
                     </div>
 
                     <div class="form-row">
                         <label>Means of Verification</label>
                         <div class="file-upload-wrap">
                             <label for="movUpload" class="etr-file-button">Choose File</label>
-                            <InputFile id="movUpload" class="etr-file-input" OnChange="HandleMovSelected" disabled="@isSubmitting" />
+                            <InputFile id="movUpload"
+                                       class="etr-file-input"
+                                       OnChange="HandleMovSelected"
+                                       disabled="@isSubmitting" />
                             <span class="upload-note upload-file-name">@(string.IsNullOrWhiteSpace(entryModel.MovFileName) ? "No file chosen." : entryModel.MovFileName)</span>
                         </div>
                     </div>
@@ -222,7 +237,7 @@
     .etr-input,
     .etr-textarea {
         width: 100%;
-        border: 0;
+        border: 1px solid transparent;
         border-radius: 10px;
         padding: 0.6rem 0.75rem;
         box-sizing: border-box;
@@ -231,6 +246,7 @@
         background: #ffffff;
         color: #1f2937;
         font-size: 0.9rem;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
     .etr-textarea {
@@ -239,9 +255,14 @@
         resize: vertical;
     }
 
-    .focus-yellow:focus {
+    .field-control:focus,
+    .option-card:focus {
         outline: none;
-        box-shadow: 0 0 0 3px rgba(235, 202, 74, 0.6);
+    }
+
+    .etr-form-wrap .field-control:focus {
+        border-color: #ebca4a !important;
+        box-shadow: none;
     }
 
     .employee-search-wrap {
@@ -379,7 +400,7 @@
 
     .option-card .opt-title { font-weight: 700; color: #111827; }
     .option-card .opt-sub { font-size: 0.82rem; color: #9ca3af; }
-    .option-card.selected { border-color: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,0.08); }
+    .option-card.selected { border-color: #10b981; box-shadow: none; }
     .option-indicator {
         position: absolute;
         top: 50%;
@@ -435,6 +456,7 @@
         align-items: center;
         justify-content: center;
         padding: 0.6rem 0.9rem;
+        border: 1px solid #e5e7eb;
         border-radius: 10px;
         background: #ffffff;
         color: #111827 !important;
@@ -492,6 +514,8 @@
 @code {
     private bool isSubmitting;
     private EtrEntryModel entryModel = new();
+    private EditContext editContext = default!;
+    private ValidationMessageStore validationMessageStore = default!;
     private List<Employee> employeeSearchResults = new();
     private Employee? selectedEmployee;
     private bool showEmployeeResults;
@@ -533,39 +557,23 @@
         }
     }
 
+    protected override void OnInitialized()
+    {
+        InitializeEditContext();
+    }
+
     private bool IsSubmitDisabled => isSubmitting;
 
     private async Task HandleSubmit(EditContext editContext)
     {
+        ValidateSelectedEmployee();
+
         // Run data annotation / IValidatableObject validation
         var valid = editContext?.Validate() ?? true;
 
         if (!valid)
         {
-            var messages = editContext.GetValidationMessages().ToList();
-            foreach (var m in messages)
-            {
-                ToastService.Show(new ToastMessage
-                {
-                    Type = ToastType.Warning,
-                    Title = "Validation",
-                    Message = m,
-                    Duration = 5000
-                });
-            }
-            return;
-        }
-
-        // Ensure selected employee matches entered id
-        if (selectedEmployee is null || !string.Equals(selectedEmployee.IdNumber, entryModel.IdNumber.Trim(), StringComparison.OrdinalIgnoreCase))
-        {
-            ToastService.Show(new ToastMessage
-            {
-                Type = ToastType.Warning,
-                Title = "Select employee",
-                Message = "Choose an employee from the search results before submitting.",
-                Duration = 4000
-            });
+            ShowValidationMessages(editContext);
             return;
         }
 
@@ -685,6 +693,7 @@
             });
 
             entryModel = new EtrEntryModel();
+            InitializeEditContext();
             selectedEmployee = null;
             employeeSearchResults.Clear();
             employeeSearchText = string.Empty;
@@ -706,7 +715,23 @@
             entryModel.IdNumber = employeeSearchText;
         }
 
+        ClearFieldValidation(nameof(EtrEntryModel.IdNumber));
+        editContext.NotifyFieldChanged(new FieldIdentifier(entryModel, nameof(EtrEntryModel.IdNumber)));
         await SearchEmployeesAsync(employeeSearchText);
+    }
+
+    private void HandleTargetInputChanged(ChangeEventArgs e)
+    {
+        entryModel.Target = e.Value?.ToString() ?? string.Empty;
+        ClearFieldValidation(nameof(EtrEntryModel.Target));
+        editContext.NotifyFieldChanged(new FieldIdentifier(entryModel, nameof(EtrEntryModel.Target)));
+    }
+
+    private void HandleAccomplishmentInputChanged(ChangeEventArgs e)
+    {
+        entryModel.Accomplishment = e.Value?.ToString() ?? string.Empty;
+        ClearFieldValidation(nameof(EtrEntryModel.Accomplishment));
+        editContext.NotifyFieldChanged(new FieldIdentifier(entryModel, nameof(EtrEntryModel.Accomplishment)));
     }
 
     // Show validation and other messages in toast when appropriate
@@ -747,7 +772,18 @@
         entryModel.MovFileName = e.File?.Name ?? string.Empty;
     }
 
-    private string GetOptionClass(string type) => entryModel.LogType == type ? "option-card selected" : "option-card";
+    private string GetOptionClass(string type)
+    {
+        var classes = new List<string> { "option-card" };
+        var isSelected = entryModel.LogType == type;
+
+        if (isSelected)
+        {
+            classes.Add("selected");
+        }
+
+        return string.Join(" ", classes.Where(c => !string.IsNullOrWhiteSpace(c)));
+    }
 
     private string GetEmployeeResultClass(Employee employee)
         => selectedEmployee?.EmployeeId == employee.EmployeeId ? "employee-result-card selected" : "employee-result-card";
@@ -757,12 +793,16 @@
 
     private string GetSectionClass(string type) => entryModel.LogType == type ? "transition-panel active" : "transition-panel";
 
-    private void SelectLogType(string type) => entryModel.LogType = type;
+    private void SelectLogType(string type)
+    {
+        entryModel.LogType = type;
+        editContext.NotifyFieldChanged(new FieldIdentifier(entryModel, nameof(EtrEntryModel.LogType)));
+    }
 
     private async Task SearchEmployeesAsync(string? searchText)
     {
         var query = (searchText ?? string.Empty).Trim();
-        var shouldShow = query.Length >= 3;
+        var shouldShow = query.Length >= 1;
         showEmployeeResults = shouldShow;
 
         if (!showEmployeeResults)
@@ -788,6 +828,8 @@
         entryModel.IdNumber = employee.IdNumber;
         employeeSearchText = $"{employee.IdNumber} - {FormatEmployeeName(employee)}";
         showEmployeeResults = false;
+        ClearFieldValidation(nameof(EtrEntryModel.IdNumber));
+        editContext.NotifyFieldChanged(new FieldIdentifier(entryModel, nameof(EtrEntryModel.IdNumber)));
         await UnregisterOutsideClickAsync();
     }
 
@@ -955,4 +997,35 @@
     }
 
     private static DateTime Min(DateTime left, DateTime right) => left <= right ? left : right;
+
+    private void InitializeEditContext()
+    {
+        editContext = new EditContext(entryModel);
+        validationMessageStore = new ValidationMessageStore(editContext);
+    }
+
+    private void ValidateSelectedEmployee()
+    {
+        var fieldIdentifier = new FieldIdentifier(entryModel, nameof(EtrEntryModel.IdNumber));
+        validationMessageStore.Clear(fieldIdentifier);
+
+        if (!string.IsNullOrWhiteSpace(entryModel.IdNumber) && !HasValidSelectedEmployee())
+        {
+            validationMessageStore.Add(fieldIdentifier, "Choose an employee from the search results before submitting.");
+        }
+
+        editContext.NotifyValidationStateChanged();
+    }
+
+    private bool HasValidSelectedEmployee()
+        => selectedEmployee is not null
+            && !string.IsNullOrWhiteSpace(entryModel.IdNumber)
+            && string.Equals(selectedEmployee.IdNumber, entryModel.IdNumber.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private void ClearFieldValidation(string fieldName)
+    {
+        var fieldIdentifier = new FieldIdentifier(entryModel, fieldName);
+        validationMessageStore.Clear(fieldIdentifier);
+        editContext.NotifyValidationStateChanged();
+    }
 }

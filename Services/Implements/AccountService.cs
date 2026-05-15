@@ -44,15 +44,24 @@ namespace Financial.Services.Implements
             ApplyAuthorizationHeader();
 
             var token = await GetStoredTokenAsync();
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return;
+            }
+
             var response = await _httpClient.PostAsJsonAsync("api/account/refresh-token", new UserSession()
             {
                 JWTToken = token
             });
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
-            //_constantss.JWTToken = result!.JWTToken;
-            await StoreTokenAsync(result!.JWTToken);
+            if (result is null || string.IsNullOrWhiteSpace(result.JWTToken))
+            {
+                return;
+            }
 
-            Console.WriteLine($"Refresh Token: {_constantss.JWTToken} || {result!.JWTToken}");
+            await StoreTokenAsync(result.JWTToken);
+
+            Console.WriteLine($"Refresh Token: {_constantss.JWTToken} || {result.JWTToken}");
         }
 
         public async Task<CustomResponses.UserResponse> GetUserAsync()
@@ -85,17 +94,27 @@ namespace Financial.Services.Implements
 
         public async Task<CustomResponses.LoginResponse> RefreshToken(UserSession userSession)
         {
-            if (_constantss.JWTToken == "") return null;
+            if (string.IsNullOrWhiteSpace(_constantss.JWTToken))
+            {
+                return new LoginResponse(false, "No token available.");
+            }
 
             EnsureBaseAddress();
             ApplyAuthorizationHeader();
 
             var response = await _httpClient.PostAsJsonAsync("api/account/refresh-token", userSession);
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+            if (result is null)
+            {
+                return new LoginResponse(false, "Token refresh failed.");
+            }
 
-            await StoreTokenAsync(result!.JWTToken);
+            if (!string.IsNullOrWhiteSpace(result.JWTToken))
+            {
+                await StoreTokenAsync(result.JWTToken);
+            }
 
-            return result!;
+            return result;
         }
 
         public async Task<CustomResponses.RegistrationResponse> RegisterAsync(RegisterDto model)

@@ -44,12 +44,12 @@
 :root {
   --sidebar-collapsed-width: 64px;
   --sidebar-expanded-width: 280px;
-  --sidebar-bg: #f4f4f7;
-  --panel-bg: #f4f4f7;
-  --muted-text: #5f6672;
-  --sidebar-title: #1f2430;
-  --sidebar-icon-bg: #e1e4ea;
-  --sidebar-frame-border: #d8dbe1;
+  --sidebar-bg: var(--etrs-gray-100);
+  --panel-bg: var(--etrs-gray-100);
+  --muted-text: var(--etrs-gray-700);
+  --sidebar-title: var(--etrs-gray-950);
+  --sidebar-icon-bg: var(--etrs-gray-200);
+  --sidebar-frame-border: var(--etrs-gray-300);
 }
 
 .etrs-sidebar-shell {
@@ -149,9 +149,9 @@
   transition: background-color .12s ease, color .12s ease;
 }
 
-.etrs-nav-link:hover { background:#eceff4; color:var(--sidebar-title); }
+.etrs-nav-link:hover { background:var(--etrs-gray-200); color:var(--sidebar-title); }
 .etrs-nav-link.active {
-  background: #e6eaef;
+  background: var(--etrs-gray-200);
   color: var(--sidebar-title);
   font-weight: 600;
 }

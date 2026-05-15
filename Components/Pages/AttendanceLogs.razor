@@ -1,13 +1,22 @@
 @page "/attendance-logs"
-@using Components.Shared
 @using Financial.Data
 @inject Financial.Services.CurrentUserService CurrentUser
 @using Financial.Model.Dtr
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
 @inject ProcurementDbContext Db
+@inject IWebHostEnvironment Environment
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @inject IJSRuntime JS
+@inject IToastService ToastService
 
 @rendermode InteractiveServer
+@implements IAsyncDisposable
+
+<HeadContent>
+    <title>ETRS | Attendance Logs</title>
+</HeadContent>
 
 <RequireAccess RequiredAccess=@(new string[] { "View", "Export", "Edit", "Import" })>
     <div class="dashboard-shell">
@@ -15,7 +24,80 @@
         <div>
             <h1 class="attendance-logs-title">Attendance Logs</h1>
         </div>
-        <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="ExportAttendanceLogsAsync" disabled=@(!CurrentUser.HasAccess("Export"))>Export</button>
+        <div class="attendance-logs-controls" @ref="periodControlsRef">
+            <div class="attendance-filter-select-wrap period-dropdown">
+                <button type="button" class="attendance-filter-select-trigger period-button @(showPeriodMenu ? "active" : null)" @onclick="TogglePeriodMenu">
+                    <span class="period-button-content">
+                        <span class="period-label">Period:</span>
+                        <span class="period-selected">@SelectedPeriodLabel</span>
+                        @if (selectedPeriod?.IsCurrent == true)
+                        {
+                            <span class="period-current-text">(Current)</span>
+                        }
+                    </span>
+                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                </button>
+
+                <div class="attendance-filter-select-menu period-menu @(showPeriodMenu ? "show" : null)">
+                    @foreach (var p in periods)
+                    {
+                        var itemId = selectedPeriod == p ? "period-1-selected-item" : null;
+                        <button type="button" class="attendance-filter-select-option period-option @(selectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectPeriod(p)">
+                            <span class="period-option-label">@p.Label</span>
+                            @if (p.IsCurrent)
+                            {
+                                <span class="period-current-text">(Current)</span>
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @if (!showAddPeriod && !isClosingAddPeriod)
+            {
+                <button type="button" class="btn btn-outline-secondary period-add-button" @onclick="ToggleAddPeriod">+</button>
+            }
+
+            @if (showAddPeriod || isClosingAddPeriod)
+            {
+                <div class="period-range-entry @(isClosingAddPeriod ? "closing" : null)">
+                    <div class="period-to-label">to:</div>
+
+                    <div class="attendance-filter-select-wrap period-dropdown">
+                    <button type="button" class="period-close-btn" title="Close period range" @onclick="ToggleAddPeriod">×</button>
+                    <button type="button" class="attendance-filter-select-trigger period-button @(showPeriod2Menu ? "active" : null)" @onclick="TogglePeriod2Menu">
+                        <span class="period-button-content">
+                            <span class="period-label">Period:</span>
+                            <span class="period-selected">@SelectedPeriod2Label</span>
+                            @if (secondSelectedPeriod?.IsCurrent == true)
+                            {
+                                <span class="period-current-text">(Current)</span>
+                            }
+                        </span>
+                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                    </button>
+
+                    <div class="attendance-filter-select-menu period-menu @(showPeriod2Menu ? "show" : null)">
+                        @foreach (var p in periods)
+                        {
+                            var itemId = secondSelectedPeriod == p ? "period-2-selected-item" : null;
+                            <button type="button" class="attendance-filter-select-option period-option @(secondSelectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectSecondPeriod(p)">
+                                <span class="period-option-label">@p.Label</span>
+                                @if (p.IsCurrent)
+                                {
+                                    <span class="period-current-text">(Current)</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                </div>
+                </div>
+            }
+
+            <span class="period-sep" aria-hidden="true"></span>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenInputLogsModal" disabled="@(!CurrentUser.HasAccess("Edit"))">Input Logs</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="ExportAttendanceLogsAsync" disabled=@(!CurrentUser.HasAccess("Export"))>Export</button>
+        </div>
     </div>
 
     <div class="metric-grid dashboard-metrics attendance-logs-metrics">
@@ -38,9 +120,243 @@
     </div>
 
     <div style="margin-top:1rem;">
-        <div style="display:flex;justify-content:flex-start;align-items:center;margin-bottom:0.6rem;gap:0.5rem;">
-            <button class='btn @(viewMode=="onsite"?"btn-primary":"btn-outline-secondary")' @onclick='() => viewMode = "onsite"'>Onsite (Biometric)</button>
-            <button class='btn @(viewMode=="wfh"?"btn-primary":"btn-outline-secondary")' @onclick='() => viewMode = "wfh"'>WFH (ETRS)</button>
+        <div class="attendance-view-tabs" role="tablist" aria-label="Attendance log views">
+            <button
+                type="button"
+                role="tab"
+                class="attendance-view-tab @(viewMode == "onsite" ? "active" : null)"
+                aria-selected="@(viewMode == "onsite")"
+                @onclick='() => viewMode = "onsite"'>
+                Onsite (Biometrics)
+            </button>
+            <button
+                type="button"
+                role="tab"
+                class="attendance-view-tab @(viewMode == "wfh" ? "active" : null)"
+                aria-selected="@(viewMode == "wfh")"
+                @onclick='() => viewMode = "wfh"'>
+                WFH (ETRS)
+            </button>
+        </div>
+
+        <div class="attendance-table-toolbar">
+            <div class="attendance-table-search">
+                <input id="attendanceLogSearch"
+                       class="form-control attendance-table-search-input"
+                       type="search"
+                       placeholder="Search..."
+                       value="@tableSearchText"
+                       @oninput="HandleTableSearchInput" />
+            </div>
+
+            <div class="attendance-table-actions" @ref="tableMenuControlsRef">
+                <div class="attendance-filter-dropdown">
+                    <button type="button" class="btn btn-outline-secondary attendance-filter-button" @onclick="ToggleFilterMenu">
+                        <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i>
+                        <span>Filter</span>
+                        @if (HasActiveTableFilters)
+                        {
+                            <span class="attendance-filter-button-clear"
+                                  title="Clear filters"
+                                  role="button"
+                                  tabindex="0"
+                                  @onclick="ClearFiltersFromButton"
+                                  @onclick:stopPropagation="true">×</span>
+                        }
+                    </button>
+
+                    <div class="attendance-filter-menu @(showFilterMenu ? "show" : null)" @onclick:stopPropagation="true">
+                        <div class="attendance-filter-grid">
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="attendanceFilterId">ID Number</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="attendanceFilterId"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "id" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("id")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterIdNumber, "All ID Numbers")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "id" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterIdNumber) ? "active" : null)" @onclick='() => SetFilterValue("id", string.Empty)'>All ID Numbers</button>
+                                        @foreach (var option in CurrentIdNumberOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterIdNumber, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("id", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="attendanceFilterEmployee">Employee</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="attendanceFilterEmployee"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "employee" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("employee")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterEmployee, "All Employees")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "employee" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterEmployee) ? "active" : null)" @onclick='() => SetFilterValue("employee", string.Empty)'>All Employees</button>
+                                        @foreach (var option in CurrentEmployeeOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterEmployee, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("employee", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="attendanceFilterDivision">Division / Unit</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="attendanceFilterDivision"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "division" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("division")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions / Units")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "division" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                        @foreach (var option in CurrentDivisionOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("division", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="attendanceFilterDesignation">Designation</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="attendanceFilterDesignation"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "designation" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("designation")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterDesignation, "All Designations")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "designation" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDesignation) ? "active" : null)" @onclick='() => SetFilterValue("designation", string.Empty)'>All Designations</button>
+                                        @foreach (var option in CurrentDesignationOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterDesignation, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("designation", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="attendanceFilterStatus">Status</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="attendanceFilterStatus"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "status" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("status")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterStatus, "All Statuses")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "status" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterStatus) ? "active" : null)" @onclick='() => SetFilterValue("status", string.Empty)'>All Statuses</button>
+                                        @foreach (var option in CurrentStatusOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterStatus, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("status", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            @if (viewMode == "wfh")
+                            {
+                                <div class="attendance-filter-field">
+                                    <label class="attendance-table-toolbar-label" for="attendanceFilterTarget">Target</label>
+                                    <div class="attendance-filter-select-wrap">
+                                        <button type="button"
+                                                id="attendanceFilterTarget"
+                                                class="attendance-filter-select-trigger @(activeFilterField == "target" ? "active" : null)"
+                                                @onclick='() => ToggleFilterField("target")'>
+                                            <span class="attendance-filter-select-value">@DisplayValue(filterTarget, "All Target")</span>
+                                            <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                        </button>
+
+                                        <div class="attendance-filter-select-menu @(activeFilterField == "target" ? "show" : null)">
+                                            <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterTarget) ? "active" : null)" @onclick='() => SetFilterValue("target", string.Empty)'>All Target</button>
+                                            @foreach (var option in TargetFilterOptions)
+                                            {
+                                                <button type="button" class="attendance-filter-select-option @(string.Equals(filterTarget, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("target", option)'>@option</button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="attendance-filter-field">
+                                    <label class="attendance-table-toolbar-label" for="attendanceFilterAccomplishment">Accomplishment</label>
+                                    <div class="attendance-filter-select-wrap">
+                                        <button type="button"
+                                                id="attendanceFilterAccomplishment"
+                                                class="attendance-filter-select-trigger @(activeFilterField == "accomplishment" ? "active" : null)"
+                                                @onclick='() => ToggleFilterField("accomplishment")'>
+                                            <span class="attendance-filter-select-value">@DisplayValue(filterAccomplishment, "All Accomplishment")</span>
+                                            <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                        </button>
+
+                                        <div class="attendance-filter-select-menu @(activeFilterField == "accomplishment" ? "show" : null)">
+                                            <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterAccomplishment) ? "active" : null)" @onclick='() => SetFilterValue("accomplishment", string.Empty)'>All Accomplishment</button>
+                                            @foreach (var option in AccomplishmentFilterOptions)
+                                            {
+                                                <button type="button" class="attendance-filter-select-option @(string.Equals(filterAccomplishment, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("accomplishment", option)'>@option</button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="attendance-filter-field">
+                                    <label class="attendance-table-toolbar-label" for="attendanceFilterMov">MOV</label>
+                                    <div class="attendance-filter-select-wrap">
+                                        <button type="button"
+                                                id="attendanceFilterMov"
+                                                class="attendance-filter-select-trigger @(activeFilterField == "mov" ? "active" : null)"
+                                                @onclick='() => ToggleFilterField("mov")'>
+                                            <span class="attendance-filter-select-value">@DisplayValue(filterMov, "All MOV")</span>
+                                            <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                        </button>
+
+                                        <div class="attendance-filter-select-menu @(activeFilterField == "mov" ? "show" : null)">
+                                            <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterMov) ? "active" : null)" @onclick='() => SetFilterValue("mov", string.Empty)'>All MOV</button>
+                                            @foreach (var option in MovFilterOptions)
+                                            {
+                                                <button type="button" class="attendance-filter-select-option @(string.Equals(filterMov, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("mov", option)'>@option</button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="attendance-filter-actions">
+                            <button type="button" class="attendance-filter-clear" @onclick="ClearFilters">Clear</button>
+                            <button type="button" class="btn btn-primary attendance-filter-apply" @onclick="CloseFilterMenu">Apply</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-filter-dropdown attendance-entries-counter">
+                    <button type="button" class="btn btn-outline-secondary attendance-filter-button attendance-entries-button" @onclick="ToggleEntriesMenu">
+                        <span>@pageSize</span>
+                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                    </button>
+
+                    <div class="attendance-entries-menu attendance-filter-menu @(showEntriesMenu ? "show" : null)" @onclick:stopPropagation="true">
+                        @foreach (var option in PageSizeOptions)
+                        {
+                            <button type="button"
+                                    class="attendance-entries-option @(pageSize == option ? "active" : null)"
+                                    @onclick="() => SelectPageSize(option)">
+                                @option
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="panel-card attendance-table-card">
@@ -49,26 +365,52 @@
                 <table class="table attendance-table attendance-table-onsite">
                     <thead style="background:var(--finance-surface-soft);border-bottom:1px solid var(--finance-border);">
                         <tr>
-                            <th>ID Number</th>
-                            <th>Employee</th>
-                            <th>Division / Unit</th>
-                            <th>Designation</th>
-                            <th>AM</th>
-                            <th>PM</th>
+                            <th class="attendance-actions-column">Actions</th>
+                            <th>@SortHeader("ID Number", "id", false)</th>
+                            <th>@SortHeader("Employee", "employee", false)</th>
+                            <th>@SortHeader("Division / Unit", "division", false)</th>
+                            <th>@SortHeader("Designation", "designation", false)</th>
+                            <th>@SortHeader("AM", "am", false)</th>
+                            <th>@SortHeader("PM", "pm", false)</th>
                             <th>Tardiness</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var log in PagedOnsiteLogs)
                         {
-                            <tr>
+                            <tr class="attendance-log-row" @ondblclick="() => OpenOnsiteDetail(log)">
+                                <td class="attendance-actions-cell">
+                                    <button type="button"
+                                            class="attendance-action-button"
+                                            title="View"
+                                            aria-label="View attendance details"
+                                            @onclick="() => OpenOnsiteDetail(log)"
+                                            @onclick:stopPropagation="true">
+                                        <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button"
+                                            class="attendance-action-button"
+                                            title="Edit"
+                                            aria-label="Edit attendance log"
+                                            @onclick="() => OpenOnsiteEdit(log)"
+                                            @onclick:stopPropagation="true"
+                                            disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                        <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                                    </button>
+                                </td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.IdNumber)">@DisplayValue(log.IdNumber)</span></td>
                                 <td><span class="cell-ellipsis" title="@FormatName(log.LastName, log.FirstName, log.MiddleName)">@FormatName(log.LastName, log.FirstName, log.MiddleName)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.DivisionCenterUnit)">@DisplayValue(log.DivisionCenterUnit)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.Designation)">@DisplayValue(log.Designation)</span></td>
                                 <td class="time-cell"><span class="cell-ellipsis" title="@FormatTimeRange(log.TimeInAm, log.TimeOutAm)">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</span></td>
                                 <td class="time-cell"><span class="cell-ellipsis" title="@FormatTimeRange(log.TimeInPm, log.TimeOutPm)">@FormatTimeRange(log.TimeInPm, log.TimeOutPm)</span></td>
-                                <td><span class="cell-ellipsis" title="@DisplayValue(log.Tardiness)">@DisplayValue(log.Tardiness)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayTardiness(log.Tardiness)">@DisplayTardiness(log.Tardiness)</span></td>
+                            </tr>
+                        }
+                        @if (!PagedOnsiteLogs.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
                             </tr>
                         }
                     </tbody>
@@ -79,24 +421,44 @@
                 <table class="table attendance-table attendance-table-wfh">
                     <thead style="background:var(--finance-surface-soft);border-bottom:1px solid var(--finance-border);">
                         <tr>
-                            <th>ID Number</th>
-                            <th>Employee</th>
-                            <th>Division / Unit</th>
-                            <th>Designation</th>
+                            <th class="attendance-actions-column">Actions</th>
+                            <th>@SortHeader("ID Number", "id", true)</th>
+                            <th>@SortHeader("Employee", "employee", true)</th>
+                            <th>@SortHeader("Division / Unit", "division", true)</th>
+                            <th>@SortHeader("Designation", "designation", true)</th>
                             <th>Target</th>
                             <th>Accomplishment</th>
                             <th>MOV</th>
                             <th>Arrangement</th>
                             <th>Status</th>
-                            <th>Time In</th>
-                            <th>Time Out</th>
+                            <th>@SortHeader("Time In", "timein", true)</th>
+                            <th>@SortHeader("Time Out", "timeout", true)</th>
                             <th>Tardiness</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var log in PagedWfhLogs)
                         {
-                            <tr>
+                            <tr class="attendance-log-row" @ondblclick="() => OpenWfhDetail(log)">
+                                <td class="attendance-actions-cell">
+                                    <button type="button"
+                                            class="attendance-action-button"
+                                            title="View"
+                                            aria-label="View attendance details"
+                                            @onclick="() => OpenWfhDetail(log)"
+                                            @onclick:stopPropagation="true">
+                                        <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button"
+                                            class="attendance-action-button"
+                                            title="Edit"
+                                            aria-label="Edit attendance log"
+                                            @onclick="() => OpenWfhEdit(log)"
+                                            @onclick:stopPropagation="true"
+                                            disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                        <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                                    </button>
+                                </td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.IdNumber)">@DisplayValue(log.IdNumber)</span></td>
                                 <td><span class="cell-ellipsis" title="@FormatName(log.LastName, log.FirstName, log.MiddleName)">@FormatName(log.LastName, log.FirstName, log.MiddleName)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.DivisionCenterUnit)">@DisplayValue(log.DivisionCenterUnit)</span></td>
@@ -117,7 +479,13 @@
                                 <td><span class="cell-ellipsis" title="@GetWfhAttendanceStatus(log)">@GetWfhAttendanceStatus(log)</span></td>
                                 <td class="time-cell"><span class="cell-ellipsis" title="@FormatTime(log.TimeIn)">@FormatTime(log.TimeIn)</span></td>
                                 <td class="time-cell"><span class="cell-ellipsis" title="@FormatTime(log.TimeOut)">@FormatTime(log.TimeOut)</span></td>
-                                <td><span class="cell-ellipsis" title="@DisplayValue(log.Tardiness)">@DisplayValue(log.Tardiness)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayTardiness(log.Tardiness)">@DisplayTardiness(log.Tardiness)</span></td>
+                            </tr>
+                        }
+                        @if (!PagedWfhLogs.Any())
+                        {
+                            <tr>
+                                <td colspan="13" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
                             </tr>
                         }
                     </tbody>
@@ -127,7 +495,7 @@
         @if (viewMode == "onsite")
         {
             <div class="table-footer">
-                <div class="table-entries">@GetEntriesText(onsiteLogs.Count, onsitePage)</div>
+                <div class="table-entries">@GetEntriesText(filteredOnsiteLogs.Count, onsitePage)</div>
                 <div class="table-pagination">
                     <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeOnsitePage(onsitePage - 1)" disabled="@(onsitePage <= 1)">&#8249;</button>
                     @foreach (var pageItem in BuildPageItems(OnsiteTotalPages, onsitePage))
@@ -148,7 +516,7 @@
         else
         {
             <div class="table-footer">
-                <div class="table-entries">@GetEntriesText(wfhLogs.Count, wfhPage)</div>
+                <div class="table-entries">@GetEntriesText(filteredWfhLogs.Count, wfhPage)</div>
                 <div class="table-pagination">
                     <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeWfhPage(wfhPage - 1)" disabled="@(wfhPage <= 1)">&#8249;</button>
                     @foreach (var pageItem in BuildPageItems(WfhTotalPages, wfhPage))
@@ -167,6 +535,437 @@
             </div>
         }
     </div>
+
+    @if (selectedOnsiteLog is not null || selectedWfhLog is not null)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseAttendanceDetail">
+            <div class="attendance-detail-modal" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Attendance Details</h2>
+                    </div>
+                    <div class="attendance-detail-header-actions">
+                        @if (selectedOnsiteLog is not null)
+                        {
+                            <button type="button"
+                                    class="attendance-detail-header-button"
+                                    @onclick="() => OpenOnsiteEdit(selectedOnsiteLog)"
+                                    disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                Edit Logs
+                            </button>
+                        }
+                        else if (selectedWfhLog is not null)
+                        {
+                            <button type="button"
+                                    class="attendance-detail-header-button"
+                                    @onclick="() => OpenWfhEdit(selectedWfhLog)"
+                                    disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                Edit Logs
+                            </button>
+                        }
+                        <button type="button" class="attendance-detail-close" @onclick="CloseAttendanceDetail" aria-label="Close details">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-body">
+                    @if (selectedOnsiteLog is not null)
+                    {
+                        <div class="attendance-detail-section attendance-detail-hero">
+                            <div>
+                                <div class="attendance-detail-eyebrow">Onsite Biometric Log</div>
+                                <div class="attendance-detail-person">@FormatName(selectedOnsiteLog.LastName, selectedOnsiteLog.FirstName, selectedOnsiteLog.MiddleName)</div>
+                            </div>
+                            <div class="attendance-detail-status">@DisplayValue(selectedOnsiteLog.Tardiness, "On Time")</div>
+                        </div>
+
+                        <div class="attendance-detail-section attendance-detail-section-primary">
+                            <div class="attendance-detail-grid">
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">ID Number</span>
+                                    <strong>@DisplayValue(selectedOnsiteLog.IdNumber)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Attendance Date</span>
+                                    <strong>@FormatDate(selectedOnsiteLog.AttendanceDate)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Division / Unit</span>
+                                    <strong>@DisplayValue(selectedOnsiteLog.DivisionCenterUnit)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Designation</span>
+                                    <strong>@DisplayValue(selectedOnsiteLog.Designation)</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-section">
+                            <div class="attendance-detail-grid attendance-detail-grid-compact">
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">AM Time In</span>
+                                    <strong>@FormatDateTime(selectedOnsiteLog.TimeInAm)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">AM Time Out</span>
+                                    <strong>@FormatDateTime(selectedOnsiteLog.TimeOutAm)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">PM Time In</span>
+                                    <strong>@FormatDateTime(selectedOnsiteLog.TimeInPm)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">PM Time Out</span>
+                                    <strong>@FormatDateTime(selectedOnsiteLog.TimeOutPm)</strong>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else if (selectedWfhLog is not null)
+                    {
+                        <div class="attendance-detail-section attendance-detail-hero">
+                            <div>
+                                <div class="attendance-detail-eyebrow">WFH ETRS Log</div>
+                                <div class="attendance-detail-person">@FormatName(selectedWfhLog.LastName, selectedWfhLog.FirstName, selectedWfhLog.MiddleName)</div>
+                            </div>
+                            <div class="attendance-detail-status">@GetWfhAttendanceStatus(selectedWfhLog)</div>
+                        </div>
+
+                        <div class="attendance-detail-section attendance-detail-section-primary">
+                            <div class="attendance-detail-grid">
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">ID Number</span>
+                                    <strong>@DisplayValue(selectedWfhLog.IdNumber)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Attendance Date</span>
+                                    <strong>@FormatDate(selectedWfhLog.AttendanceDate)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Division / Unit</span>
+                                    <strong>@DisplayValue(selectedWfhLog.DivisionCenterUnit)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Designation</span>
+                                    <strong>@DisplayValue(selectedWfhLog.Designation)</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-section">
+                            <div class="attendance-detail-grid attendance-detail-grid-compact">
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Time In</span>
+                                    <strong>@FormatDateTime(selectedWfhLog.TimeIn)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Time Out</span>
+                                    <strong>@FormatDateTime(selectedWfhLog.TimeOut)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Tardiness</span>
+                                    <strong>@DisplayValue(selectedWfhLog.Tardiness, "On Time")</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">MOV</span>
+                                    @if (string.IsNullOrWhiteSpace(selectedWfhLog.Mov))
+                                    {
+                                        <strong>-</strong>
+                                    }
+                                    else
+                                    {
+                                        <a class="attendance-detail-text-action" href="@selectedWfhLog.Mov" target="_blank">Open file</a>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-section">
+                            <div class="attendance-detail-field attendance-detail-field-wide">
+                                <span class="attendance-detail-label">Target</span>
+                                <p class="attendance-detail-preserve-spacing">@DisplayValue(selectedWfhLog.Target)</p>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-section">
+                            <div class="attendance-detail-field attendance-detail-field-wide">
+                                <span class="attendance-detail-label">Accomplishment</span>
+                                <p class="attendance-detail-preserve-spacing">@DisplayValue(selectedWfhLog.Accomplishment)</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseAttendanceDetail">Close</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (showInputLogsModal)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseInputLogsModal">
+            <div class="attendance-detail-modal attendance-input-modal" @onclick="CloseModalTransientUiAsync" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Input Logs</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseInputLogsModal" aria-label="Close input logs">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body attendance-input-body">
+                    <div class="attendance-detail-section attendance-detail-hero">
+                        <div>
+                            <div class="attendance-detail-eyebrow">Manual Attendance Entry</div>
+                            <div class="attendance-detail-person">Choose log type, then enter the details.</div>
+                            <div class="attendance-detail-meta">This will add or update a daily attendance record for the selected employee.</div>
+                        </div>
+                        <div class="attendance-input-pill">@InputLogModeLabel</div>
+                    </div>
+
+                    <div class="attendance-detail-section attendance-detail-section-primary">
+                        <div class="attendance-input-mode-grid">
+                            <button type="button" class="attendance-input-mode-card @(inputLogMode == InputLogMode.Onsite ? "selected" : null)" @onclick='() => SelectInputLogMode(InputLogMode.Onsite)'>
+                                <span class="attendance-input-mode-title">Onsite</span>
+                                <span class="attendance-input-mode-sub">AM / PM biometric-style logs</span>
+                            </button>
+                            <button type="button" class="attendance-input-mode-card @(inputLogMode == InputLogMode.Wfh ? "selected" : null)" @onclick='() => SelectInputLogMode(InputLogMode.Wfh)'>
+                                <span class="attendance-input-mode-title">WFH</span>
+                                <span class="attendance-input-mode-sub">Time in / out with work details</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-section">
+                        <div class="attendance-input-grid">
+                            <div class="attendance-input-field">
+                                <span class="attendance-detail-label">Employee</span>
+                                <div class="attendance-input-search-wrap" @ref="inputEmployeeSearchWrapRef" @onclick:stopPropagation="true">
+                                    <div class="attendance-input-search-input-wrap">
+                                        <input
+                                            value="@inputEmployeeSearchText"
+                                            @oninput="HandleInputEmployeeSearchChanged"
+                                            @onfocus="HandleInputEmployeeSearchFocus"
+                                            class="form-control attendance-input-control attendance-input-search-input"
+                                            autocomplete="off"
+                                            disabled="@isSavingInputLog" />
+                                        <span class="attendance-input-search-icon" aria-hidden="true">Search</span>
+                                    </div>
+
+                                    <div class="@GetInputEmployeeOverlayClass()">
+                                        @if (showInputEmployeeResults)
+                                        {
+                                            @if (inputEmployeeSearchResults.Count == 0)
+                                            {
+                                                <div class="attendance-input-empty-state">No Employee Found</div>
+                                            }
+                                            else
+                                            {
+                                                <div class="attendance-input-results-grid">
+                                                    @foreach (var employee in inputEmployeeSearchResults)
+                                                    {
+                                                        <button type="button" class="@GetInputEmployeeResultClass(employee)" @onclick="() => SelectInputEmployee(employee)">
+                                                            <span class="attendance-input-result-id">@employee.IdNumber</span>
+                                                            <span class="attendance-input-result-name">@FormatInputEmployeeName(employee)</span>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="attendance-input-field">
+                                <span class="attendance-detail-label">Attendance Date</span>
+                                <InputDate @bind-Value="inputForm.AttendanceDate" class="form-control attendance-input-control" />
+                            </div>
+                            <div class="attendance-input-mode-panel attendance-input-field-wide attendance-input-mode-panel-@inputLogMode.ToString().ToLowerInvariant()" @key="inputLogMode">
+                                <div class="attendance-input-mode-panel-grid">
+                                    @if (inputLogMode == InputLogMode.Onsite)
+                                    {
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">AM Time In</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@inputForm.OnsiteTimeInAm" @onchange='e => UpdateTimeField(value => inputForm.OnsiteTimeInAm = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">AM Time Out</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@inputForm.OnsiteTimeOutAm" @onchange='e => UpdateTimeField(value => inputForm.OnsiteTimeOutAm = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">PM Time In</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@inputForm.OnsiteTimeInPm" @onchange='e => UpdateTimeField(value => inputForm.OnsiteTimeInPm = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">PM Time Out</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@inputForm.OnsiteTimeOutPm" @onchange='e => UpdateTimeField(value => inputForm.OnsiteTimeOutPm = value, e)' />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">Time In</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@inputForm.WfhTimeIn" @onchange='e => UpdateTimeField(value => inputForm.WfhTimeIn = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">Time Out</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@inputForm.WfhTimeOut" @onchange='e => UpdateTimeField(value => inputForm.WfhTimeOut = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field attendance-input-field-wide">
+                                            <span class="attendance-detail-label">Target</span>
+                                            <textarea class="form-control attendance-input-control attendance-input-textarea" @bind="inputForm.Target"></textarea>
+                                        </div>
+                                        <div class="attendance-input-field attendance-input-field-wide">
+                                            <span class="attendance-detail-label">Accomplishment</span>
+                                            <textarea class="form-control attendance-input-control attendance-input-textarea" @bind="inputForm.Accomplishment"></textarea>
+                                        </div>
+                                        <div class="attendance-input-field attendance-input-field-wide">
+                                            <span class="attendance-detail-label">Means of Verification</span>
+                                            <div class="attendance-input-upload-wrap">
+                                                <label for="attendanceInputMovUpload" class="attendance-input-file-button">Choose File</label>
+                                                <InputFile id="attendanceInputMovUpload"
+                                                           class="attendance-input-file-input"
+                                                           OnChange="HandleInputMovSelected"
+                                                           disabled="@isSavingInputLog" />
+                                                <span class="attendance-input-upload-note">@(string.IsNullOrWhiteSpace(inputForm.MovFileName) ? "No file chosen." : inputForm.MovFileName)</span>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseInputLogsModal" disabled="@isSavingInputLog">Cancel</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveInputLogAsync" disabled="@isSavingInputLog">@(isSavingInputLog ? "Saving..." : "Save")</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (showEditLogsModal)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseEditLogsModal">
+            <div class="attendance-detail-modal attendance-input-modal" @onclick="CloseModalTransientUiAsync" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Edit Logs</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseEditLogsModal" aria-label="Close edit logs">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body attendance-input-body">
+                    <div class="attendance-detail-section attendance-detail-hero">
+                        <div>
+                            <div class="attendance-detail-eyebrow">@editLogForm.LogTypeLabel Log</div>
+                            <div class="attendance-detail-person">@editLogForm.EmployeeName</div>
+                        </div>
+                        <div class="attendance-input-pill">@editLogForm.LogTypeLabel</div>
+                    </div>
+
+                    <div class="attendance-detail-section attendance-detail-section-primary">
+                        <div class="attendance-input-grid">
+                            <div class="attendance-input-field">
+                                <span class="attendance-detail-label">Attendance Date</span>
+                                <input class="form-control attendance-input-control attendance-input-control-readonly" value="@FormatDate(editLogForm.AttendanceDate)" readonly />
+                            </div>
+                            <div class="attendance-input-field">
+                                <span class="attendance-detail-label">Tardiness</span>
+                                <div class="attendance-filter-select-wrap attendance-input-select-wrap" @onclick:stopPropagation="true">
+                                    <button type="button"
+                                            class="attendance-filter-select-trigger attendance-input-control @(showEditTardinessMenu ? "active" : null)"
+                                            @onclick="ToggleEditTardinessMenu">
+                                        <span class="attendance-filter-select-value">@DisplayEditTardiness(editLogForm.Tardiness)</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(showEditTardinessMenu ? "show" : null)">
+                                        @foreach (var option in EditTardinessOptions)
+                                        {
+                                            <button type="button"
+                                                    class="attendance-filter-select-option @(string.Equals(DisplayEditTardiness(editLogForm.Tardiness), option, StringComparison.OrdinalIgnoreCase) ? "active" : null)"
+                                                    @onclick='() => SelectEditTardiness(option)'>
+                                                @option
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="attendance-input-mode-panel attendance-input-field-wide attendance-input-mode-panel-@(editLogForm.IsWfh ? "wfh" : "onsite")">
+                                <div class="attendance-input-mode-panel-grid">
+                                    @if (!editLogForm.IsWfh)
+                                    {
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">AM Time In</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@editLogForm.OnsiteTimeInAm" @onchange='e => UpdateTimeField(value => editLogForm.OnsiteTimeInAm = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">AM Time Out</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@editLogForm.OnsiteTimeOutAm" @onchange='e => UpdateTimeField(value => editLogForm.OnsiteTimeOutAm = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">PM Time In</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@editLogForm.OnsiteTimeInPm" @onchange='e => UpdateTimeField(value => editLogForm.OnsiteTimeInPm = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">PM Time Out</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@editLogForm.OnsiteTimeOutPm" @onchange='e => UpdateTimeField(value => editLogForm.OnsiteTimeOutPm = value, e)' />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">Time In</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@editLogForm.WfhTimeIn" @onchange='e => UpdateTimeField(value => editLogForm.WfhTimeIn = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field">
+                                            <span class="attendance-detail-label">Time Out</span>
+                                            <input type="time" class="form-control attendance-input-control" value="@editLogForm.WfhTimeOut" @onchange='e => UpdateTimeField(value => editLogForm.WfhTimeOut = value, e)' />
+                                        </div>
+                                        <div class="attendance-input-field attendance-input-field-wide">
+                                            <span class="attendance-detail-label">Target</span>
+                                            <textarea class="form-control attendance-input-control attendance-input-textarea" @bind="editLogForm.Target"></textarea>
+                                        </div>
+                                        <div class="attendance-input-field attendance-input-field-wide">
+                                            <span class="attendance-detail-label">Accomplishment</span>
+                                            <textarea class="form-control attendance-input-control attendance-input-textarea" @bind="editLogForm.Accomplishment"></textarea>
+                                        </div>
+                                        <div class="attendance-input-field attendance-input-field-wide">
+                                            <span class="attendance-detail-label">Means of Verification</span>
+                                            <div class="attendance-input-upload-wrap">
+                                                <label for="attendanceEditMovUpload" class="attendance-input-file-button">Replace File</label>
+                                                <InputFile id="attendanceEditMovUpload"
+                                                           class="attendance-input-file-input"
+                                                           OnChange="HandleEditMovSelected"
+                                                           disabled="@isSavingEditLog" />
+                                                <span class="attendance-input-upload-note">@(string.IsNullOrWhiteSpace(editLogForm.MovFileName) ? "Keep current file." : editLogForm.MovFileName)</span>
+                                                @if (!string.IsNullOrWhiteSpace(editLogForm.ExistingMov))
+                                                {
+                                                    <a class="attendance-detail-text-action attendance-input-upload-link-end" href="@editLogForm.ExistingMov" target="_blank">Open current file</a>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseEditLogsModal" disabled="@isSavingEditLog">Cancel</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveEditLogAsync" disabled="@isSavingEditLog">@(isSavingEditLog ? "Saving..." : "Save Changes")</button>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 </RequireAccess>
 
@@ -180,9 +979,309 @@
         white-space: nowrap;
     }
 
+    .attendance-view-tabs {
+        display: flex;
+        align-items: flex-end;
+        gap: 2rem;
+        margin-bottom: 0.85rem;
+        padding: 0 0.25rem;
+        border-bottom: 1px solid #d9dee7;
+    }
+
+    .attendance-view-tab {
+        position: relative;
+        margin: 0;
+        padding: 0.9rem 0.15rem 0.8rem;
+        border: 0;
+        background: transparent;
+        color: #6b7280;
+        font-size: 0.95rem;
+        font-weight: 500;
+        line-height: 1.2;
+        transition: color 0.18s ease;
+    }
+
+    .attendance-view-tab:hover {
+        color: #6b7280;
+    }
+
+    .attendance-view-tab::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -1px;
+        height: 2px;
+        background: transparent;
+        transition: background-color 0.18s ease;
+    }
+
+    .attendance-view-tab.active {
+        color: #6b7280;
+        font-weight: 600;
+    }
+
+    .attendance-view-tab.active::after {
+        background: #9ca3af;
+    }
+
     .attendance-table-card {
         padding: 1rem;
         overflow-x: auto;
+    }
+
+    .attendance-table-toolbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .attendance-table-search {
+        flex: 1 1 420px;
+        max-width: 520px;
+    }
+
+    .attendance-table-search-input {
+        min-height: 2.85rem;
+    }
+
+    .attendance-table-search-input::-webkit-search-cancel-button {
+        cursor: pointer;
+        filter: grayscale(1) brightness(0);
+        opacity: 1;
+    }
+
+    .attendance-table-actions {
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .attendance-table-toolbar-label {
+        display: inline-block;
+        margin-bottom: 0.25rem;
+        color: var(--finance-text-muted);
+        font-size: 0.74rem;
+        font-weight: 600;
+    }
+
+    .attendance-filter-dropdown {
+        position: relative;
+    }
+
+    .attendance-filter-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.85rem;
+    }
+
+    .attendance-filter-button-clear {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 0.92rem;
+        height: 0.92rem;
+        border: 1px solid #d4d8e1;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted);
+        font-size: 0.62rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .attendance-filter-button-clear:hover {
+        border-color: #bcc4d2;
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .attendance-filter-menu {
+        position: absolute;
+        top: calc(100% + 0.55rem);
+        right: 0;
+        width: min(92vw, 560px);
+        padding: 0.55rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 20;
+    }
+
+    .attendance-filter-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .attendance-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .attendance-filter-field {
+        min-width: 0;
+        position: relative;
+    }
+
+    .attendance-filter-select-wrap {
+        position: relative;
+    }
+
+    .attendance-filter-select-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        width: 100%;
+        min-height: 2.15rem;
+        padding: 0.38rem 0.68rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+
+    .attendance-filter-select-trigger.active {
+        border-color: rgba(16, 77, 173, 0.35);
+        box-shadow: 0 0 0 3px rgba(16, 77, 173, 0.08);
+    }
+
+    .attendance-filter-select-value {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .attendance-filter-select-menu {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        max-height: 220px;
+        padding: 0.3rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        overflow-y: auto;
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 8;
+    }
+
+    .attendance-filter-select-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .attendance-filter-select-option {
+        display: block;
+        width: 100%;
+        padding: 0.45rem 0.55rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .attendance-filter-select-option:hover,
+    .attendance-filter-select-option.active {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .attendance-filter-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        margin-top: 0.55rem;
+        font-size: 0.82rem;
+    }
+
+    .attendance-filter-clear {
+        border: 0;
+        padding: 0.3rem 0.45rem;
+        background: transparent;
+        color: var(--finance-text-muted);
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+
+    .attendance-filter-apply {
+        min-width: 64px;
+        min-height: 2rem;
+        padding: 0.32rem 0.72rem;
+        font-size: 0.82rem;
+    }
+
+    .attendance-entries-counter {
+        min-width: 92px;
+    }
+
+    .attendance-entries-button {
+        justify-content: space-between;
+        min-width: 92px;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .attendance-dropdown-caret {
+        font-size: 0.78rem;
+    }
+
+    .attendance-entries-menu {
+        width: 100%;
+        min-width: 92px;
+        padding: 0.35rem;
+    }
+
+    .attendance-entries-option {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 0.65rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        text-align: left;
+        font-size: 0.92rem;
+    }
+
+    .attendance-entries-option:hover,
+    .attendance-entries-option.active {
+        background: var(--finance-surface-soft);
+    }
+
+    .attendance-empty-state {
+        padding: 2rem 1rem;
+        text-align: center;
+        color: var(--finance-text-muted);
     }
 
     .attendance-table {
@@ -209,6 +1308,64 @@
         min-width: 8rem;
     }
 
+    .attendance-sort-header {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .attendance-sort-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        letter-spacing: inherit;
+        text-transform: inherit;
+    }
+
+    .attendance-sort-trigger.active {
+        color: var(--finance-text, #25324b);
+    }
+
+    .attendance-sort-label {
+        white-space: nowrap;
+    }
+
+    .attendance-sort-icon {
+        color: var(--finance-text-muted);
+        line-height: 1;
+    }
+
+    .attendance-sort-icon.active {
+        color: var(--finance-primary, #1f3a8a);
+    }
+
+    .attendance-sort-clear {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 0.92rem;
+        height: 0.92rem;
+        padding: 0;
+        border: 1px solid #d4d8e1;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted);
+        font-size: 0.62rem;
+        font-weight: 500;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .attendance-sort-clear:hover {
+        border-color: #bcc4d2;
+        color: var(--finance-primary, var(--finance-text));
+    }
+
     .attendance-table .cell-ellipsis {
         display: block;
         max-width: 18rem;
@@ -221,6 +1378,15 @@
         border-bottom: 1px solid var(--finance-border-soft);
     }
 
+    .attendance-table tbody .attendance-log-row {
+        cursor: pointer;
+        transition: background-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .attendance-table tbody .attendance-log-row:hover {
+        background: #fbfcff;
+    }
+
     .attendance-table .time-cell {
         min-width: 10rem;
     }
@@ -228,53 +1394,1369 @@
     .attendance-table .time-cell .cell-ellipsis {
         max-width: 11rem;
     }
+
+    .attendance-actions-column {
+        min-width: 8.5rem;
+    }
+
+    .attendance-actions-cell {
+        min-width: 8.5rem;
+    }
+
+    .attendance-table .attendance-actions-cell {
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .attendance-action-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        margin-right: 0.45rem;
+        border: 1px solid var(--finance-border, #d9dee7);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted, #6b7280);
+        transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+    }
+
+    .attendance-action-button:last-child {
+        margin-right: 0;
+    }
+
+    .attendance-action-button:hover,
+    .attendance-action-button:focus-visible {
+        border-color: var(--finance-border, #d9dee7);
+        color: var(--finance-text, #25324b);
+        background: #f5f7fb;
+    }
+
+    .attendance-action-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .attendance-logs-controls {
+        display:flex;
+        align-items:center;
+        gap:0.5rem;
+    }
+
+    .date-filter {
+        display:flex;
+        align-items:center;
+        gap:0.4rem;
+    }
+
+    .date-filter input[type="date"] {
+        height: calc(1.5em + 0.5rem + 2px);
+    }
+
+    .date-filter-sep {
+        font-size:0.9rem;
+        color:var(--finance-text-muted);
+    }
+
+    .period-dropdown {
+        display:inline-block;
+        min-width: 260px; /* controls default field width */
+    }
+
+    .period-button {
+        min-height: 2.5rem;
+        padding: 0.5rem 0.8rem;
+    }
+
+    .period-button-content {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 0;
+        flex: 1 1 auto;
+        white-space: nowrap;
+    }
+
+    .period-label {
+        font-weight:500;
+        color:var(--finance-text-muted);
+    }
+
+    .period-selected {
+        font-weight:600;
+        max-width: 160px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    .period-menu {
+        min-width:260px;
+        max-height:320px;
+        z-index: 1100;
+    }
+
+    .period-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .period-option-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .period-add-button {
+        margin-left:0.5rem;
+        height: calc(1.6rem + 0.5rem);
+        width: calc(1.6rem + 0.5rem);
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:8px;
+    }
+
+    .period-dropdown + .period-add-button + .period-dropdown { margin-left:0.5rem; }
+
+    .period-dropdown .period-button { width:100%; }
+    .period-dropdown + .period-add-button + .period-dropdown .period-button { width:100%; }
+
+    .period-to-label {
+        display:inline-flex;
+        align-items:center;
+        padding:0 0.15rem;
+        margin:0 0.05rem;
+        color:var(--finance-text-muted);
+        font-weight:500;
+    }
+
+    .period-range-entry {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        animation: period-range-enter 180ms ease-out;
+        transform-origin: left center;
+    }
+
+    .period-range-entry.closing {
+        animation: period-range-exit 180ms ease-in forwards;
+        pointer-events: none;
+    }
+
+    .period-current-text {
+        color:var(--finance-text-muted);
+        font-size:0.9rem;
+        margin-left:0.4rem;
+        white-space:nowrap;
+    }
+
+    .period-close-btn {
+        position:absolute;
+        right:-8px;
+        top:-10px;
+        width:18px;
+        height:18px;
+        border-radius:50%;
+        border:1px solid var(--finance-border);
+        background:#fff;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        font-size:11px;
+        line-height:1;
+        cursor:pointer;
+        color:var(--finance-text-muted);
+        padding:0;
+        z-index:2;
+    }
+
+    .period-close-btn:hover {
+        background:var(--finance-surface-soft);
+    }
+
+
+    .period-sep {
+        display:inline-block;
+        width:1px;
+        height:26px;
+        background:var(--finance-border);
+        margin: 0 0.75rem;
+        align-self:center;
+        opacity:0.8;
+    }
+
+    /* Status badge used elsewhere (employees) and reused here for Current pill */
+    .status-badge {
+        display:inline-block;
+        padding:0.35rem 0.75rem;
+        border-radius:20px;
+        font-size:0.85rem;
+        background:var(--etrs-gray-100);
+        color:var(--etrs-black);
+        border:1px solid var(--etrs-gray-200);
+    }
+
+    .status-ok {
+        background:#fff;
+        color:var(--etrs-black);
+        border:1px solid var(--etrs-gray-300);
+    }
+
+    .attendance-detail-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: rgba(30, 41, 57, 0.28);
+        backdrop-filter: blur(8px);
+    }
+
+    .attendance-detail-modal {
+        width: min(100%, 760px);
+        max-height: min(92vh, 900px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300) 88%, white);
+        border-radius: 10px;
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        animation: attendance-detail-enter 180ms ease-out;
+    }
+
+    .attendance-detail-header,
+    .attendance-detail-hero,
+    .attendance-detail-footer {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .attendance-detail-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 1.15rem 1.5rem 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border-bottom: 1px solid var(--etrs-gray-200);
+    }
+
+    .attendance-detail-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 1rem 1.5rem;
+    }
+
+    .attendance-detail-title {
+        margin: 0;
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .attendance-detail-header-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.5rem;
+        padding: 0.55rem 1rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 0.75rem;
+        background: #fff;
+        color: var(--etrs-black);
+        font-weight: 500;
+    }
+
+    .attendance-detail-header-button:hover,
+    .attendance-detail-header-button:focus-visible {
+        background: #f5f7fb;
+    }
+
+    .attendance-detail-header-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .attendance-detail-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--etrs-gray-700);
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .attendance-detail-section {
+        margin-top: 1rem;
+        padding: 1rem 1.05rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    .attendance-detail-hero {
+        align-items: center;
+        background: #ffffff;
+        border-color: var(--etrs-gray-200);
+        border-radius: 8px;
+    }
+
+    .attendance-detail-eyebrow {
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-person {
+        margin-top: 0.35rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-meta {
+        margin-top: 0.2rem;
+        font-weight: 400;
+        color: var(--etrs-gray-700);
+    }
+
+    .attendance-detail-status {
+        flex: 0 0 auto;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        background: var(--etrs-gray-100);
+        border: 1px solid var(--etrs-gray-200);
+        color: var(--etrs-gray-800);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .attendance-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .attendance-detail-grid-compact {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .attendance-detail-preserve-spacing {
+        white-space: break-spaces;
+    }
+
+    .attendance-detail-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+
+    .attendance-detail-field strong,
+    .attendance-detail-field p,
+    .attendance-detail-field a {
+        margin: 0;
+        color: var(--etrs-black);
+        overflow-wrap: anywhere;
+    }
+
+    .attendance-detail-field-wide {
+        width: 100%;
+    }
+
+    .attendance-detail-label {
+        color: var(--etrs-gray-700);
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .attendance-detail-section-primary .attendance-detail-label {
+        font-weight: 500;
+    }
+
+    .attendance-detail-section-primary .attendance-detail-field strong,
+    .attendance-detail-section-primary .attendance-detail-field a {
+        font-weight: 600;
+    }
+
+    .attendance-detail-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 1rem 1.5rem 1.25rem;
+        background: linear-gradient(180deg, rgba(250, 250, 250, 0.92) 0%, var(--etrs-gray-50) 100%);
+        border-top: 1px solid var(--etrs-gray-200);
+    }
+
+    .attendance-detail-done {
+        min-width: 7rem;
+        border-radius: 12px;
+        padding-inline: 1.25rem;
+    }
+
+    .attendance-detail-text-action {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--etrs-gray-700);
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .attendance-detail-text-action:hover,
+    .attendance-detail-text-action:focus-visible {
+        color: var(--etrs-black);
+        text-decoration: none;
+    }
+
+    .attendance-detail-text-action:disabled {
+        color: var(--etrs-gray-500);
+        text-decoration: none;
+    }
+
+    .attendance-input-modal {
+        width: min(100%, 900px);
+    }
+
+    .attendance-input-body {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .attendance-input-pill {
+        flex: 0 0 auto;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        background: var(--etrs-gray-100);
+        border: 1px solid var(--etrs-gray-200);
+        color: var(--etrs-gray-800);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .attendance-input-mode-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .attendance-input-mode-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 1rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.92);
+        text-align: left;
+        color: var(--etrs-black);
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+
+    .attendance-input-mode-card.selected {
+        border-color: var(--etrs-gray-400);
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
+    }
+
+    .attendance-input-mode-title {
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .attendance-input-mode-sub {
+        font-size: 0.9rem;
+        color: var(--etrs-gray-700);
+    }
+
+    .attendance-input-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .attendance-input-search-wrap {
+        position: relative;
+    }
+
+    .attendance-input-search-input-wrap {
+        position: relative;
+    }
+
+    .attendance-input-search-input {
+        padding-right: 5.5rem;
+    }
+
+    .attendance-input-search-icon {
+        position: absolute;
+        top: 50%;
+        right: 0.9rem;
+        transform: translateY(-50%);
+        color: var(--etrs-gray-600);
+        font-size: 0.82rem;
+        font-weight: 600;
+        pointer-events: none;
+    }
+
+    .attendance-input-results-overlay {
+        position: absolute;
+        top: calc(100% + 0.45rem);
+        left: 0;
+        right: 0;
+        z-index: 5;
+        padding: 0.8rem;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.98);
+        border: 1px solid var(--etrs-gray-200);
+        box-shadow: 0 16px 34px rgba(15,23,42,0.12);
+        max-height: 280px;
+        overflow-y: auto;
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .attendance-input-results-overlay.active {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .attendance-input-results-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.7rem;
+    }
+
+    .attendance-input-result-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        width: 100%;
+        padding: 0.8rem 0.85rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 10px;
+        background: #ffffff;
+        text-align: left;
+        color: var(--etrs-black);
+        animation: attendance-input-result-in 0.22s ease forwards;
+    }
+
+    .attendance-input-result-card.selected {
+        border-color: var(--etrs-gray-400);
+        box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
+    }
+
+    .attendance-input-result-id {
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .attendance-input-result-name {
+        font-size: 0.8rem;
+        color: var(--etrs-gray-700);
+        line-height: 1.35;
+    }
+
+    .attendance-input-empty-state {
+        padding: 0.5rem 0.15rem;
+        color: var(--etrs-gray-700);
+        font-size: 0.9rem;
+    }
+
+    .attendance-input-mode-panel {
+        animation: attendance-input-mode-swap 220ms ease;
+        transform-origin: top center;
+    }
+
+    .attendance-input-mode-panel-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .attendance-input-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+
+    .attendance-input-control {
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        min-height: 3rem;
+        padding: 0.75rem 0.9rem;
+        background: #ffffff;
+        color: var(--etrs-black);
+        box-shadow: none;
+    }
+
+    .attendance-input-control:focus {
+        border-color: var(--etrs-gray-400);
+        box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
+    }
+
+    .attendance-input-control::placeholder {
+        color: var(--etrs-gray-500);
+    }
+
+    .attendance-input-control-readonly {
+        background: #f3f4f6;
+        color: var(--etrs-gray-700);
+        border-color: var(--etrs-gray-200);
+    }
+
+    .attendance-input-control-readonly[readonly] {
+        background: #f3f4f6;
+        color: var(--etrs-gray-700);
+        cursor: default;
+    }
+
+    .attendance-input-select-wrap .attendance-filter-select-trigger {
+        min-height: 3rem;
+        padding: 0.75rem 0.9rem;
+        font-size: 1rem;
+        border-color: var(--etrs-gray-200);
+        color: var(--etrs-black);
+    }
+
+    .attendance-input-select-wrap .attendance-filter-select-trigger.active {
+        border-color: var(--etrs-gray-400);
+        box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
+    }
+
+    .attendance-input-select-wrap .attendance-filter-select-menu {
+        z-index: 20;
+    }
+
+    .attendance-input-field .attendance-detail-label {
+        margin: 0;
+    }
+
+    .attendance-input-field-wide {
+        grid-column: 1 / -1;
+    }
+
+    .attendance-input-textarea {
+        min-height: 6.5rem;
+        resize: vertical;
+    }
+
+    .attendance-input-upload-wrap {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .attendance-input-file-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .attendance-input-file-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 116px;
+        min-height: 3rem;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--etrs-black);
+        cursor: pointer;
+        font-weight: 500;
+    }
+
+    .attendance-input-upload-note {
+        color: var(--etrs-gray-700);
+        font-size: 0.9rem;
+    }
+
+    .attendance-input-upload-link-end {
+        margin-left: auto;
+        text-align: right;
+    }
+
+    @@keyframes attendance-detail-enter {
+        from {
+            opacity: 0;
+            transform: translateY(10px) scale(0.985);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @@keyframes attendance-input-mode-swap {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes attendance-input-result-in {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .attendance-table-toolbar,
+        .attendance-table-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .attendance-table-search {
+            max-width: none;
+        }
+
+        .attendance-filter-menu {
+            left: 0;
+            right: auto;
+            width: min(100vw - 2rem, 560px);
+        }
+
+        .attendance-filter-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attendance-detail-modal {
+            border-radius: 10px;
+        }
+
+        .attendance-detail-header,
+        .attendance-detail-hero {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .attendance-detail-header,
+        .attendance-detail-body,
+        .attendance-detail-footer {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        .attendance-detail-grid,
+        .attendance-detail-grid-compact {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attendance-input-mode-panel-grid,
+        .attendance-input-mode-grid,
+        .attendance-input-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attendance-input-results-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attendance-detail-status,
+        .attendance-detail-done {
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    @@keyframes period-range-enter {
+        from {
+            opacity: 0;
+            transform: translateX(-8px) scale(0.98);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
+
+    @@keyframes period-range-exit {
+        from {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(-8px) scale(0.98);
+        }
+    }
+
 </style>
 
 @code {
-    private const int PageSize = 10;
+    private const int MaxPageSize = 100;
+    private enum InputLogMode
+    {
+        Onsite,
+        Wfh
+    }
+
+    private sealed class ManualInputForm
+    {
+        [Range(1, int.MaxValue, ErrorMessage = "Select an employee.")]
+        public int EmployeeId { get; set; }
+        public DateTime AttendanceDate { get; set; } = DateTime.Today;
+        public string OnsiteTimeInAm { get; set; } = string.Empty;
+        public string OnsiteTimeOutAm { get; set; } = string.Empty;
+        public string OnsiteTimeInPm { get; set; } = string.Empty;
+        public string OnsiteTimeOutPm { get; set; } = string.Empty;
+        public string WfhTimeIn { get; set; } = string.Empty;
+        public string WfhTimeOut { get; set; } = string.Empty;
+        public string Target { get; set; } = string.Empty;
+        public string Accomplishment { get; set; } = string.Empty;
+        public string MovFileName { get; set; } = string.Empty;
+        public IBrowserFile? MovFile { get; set; }
+    }
+
+    private sealed class EditLogForm
+    {
+        public bool IsWfh { get; set; }
+        public int AttendanceLogId { get; set; }
+        public int AttendanceLogWfhId { get; set; }
+        public DateTime AttendanceDate { get; set; } = DateTime.Today;
+        public string EmployeeName { get; set; } = string.Empty;
+        public string LogTypeLabel => IsWfh ? "WFH" : "Onsite";
+        public string Tardiness { get; set; } = string.Empty;
+        public string OnsiteTimeInAm { get; set; } = string.Empty;
+        public string OnsiteTimeOutAm { get; set; } = string.Empty;
+        public string OnsiteTimeInPm { get; set; } = string.Empty;
+        public string OnsiteTimeOutPm { get; set; } = string.Empty;
+        public string WfhTimeIn { get; set; } = string.Empty;
+        public string WfhTimeOut { get; set; } = string.Empty;
+        public string Target { get; set; } = string.Empty;
+        public string Accomplishment { get; set; } = string.Empty;
+        public string ExistingMov { get; set; } = string.Empty;
+        public string MovFileName { get; set; } = string.Empty;
+        public IBrowserFile? MovFile { get; set; }
+    }
+
+    private sealed class AttendanceTableState
+    {
+        public string SearchText { get; set; } = string.Empty;
+        public string FilterIdNumber { get; set; } = string.Empty;
+        public string FilterEmployee { get; set; } = string.Empty;
+        public string FilterDivision { get; set; } = string.Empty;
+        public string FilterDesignation { get; set; } = string.Empty;
+        public string FilterStatus { get; set; } = string.Empty;
+        public string FilterTarget { get; set; } = string.Empty;
+        public string FilterAccomplishment { get; set; } = string.Empty;
+        public string FilterMov { get; set; } = string.Empty;
+        public bool ShowFilterMenu { get; set; }
+        public bool ShowEntriesMenu { get; set; }
+        public int PageSize { get; set; } = 10;
+        public int Page { get; set; } = 1;
+        public string? SortColumn { get; set; }
+        public bool SortDescending { get; set; }
+    }
+
     private string viewMode = "onsite";
     private int employeeCount;
     private int wfhTaggedCount;
     private int exceptionTodayCount;
+    private static readonly int[] PageSizeOptions = new[] { 10, 25, 50, 100 };
+    private readonly AttendanceTableState onsiteTableState = new();
+    private readonly AttendanceTableState wfhTableState = new();
+    private DateTime filterStart;
+    private DateTime filterEnd;
+    private AttendanceLog? selectedOnsiteLog;
+    private AttendanceLogWfh? selectedWfhLog;
+    private bool showInputLogsModal;
+    private bool isSavingInputLog;
+    private InputLogMode inputLogMode = InputLogMode.Onsite;
+    private ManualInputForm inputForm = new();
+    private bool showEditLogsModal;
+    private bool isSavingEditLog;
+    private EditLogForm editLogForm = new();
+    private bool showEditTardinessMenu;
+    private ElementReference inputEmployeeSearchWrapRef;
+    private DotNetObjectReference<AttendanceLogs>? inputEmployeeSearchDotNetRef;
+    private bool pendingRegisterInputEmployeeOutsideClick;
+    private bool showInputEmployeeResults;
+    private string inputEmployeeSearchText = string.Empty;
+    private List<Employee> inputEmployeeSearchResults = new();
+    private Employee? selectedInputEmployee;
+
+    private class Period
+    {
+        public DateTime Start { get; set; }
+        public DateTime End { get; set; }
+        public string Label { get; set; } = string.Empty;
+        public bool IsCurrent { get; set; }
+    }
+
+    private List<Period> periods = new();
+    private Period? selectedPeriod;
+    private bool showPeriodMenu;
+    private bool showAddPeriod;
+    private bool isClosingAddPeriod;
+    private Period? secondSelectedPeriod;
+    private bool showPeriod2Menu;
+    private ElementReference periodControlsRef;
+    private DotNetObjectReference<AttendanceLogs>? periodDropdownDotNetRef;
+    private bool periodDismissRegistered;
+    private ElementReference tableMenuControlsRef;
+    private DotNetObjectReference<AttendanceLogs>? tableMenuDotNetRef;
+    private bool tableMenuDismissRegistered;
+    private string? activeFilterField;
+
+    private string SelectedPeriod2Label => secondSelectedPeriod?.Label ?? "Select a period";
+
+    private string SelectedPeriodLabel => selectedPeriod?.Label ?? "";
+    private string InputLogModeLabel => inputLogMode == InputLogMode.Onsite ? "Onsite" : "WFH";
+    private IEnumerable<string> EditTardinessOptions => BuildEditTardinessOptions();
+    private AttendanceTableState CurrentTableState => viewMode == "onsite" ? onsiteTableState : wfhTableState;
+    private IEnumerable<string> CurrentIdNumberOptions => viewMode == "onsite"
+        ? GetDistinctOptions(onsiteLogs.Select(log => log.IdNumber))
+        : GetDistinctOptions(wfhLogs.Select(log => log.IdNumber));
+    private IEnumerable<string> CurrentEmployeeOptions => viewMode == "onsite"
+        ? GetDistinctOptions(onsiteLogs.Select(log => FormatName(log.LastName, log.FirstName, log.MiddleName)))
+        : GetDistinctOptions(wfhLogs.Select(log => FormatName(log.LastName, log.FirstName, log.MiddleName)));
+    private IEnumerable<string> CurrentDivisionOptions => viewMode == "onsite"
+        ? GetDistinctOptions(onsiteLogs.Select(log => log.DivisionCenterUnit))
+        : GetDistinctOptions(wfhLogs.Select(log => log.DivisionCenterUnit));
+    private IEnumerable<string> CurrentDesignationOptions => viewMode == "onsite"
+        ? GetDistinctOptions(onsiteLogs.Select(log => log.Designation))
+        : GetDistinctOptions(wfhLogs.Select(log => log.Designation));
+    private static readonly string[] TargetFilterOptions = new[]
+    {
+        "With Target",
+        "Without Target"
+    };
+    private static readonly string[] AccomplishmentFilterOptions = new[]
+    {
+        "With Accomplishment",
+        "Without Accomplishment"
+    };
+    private static readonly string[] MovFilterOptions = new[]
+    {
+        "With MOV",
+        "Without MOV"
+    };
+    private IEnumerable<string> CurrentStatusOptions => viewMode == "onsite"
+        ? GetDistinctOptions(onsiteLogs.Select(GetOnsiteAttendanceStatus))
+        : GetDistinctOptions(wfhLogs.Select(GetWfhAttendanceStatus));
+    private string tableSearchText
+    {
+        get => CurrentTableState.SearchText;
+        set => CurrentTableState.SearchText = value;
+    }
+
+    private string filterIdNumber
+    {
+        get => CurrentTableState.FilterIdNumber;
+        set => CurrentTableState.FilterIdNumber = value;
+    }
+
+    private string filterEmployee
+    {
+        get => CurrentTableState.FilterEmployee;
+        set => CurrentTableState.FilterEmployee = value;
+    }
+
+    private string filterDivision
+    {
+        get => CurrentTableState.FilterDivision;
+        set => CurrentTableState.FilterDivision = value;
+    }
+
+    private string filterDesignation
+    {
+        get => CurrentTableState.FilterDesignation;
+        set => CurrentTableState.FilterDesignation = value;
+    }
+
+    private string filterStatus
+    {
+        get => CurrentTableState.FilterStatus;
+        set => CurrentTableState.FilterStatus = value;
+    }
+
+    private string filterTarget
+    {
+        get => CurrentTableState.FilterTarget;
+        set => CurrentTableState.FilterTarget = value;
+    }
+
+    private string filterAccomplishment
+    {
+        get => CurrentTableState.FilterAccomplishment;
+        set => CurrentTableState.FilterAccomplishment = value;
+    }
+
+    private string filterMov
+    {
+        get => CurrentTableState.FilterMov;
+        set => CurrentTableState.FilterMov = value;
+    }
+
+    private bool showFilterMenu
+    {
+        get => CurrentTableState.ShowFilterMenu;
+        set => CurrentTableState.ShowFilterMenu = value;
+    }
+
+    private bool showEntriesMenu
+    {
+        get => CurrentTableState.ShowEntriesMenu;
+        set => CurrentTableState.ShowEntriesMenu = value;
+    }
+
+    private string? sortColumn
+    {
+        get => CurrentTableState.SortColumn;
+        set => CurrentTableState.SortColumn = value;
+    }
+
+    private bool sortDescending
+    {
+        get => CurrentTableState.SortDescending;
+        set => CurrentTableState.SortDescending = value;
+    }
+
+    private int pageSize
+    {
+        get => CurrentTableState.PageSize;
+        set => CurrentTableState.PageSize = value;
+    }
+
+    [Inject]
+    private IJSRuntime? JSRuntime { get; set; }
+
+    private async Task TogglePeriodMenu()
+    {
+        showPeriodMenu = !showPeriodMenu;
+        if (showPeriodMenu)
+        {
+            showPeriod2Menu = false;
+        }
+        if (showPeriodMenu)
+        {
+            await ScrollSelectedPeriodIntoViewAsync("period-1-selected-item");
+        }
+    }
+
+    private async Task SelectPeriod(Period p)
+    {
+        selectedPeriod = p;
+        NormalizeSelectedPeriods();
+        showPeriodMenu = false;
+        ApplySelectedPeriodRange();
+        await LoadLogsAsync();
+    }
+
+    private async Task ToggleAddPeriod()
+    {
+        if (!showAddPeriod && !isClosingAddPeriod)
+        {
+            isClosingAddPeriod = false;
+            showAddPeriod = true;
+            return;
+        }
+
+        if (isClosingAddPeriod)
+        {
+            return;
+        }
+
+        isClosingAddPeriod = true;
+        showPeriod2Menu = false;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(180);
+
+        showAddPeriod = false;
+        isClosingAddPeriod = false;
+
+        // clear second selection when hiding
+        secondSelectedPeriod = null;
+        showPeriod2Menu = false;
+
+        selectedPeriod = periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
+
+        // reset filter to only first period
+        if (selectedPeriod != null)
+        {
+            filterStart = selectedPeriod.Start;
+            filterEnd = selectedPeriod.End;
+            await LoadLogsAsync();
+        }
+    }
+
+    private async Task TogglePeriod2Menu()
+    {
+        showPeriod2Menu = !showPeriod2Menu;
+        if (showPeriod2Menu)
+        {
+            showPeriodMenu = false;
+        }
+        if (showPeriod2Menu)
+        {
+            await ScrollSelectedPeriodIntoViewAsync("period-2-selected-item");
+        }
+    }
+
+    private async Task SelectSecondPeriod(Period p)
+    {
+        secondSelectedPeriod = p;
+        NormalizeSelectedPeriods();
+        showPeriod2Menu = false;
+        ApplySelectedPeriodRange();
+        await LoadLogsAsync();
+    }
+
+    private void NormalizeSelectedPeriods()
+    {
+        if (selectedPeriod == null || secondSelectedPeriod == null)
+        {
+            return;
+        }
+
+        if (secondSelectedPeriod.Start < selectedPeriod.Start)
+        {
+            (selectedPeriod, secondSelectedPeriod) = (secondSelectedPeriod, selectedPeriod);
+        }
+    }
+
+    private void ApplySelectedPeriodRange()
+    {
+        if (selectedPeriod == null && secondSelectedPeriod == null)
+        {
+            return;
+        }
+
+        if (selectedPeriod == null)
+        {
+            selectedPeriod = secondSelectedPeriod;
+        }
+
+        if (secondSelectedPeriod == null)
+        {
+            filterStart = selectedPeriod!.Start;
+            filterEnd = selectedPeriod.End;
+            return;
+        }
+
+        var start = selectedPeriod!.Start <= secondSelectedPeriod.Start
+            ? selectedPeriod.Start
+            : secondSelectedPeriod.Start;
+        var end = selectedPeriod.End >= secondSelectedPeriod.End
+            ? selectedPeriod.End
+            : secondSelectedPeriod.End;
+
+        filterStart = start;
+        filterEnd = end;
+    }
+
+    private async Task ScrollSelectedPeriodIntoViewAsync(string elementId)
+    {
+        try
+        {
+            await JSRuntime!.InvokeVoidAsync("etrWorkFromHome.scrollElementIntoView", elementId);
+        }
+        catch
+        {
+        }
+    }
     private List<AttendanceLog> onsiteLogs = new();
     private List<AttendanceLogWfh> wfhLogs = new();
+    private List<AttendanceLog> filteredOnsiteLogs = new();
+    private List<AttendanceLogWfh> filteredWfhLogs = new();
     private int onsitePage = 1;
     private int wfhPage = 1;
 
-    private IEnumerable<AttendanceLog> PagedOnsiteLogs => onsiteLogs
-        .Skip((onsitePage - 1) * PageSize)
-        .Take(PageSize);
+    private IEnumerable<AttendanceLog> PagedOnsiteLogs => filteredOnsiteLogs
+        .Skip((onsitePage - 1) * pageSize)
+        .Take(pageSize);
 
-    private IEnumerable<AttendanceLogWfh> PagedWfhLogs => wfhLogs
-        .Skip((wfhPage - 1) * PageSize)
-        .Take(PageSize);
+    private IEnumerable<AttendanceLogWfh> PagedWfhLogs => filteredWfhLogs
+        .Skip((wfhPage - 1) * pageSize)
+        .Take(pageSize);
 
-    private int OnsiteTotalPages => Math.Max(1, (int)Math.Ceiling(onsiteLogs.Count / (double)PageSize));
-    private int WfhTotalPages => Math.Max(1, (int)Math.Ceiling(wfhLogs.Count / (double)PageSize));
+    private int OnsiteTotalPages => Math.Max(1, (int)Math.Ceiling(filteredOnsiteLogs.Count / (double)pageSize));
+    private int WfhTotalPages => Math.Max(1, (int)Math.Ceiling(filteredWfhLogs.Count / (double)pageSize));
 
     protected override async Task OnInitializedAsync()
     {
         employeeCount = await Db.Employees.CountAsync();
+        // build period list starting from March 2026 to current month (chronological)
+        BuildPeriods(DateTime.Today);
+
+        // select current cutoff by default (do not reorder the list)
+        selectedPeriod = periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
+        if (selectedPeriod != null)
+        {
+            filterStart = selectedPeriod.Start;
+            filterEnd = selectedPeriod.End;
+        }
+
+        await LoadLogsAsync();
+
+        // Exceptions Today should reflect today's data across all records
+        var todayWfh = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Include(l => l.ExceptionCondition)
+            .Where(l => l.AttendanceDate.Date == DateTime.Today)
+            .ToListAsync();
+
+        exceptionTodayCount = todayWfh.Count(l =>
+            !string.Equals(GetWorkArrangement(l), "WFH", StringComparison.OrdinalIgnoreCase));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await SyncPeriodDismissRegistrationAsync();
+        await SyncTableMenuDismissRegistrationAsync();
+        if (pendingRegisterInputEmployeeOutsideClick && showInputEmployeeResults)
+        {
+            pendingRegisterInputEmployeeOutsideClick = false;
+            await RegisterInputEmployeeOutsideClickAsync();
+        }
+    }
+
+    private void BuildPeriods(DateTime now)
+    {
+        periods.Clear();
+        var startMonth = new DateTime(2026, 3, 1);
+        var currentMonth = new DateTime(now.Year, now.Month, 1);
+
+        for (var month = startMonth; month <= currentMonth; month = month.AddMonths(1))
+        {
+            var firstStart = new DateTime(month.Year, month.Month, 1);
+            var firstEnd = firstStart.AddDays(14); // 1-15
+            var secondStart = firstStart.AddDays(15); // 16th
+            var secondEnd = new DateTime(month.Year, month.Month, DateTime.DaysInMonth(month.Year, month.Month));
+
+            var p1 = new Period
+            {
+                Start = firstStart,
+                End = firstEnd,
+                Label = $"{firstStart:MMM dd} - {firstEnd:dd}, {firstEnd:yyyy}",
+                IsCurrent = now.Date >= firstStart.Date && now.Date <= firstEnd.Date
+            };
+
+            var p2 = new Period
+            {
+                Start = secondStart,
+                End = secondEnd,
+                Label = $"{secondStart:MMM dd} - {secondEnd:dd}, {secondEnd:yyyy}",
+                IsCurrent = now.Date >= secondStart.Date && now.Date <= secondEnd.Date
+            };
+
+            periods.Add(p1);
+            periods.Add(p2);
+        }
+    }
+
+    private static (DateTime Start, DateTime End) GetCurrentCutoffRange(DateTime now)
+    {
+        var startOfMonth = new DateTime(now.Year, now.Month, 1);
+        var fifteenth = startOfMonth.AddDays(14); // 1 + 14 = 15th
+        if (now.Date <= fifteenth.Date)
+        {
+            return (startOfMonth.Date, fifteenth.Date);
+        }
+
+        var lastDay = new DateTime(now.Year, now.Month, DateTime.DaysInMonth(now.Year, now.Month));
+        return (startOfMonth.AddDays(15).Date, lastDay.Date);
+    }
+
+    private async Task LoadLogsAsync()
+    {
+        // Ensure valid range
+        if (filterStart > filterEnd)
+        {
+            var tmp = filterStart;
+            filterStart = filterEnd;
+            filterEnd = tmp;
+        }
+
+        var start = filterStart.Date;
+        var endExclusive = filterEnd.Date.AddDays(1);
 
         onsiteLogs = await Db.AttendanceLogs
             .AsNoTracking()
+            .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .OrderByDescending(l => l.AttendanceDate)
             .ThenBy(l => l.LastName)
             .ThenBy(l => l.FirstName)
             .ToListAsync();
+
+        wfhTaggedCount = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
+            .CountAsync(l => (l.WorkArrangement ?? "WFH") == "WFH" && l.ExceptionConditionId == null);
 
         wfhLogs = await Db.AttendanceLogsWfh
             .AsNoTracking()
             .Include(l => l.ExceptionCondition)
+            .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
+            .Where(l => l.ExceptionConditionId == null
+                && l.WorkArrangement == "WFH"
+                && (l.TimeIn.HasValue
+                    || l.TimeOut.HasValue
+                    || !string.IsNullOrWhiteSpace(l.Target)
+                    || !string.IsNullOrWhiteSpace(l.Accomplishment)
+                    || !string.IsNullOrWhiteSpace(l.Mov)))
             .OrderByDescending(l => l.AttendanceDate)
             .ThenBy(l => l.LastName)
             .ThenBy(l => l.FirstName)
             .ToListAsync();
-
-        wfhTaggedCount = wfhLogs.Count(l => string.Equals(GetWorkArrangement(l), "WFH", StringComparison.OrdinalIgnoreCase));
-        exceptionTodayCount = wfhLogs.Count(l =>
-            l.AttendanceDate == DateTime.Today &&
-            !string.Equals(GetWorkArrangement(l), "WFH", StringComparison.OrdinalIgnoreCase));
 
         // Compute tardiness/absent labels in-memory according to rules
         foreach (var log in wfhLogs)
@@ -286,13 +2768,1153 @@
         {
             log.Tardiness = ComputeTardinessForOnsite(log);
         }
+
+        RefreshFilteredLogs(resetPaging: true);
+
+        StateHasChanged();
     }
+
+    private void RefreshFilteredLogs(bool resetPaging = false)
+    {
+        filteredOnsiteLogs = ApplyOnsiteSort(
+                onsiteLogs.Where(MatchesOnsiteFilters),
+                onsiteTableState)
+            .ToList();
+
+        filteredWfhLogs = ApplyWfhSort(
+                wfhLogs.Where(MatchesWfhFilters),
+                wfhTableState)
+            .ToList();
+
+        if (resetPaging)
+        {
+            onsitePage = 1;
+            wfhPage = 1;
+            return;
+        }
+
+        onsitePage = Math.Clamp(onsitePage, 1, OnsiteTotalPages);
+        wfhPage = Math.Clamp(wfhPage, 1, WfhTotalPages);
+    }
+
+    private bool MatchesOnsiteFilters(AttendanceLog log)
+    {
+        if (!MatchesSharedSearch(log.IdNumber, log.LastName, log.FirstName, log.MiddleName, log.DivisionCenterUnit, log.Designation))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(log.IdNumber, filterIdNumber))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(FormatName(log.LastName, log.FirstName, log.MiddleName), filterEmployee))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(log.DivisionCenterUnit, filterDivision))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(log.Designation, filterDesignation))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(GetOnsiteAttendanceStatus(log), filterStatus))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool MatchesWfhFilters(AttendanceLogWfh log)
+    {
+        if (!MatchesSharedSearch(log.IdNumber, log.LastName, log.FirstName, log.MiddleName, log.DivisionCenterUnit, log.Designation))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(log.IdNumber, filterIdNumber))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(FormatName(log.LastName, log.FirstName, log.MiddleName), filterEmployee))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(log.DivisionCenterUnit, filterDivision))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(log.Designation, filterDesignation))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(GetWfhAttendanceStatus(log), filterStatus))
+        {
+            return false;
+        }
+
+        if (!MatchesPresenceFilter(filterTarget, log.Target, "With Target", "Without Target"))
+        {
+            return false;
+        }
+
+        if (!MatchesPresenceFilter(filterAccomplishment, log.Accomplishment, "With Accomplishment", "Without Accomplishment"))
+        {
+            return false;
+        }
+
+        return MatchesPresenceFilter(filterMov, log.Mov, "With MOV", "Without MOV");
+    }
+
+    private bool MatchesSharedSearch(
+        string? idNumber,
+        string? lastName,
+        string? firstName,
+        string? middleName,
+        string? division,
+        string? designation)
+    {
+        var query = tableSearchText.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return ContainsText(idNumber, query)
+            || MatchesEmployeeName(lastName, firstName, middleName, query)
+            || ContainsText(division, query)
+            || ContainsText(designation, query);
+    }
+
+    private static bool ContainsText(string? source, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(source)
+            && source.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesSelectedValue(string? source, string? selectedValue)
+    {
+        if (string.IsNullOrWhiteSpace(selectedValue))
+        {
+            return true;
+        }
+
+        return string.Equals(source?.Trim(), selectedValue.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesPresenceFilter(string? selectedValue, string? actualValue, string withValue, string withoutValue)
+    {
+        if (string.IsNullOrWhiteSpace(selectedValue))
+        {
+            return true;
+        }
+
+        var hasValue = !string.IsNullOrWhiteSpace(actualValue);
+
+        if (string.Equals(selectedValue, withValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return hasValue;
+        }
+
+        if (string.Equals(selectedValue, withoutValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return !hasValue;
+        }
+
+        return true;
+    }
+
+    private static bool MatchesEmployeeName(string? lastName, string? firstName, string? middleName, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        var trimmedQuery = query.Trim();
+        var fullName = string.Join(" ", new[] { firstName, middleName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        var reversedName = string.Join(" ", new[] { lastName, firstName, middleName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        var formattedName = FormatName(lastName ?? string.Empty, firstName ?? string.Empty, middleName ?? string.Empty);
+
+        return ContainsText(firstName, trimmedQuery)
+            || ContainsText(middleName, trimmedQuery)
+            || ContainsText(lastName, trimmedQuery)
+            || ContainsText(fullName, trimmedQuery)
+            || ContainsText(reversedName, trimmedQuery)
+            || ContainsText(formattedName, trimmedQuery);
+    }
+
+    private Task HandleTableSearchInput(ChangeEventArgs e)
+    {
+        tableSearchText = e.Value?.ToString() ?? string.Empty;
+        RefreshFilteredLogs(resetPaging: true);
+        return Task.CompletedTask;
+    }
+
+    private void ToggleFilterField(string fieldKey)
+    {
+        activeFilterField = string.Equals(activeFilterField, fieldKey, StringComparison.Ordinal) ? null : fieldKey;
+    }
+
+    private void SetFilterValue(string fieldKey, string value)
+    {
+        switch (fieldKey)
+        {
+            case "id":
+                filterIdNumber = value;
+                break;
+            case "employee":
+                filterEmployee = value;
+                break;
+            case "division":
+                filterDivision = value;
+                break;
+            case "designation":
+                filterDesignation = value;
+                break;
+            case "status":
+                filterStatus = value;
+                break;
+            case "target":
+                filterTarget = value;
+                break;
+            case "accomplishment":
+                filterAccomplishment = value;
+                break;
+            case "mov":
+                filterMov = value;
+                break;
+        }
+
+        activeFilterField = null;
+        RefreshFilteredLogs(resetPaging: true);
+    }
+
+    private void ToggleEntriesMenu()
+    {
+        showEntriesMenu = !showEntriesMenu;
+        if (showEntriesMenu)
+        {
+            showFilterMenu = false;
+            activeFilterField = null;
+        }
+    }
+
+    private void SelectPageSize(int selectedPageSize)
+    {
+        pageSize = Math.Clamp(selectedPageSize, 1, MaxPageSize);
+        onsitePage = 1;
+        wfhPage = 1;
+        showEntriesMenu = false;
+    }
+
+    private void ToggleFilterMenu()
+    {
+        showFilterMenu = !showFilterMenu;
+        if (showFilterMenu)
+        {
+            showEntriesMenu = false;
+        }
+        else
+        {
+            activeFilterField = null;
+        }
+    }
+
+    private void CloseFilterMenu()
+    {
+        showFilterMenu = false;
+        activeFilterField = null;
+    }
+
+    private void ClearFilters()
+    {
+        tableSearchText = string.Empty;
+        filterIdNumber = string.Empty;
+        filterEmployee = string.Empty;
+        filterDivision = string.Empty;
+        filterDesignation = string.Empty;
+        filterStatus = string.Empty;
+        filterTarget = string.Empty;
+        filterAccomplishment = string.Empty;
+        filterMov = string.Empty;
+        RefreshFilteredLogs(resetPaging: true);
+        showFilterMenu = false;
+        showEntriesMenu = false;
+        activeFilterField = null;
+    }
+
+    private bool HasActiveTableFilters
+        => !string.IsNullOrWhiteSpace(filterIdNumber)
+            || !string.IsNullOrWhiteSpace(filterEmployee)
+            || !string.IsNullOrWhiteSpace(filterDivision)
+            || !string.IsNullOrWhiteSpace(filterDesignation)
+            || !string.IsNullOrWhiteSpace(filterStatus)
+            || !string.IsNullOrWhiteSpace(filterTarget)
+            || !string.IsNullOrWhiteSpace(filterAccomplishment)
+            || !string.IsNullOrWhiteSpace(filterMov);
+
+    private void ClearFiltersFromButton(MouseEventArgs _)
+        => ClearFilters();
+
+    private RenderFragment SortHeader(string label, string column, bool isWfh) => builder =>
+    {
+        var sequence = 0;
+        var isSorted = IsSortedColumn(column, isWfh);
+        var isDescending = GetIsSortedDescending(column, isWfh);
+        var showClear = HasCustomSort(column, isWfh);
+
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "attendance-sort-header");
+
+        builder.OpenElement(sequence++, "button");
+        builder.AddAttribute(sequence++, "type", "button");
+        builder.AddAttribute(sequence++, "class", $"attendance-sort-trigger{(isSorted ? " active" : string.Empty)}");
+        builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => ToggleSort(column, isWfh)));
+        builder.AddAttribute(sequence++, "title", $"Sort by {label}");
+
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", "attendance-sort-label");
+        builder.AddContent(sequence++, label);
+        builder.CloseElement();
+
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", $"attendance-sort-icon{(isSorted ? " active" : string.Empty)}");
+        builder.OpenElement(sequence++, "i");
+        builder.AddAttribute(sequence++, "class", isDescending ? "fa-solid fa-caret-down" : "fa-solid fa-caret-up");
+        builder.AddAttribute(sequence++, "aria-hidden", "true");
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+
+        if (showClear)
+        {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", "attendance-sort-clear");
+            builder.AddAttribute(sequence++, "title", "Clear sorting");
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => ClearSorting(isWfh)));
+            builder.AddAttribute(sequence++, "aria-label", "Clear sorting");
+            builder.AddContent(sequence++, "×");
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private bool HasCustomSort(string column, bool isWfh)
+    {
+        var state = isWfh ? wfhTableState : onsiteTableState;
+        return !string.IsNullOrWhiteSpace(state.SortColumn)
+            && string.Equals(state.SortColumn, column, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsSortedColumn(string column, bool isWfh)
+    {
+        var state = isWfh ? wfhTableState : onsiteTableState;
+        if (!string.IsNullOrWhiteSpace(state.SortColumn))
+        {
+            return string.Equals(state.SortColumn, column, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(column, "employee", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool GetIsSortedDescending(string column, bool isWfh)
+    {
+        var state = isWfh ? wfhTableState : onsiteTableState;
+        if (string.IsNullOrWhiteSpace(state.SortColumn))
+        {
+            return false;
+        }
+
+        return string.Equals(state.SortColumn, column, StringComparison.OrdinalIgnoreCase) && state.SortDescending;
+    }
+
+    private void ToggleSort(string column, bool isWfh)
+    {
+        var state = isWfh ? wfhTableState : onsiteTableState;
+        if (string.Equals(state.SortColumn, column, StringComparison.OrdinalIgnoreCase))
+        {
+            state.SortDescending = !state.SortDescending;
+        }
+        else
+        {
+            state.SortColumn = column;
+            state.SortDescending = false;
+        }
+
+        if (isWfh)
+        {
+            wfhPage = 1;
+        }
+        else
+        {
+            onsitePage = 1;
+        }
+
+        RefreshFilteredLogs();
+    }
+
+    private void ClearSorting(bool isWfh)
+    {
+        var state = isWfh ? wfhTableState : onsiteTableState;
+        state.SortColumn = null;
+        state.SortDescending = false;
+
+        if (isWfh)
+        {
+            wfhPage = 1;
+        }
+        else
+        {
+            onsitePage = 1;
+        }
+
+        RefreshFilteredLogs();
+    }
+
+    private static IEnumerable<AttendanceLog> ApplyOnsiteSort(IEnumerable<AttendanceLog> logs, AttendanceTableState state)
+    {
+        var column = state.SortColumn?.Trim().ToLowerInvariant();
+        var descending = state.SortDescending;
+
+        return column switch
+        {
+            "id" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.IdNumber))
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "division" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.DivisionCenterUnit))
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "designation" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.Designation))
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "am" => OrderByDirection(logs, descending, log => log.TimeInAm ?? DateTime.MinValue)
+                .ThenBy(log => log.TimeOutAm ?? DateTime.MinValue)
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "pm" => OrderByDirection(logs, descending, log => log.TimeInPm ?? DateTime.MinValue)
+                .ThenBy(log => log.TimeOutPm ?? DateTime.MinValue)
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "employee" or null or "" => OrderByEmployee(logs, descending),
+            _ => OrderByEmployee(logs, false)
+        };
+    }
+
+    private static IEnumerable<AttendanceLogWfh> ApplyWfhSort(IEnumerable<AttendanceLogWfh> logs, AttendanceTableState state)
+    {
+        var column = state.SortColumn?.Trim().ToLowerInvariant();
+        var descending = state.SortDescending;
+
+        return column switch
+        {
+            "id" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.IdNumber))
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "division" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.DivisionCenterUnit))
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "designation" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.Designation))
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "timein" => OrderByDirection(logs, descending, log => log.TimeIn ?? DateTime.MinValue)
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "timeout" => OrderByDirection(logs, descending, log => log.TimeOut ?? DateTime.MinValue)
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "employee" or null or "" => OrderByEmployee(logs, descending),
+            _ => OrderByEmployee(logs, false)
+        };
+    }
+
+    private static IOrderedEnumerable<T> OrderByEmployee<T>(IEnumerable<T> logs, bool descending) where T : class
+        => descending
+            ? logs.OrderByDescending(log => NormalizeSortValue(GetLastName(log)))
+                .ThenByDescending(log => NormalizeSortValue(GetFirstName(log)))
+                .ThenByDescending(log => NormalizeSortValue(GetMiddleName(log)))
+                .ThenByDescending(log => NormalizeSortValue(GetIdNumber(log)))
+            : logs.OrderBy(log => NormalizeSortValue(GetLastName(log)))
+                .ThenBy(log => NormalizeSortValue(GetFirstName(log)))
+                .ThenBy(log => NormalizeSortValue(GetMiddleName(log)))
+                .ThenBy(log => NormalizeSortValue(GetIdNumber(log)));
+
+    private static IOrderedEnumerable<T> OrderByDirection<T, TKey>(IEnumerable<T> source, bool descending, Func<T, TKey> selector)
+        => descending ? source.OrderByDescending(selector) : source.OrderBy(selector);
+
+    private static string NormalizeSortValue(string? value) => value?.Trim() ?? string.Empty;
+
+    private static string? GetLastName<T>(T log) where T : class => log switch
+    {
+        AttendanceLog onsite => onsite.LastName,
+        AttendanceLogWfh wfh => wfh.LastName,
+        _ => string.Empty
+    };
+
+    private static string? GetFirstName<T>(T log) where T : class => log switch
+    {
+        AttendanceLog onsite => onsite.FirstName,
+        AttendanceLogWfh wfh => wfh.FirstName,
+        _ => string.Empty
+    };
+
+    private static string? GetMiddleName<T>(T log) where T : class => log switch
+    {
+        AttendanceLog onsite => onsite.MiddleName,
+        AttendanceLogWfh wfh => wfh.MiddleName,
+        _ => string.Empty
+    };
+
+    private static string? GetIdNumber<T>(T log) where T : class => log switch
+    {
+        AttendanceLog onsite => onsite.IdNumber,
+        AttendanceLogWfh wfh => wfh.IdNumber,
+        _ => string.Empty
+    };
+
+
 
     private static string FormatName(string lastName, string firstName, string middleName)
     {
         var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
         return $"{lastName}, {firstName}{middleInitial}";
     }
+
+    private static IEnumerable<string> GetDistinctOptions(IEnumerable<string?> values)
+        => values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase);
+
+    private void OpenOnsiteDetail(AttendanceLog log)
+    {
+        selectedOnsiteLog = log;
+        selectedWfhLog = null;
+    }
+
+    private void OpenWfhDetail(AttendanceLogWfh log)
+    {
+        selectedWfhLog = log;
+        selectedOnsiteLog = null;
+    }
+
+    private void OpenOnsiteEdit(AttendanceLog log)
+    {
+        CloseAttendanceDetail();
+
+        editLogForm = new EditLogForm
+        {
+            IsWfh = false,
+            AttendanceLogId = log.AttendanceLogId,
+            AttendanceDate = log.AttendanceDate,
+            EmployeeName = FormatName(log.LastName, log.FirstName, log.MiddleName),
+            Tardiness = NormalizeTardinessForEdit(log.Tardiness),
+            OnsiteTimeInAm = FormatTimeInput(log.TimeInAm),
+            OnsiteTimeOutAm = FormatTimeInput(log.TimeOutAm),
+            OnsiteTimeInPm = FormatTimeInput(log.TimeInPm),
+            OnsiteTimeOutPm = FormatTimeInput(log.TimeOutPm)
+        };
+
+        showEditTardinessMenu = false;
+        showEditLogsModal = true;
+    }
+
+    private void OpenWfhEdit(AttendanceLogWfh log)
+    {
+        CloseAttendanceDetail();
+
+        editLogForm = new EditLogForm
+        {
+            IsWfh = true,
+            AttendanceLogWfhId = log.AttendanceLogWfhId,
+            AttendanceDate = log.AttendanceDate,
+            EmployeeName = FormatName(log.LastName, log.FirstName, log.MiddleName),
+            Tardiness = NormalizeTardinessForEdit(log.Tardiness),
+            WfhTimeIn = FormatTimeInput(log.TimeIn),
+            WfhTimeOut = FormatTimeInput(log.TimeOut),
+            Target = log.Target,
+            Accomplishment = log.Accomplishment,
+            ExistingMov = log.Mov
+        };
+
+        showEditTardinessMenu = false;
+        showEditLogsModal = true;
+    }
+
+    private void OpenInputLogsModal()
+    {
+        ResetInputForm();
+        showInputLogsModal = true;
+    }
+
+    private void CloseInputLogsModal()
+    {
+        showInputLogsModal = false;
+        isSavingInputLog = false;
+        showInputEmployeeResults = false;
+        _ = UnregisterInputEmployeeOutsideClickAsync();
+    }
+
+    private void CloseEditLogsModal()
+    {
+        showEditLogsModal = false;
+        isSavingEditLog = false;
+        showEditTardinessMenu = false;
+        editLogForm = new EditLogForm();
+    }
+
+    private void SelectInputLogMode(InputLogMode mode)
+    {
+        inputLogMode = mode;
+        inputForm.OnsiteTimeInAm = string.Empty;
+        inputForm.OnsiteTimeOutAm = string.Empty;
+        inputForm.OnsiteTimeInPm = string.Empty;
+        inputForm.OnsiteTimeOutPm = string.Empty;
+        inputForm.WfhTimeIn = string.Empty;
+        inputForm.WfhTimeOut = string.Empty;
+        inputForm.Target = string.Empty;
+        inputForm.Accomplishment = string.Empty;
+        inputForm.MovFileName = string.Empty;
+        inputForm.MovFile = null;
+    }
+
+    private void ResetInputForm()
+    {
+        inputLogMode = InputLogMode.Onsite;
+        inputForm = new ManualInputForm
+        {
+            AttendanceDate = DateTime.Today
+        };
+        selectedInputEmployee = null;
+        inputEmployeeSearchResults.Clear();
+        inputEmployeeSearchText = string.Empty;
+        showInputEmployeeResults = false;
+    }
+
+    private void CloseAttendanceDetail()
+    {
+        selectedOnsiteLog = null;
+        selectedWfhLog = null;
+    }
+
+    private async Task SaveEditLogAsync()
+    {
+        if (isSavingEditLog)
+        {
+            return;
+        }
+
+        isSavingEditLog = true;
+
+        try
+        {
+            if (editLogForm.IsWfh)
+            {
+                await SaveEditedWfhLogAsync();
+            }
+            else
+            {
+                await SaveEditedOnsiteLogAsync();
+            }
+
+            await LoadLogsAsync();
+            CloseEditLogsModal();
+        }
+        catch (InvalidOperationException ex)
+        {
+            ShowToast(ToastType.Warning, "Validation", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Save failed", ex.Message);
+        }
+        finally
+        {
+            isSavingEditLog = false;
+        }
+    }
+
+    private async Task SaveInputLogAsync()
+    {
+        if (isSavingInputLog)
+        {
+            return;
+        }
+
+        var validationContext = new ValidationContext(inputForm);
+        var validationResults = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(inputForm, validationContext, validationResults, true))
+        {
+            ShowToast(ToastType.Warning, "Validation", validationResults[0].ErrorMessage ?? "Invalid input.");
+            return;
+        }
+
+        var employee = await Db.Employees.FirstOrDefaultAsync(e => e.EmployeeId == inputForm.EmployeeId);
+        if (employee is null)
+        {
+            ShowToast(ToastType.Warning, "Employee not found", "The selected employee no longer exists.");
+            return;
+        }
+
+        isSavingInputLog = true;
+
+        try
+        {
+            if (inputLogMode == InputLogMode.Onsite)
+            {
+                await SaveOnsiteInputLogAsync(employee);
+            }
+            else
+            {
+                await SaveWfhInputLogAsync(employee);
+            }
+
+            await LoadLogsAsync();
+            CloseInputLogsModal();
+        }
+        catch (InvalidOperationException ex)
+        {
+            ShowToast(ToastType.Warning, "Validation", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Save failed", ex.Message);
+        }
+        finally
+        {
+            isSavingInputLog = false;
+        }
+    }
+
+    private async Task SaveOnsiteInputLogAsync(Employee employee)
+    {
+        var attendanceDate = inputForm.AttendanceDate.Date;
+        var newTimeInAm = CombineDateAndTime(attendanceDate, inputForm.OnsiteTimeInAm);
+        var newTimeOutAm = CombineDateAndTime(attendanceDate, inputForm.OnsiteTimeOutAm);
+        var newTimeInPm = CombineDateAndTime(attendanceDate, inputForm.OnsiteTimeInPm);
+        var newTimeOutPm = CombineDateAndTime(attendanceDate, inputForm.OnsiteTimeOutPm);
+        var hasAnyTime = newTimeInAm.HasValue
+            || newTimeOutAm.HasValue
+            || newTimeInPm.HasValue
+            || newTimeOutPm.HasValue;
+
+        if (!hasAnyTime)
+        {
+            throw new InvalidOperationException("Enter at least one onsite time value.");
+        }
+
+        var log = await Db.AttendanceLogs
+            .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == attendanceDate);
+
+        if (log is null)
+        {
+            log = new AttendanceLog
+            {
+                EmployeeId = employee.EmployeeId,
+                AttendanceDate = attendanceDate
+            };
+            Db.AttendanceLogs.Add(log);
+        }
+
+        log.IdNumber = employee.IdNumber;
+        log.LastName = employee.LastName;
+        log.FirstName = employee.FirstName;
+        log.MiddleName = employee.MiddleName;
+        log.DivisionCenterUnit = employee.DivisionCenterUnit;
+        log.Designation = employee.Designation;
+        log.TimeInAm ??= newTimeInAm;
+        log.TimeOutAm ??= newTimeOutAm;
+        log.TimeInPm ??= newTimeInPm;
+        log.TimeOutPm ??= newTimeOutPm;
+        log.Tardiness = ComputeTardinessForOnsite(log);
+
+        await Db.SaveChangesAsync();
+        ShowToast(ToastType.Success, "Onsite log saved", $"{employee.FirstName} {employee.LastName} onsite log was saved.");
+    }
+
+    private async Task SaveWfhInputLogAsync(Employee employee)
+    {
+        var attendanceDate = inputForm.AttendanceDate.Date;
+        var timeIn = CombineDateAndTime(attendanceDate, inputForm.WfhTimeIn);
+        var timeOut = CombineDateAndTime(attendanceDate, inputForm.WfhTimeOut);
+        var target = inputForm.Target.Trim();
+        var accomplishment = inputForm.Accomplishment.Trim();
+        var mov = await SaveInputMovFileAsync(inputForm.MovFile);
+
+        if (!timeIn.HasValue && !timeOut.HasValue && string.IsNullOrWhiteSpace(target) && string.IsNullOrWhiteSpace(accomplishment) && string.IsNullOrWhiteSpace(mov))
+        {
+            throw new InvalidOperationException("Enter at least time in, time out, target, accomplishment, or means of verification for the WFH log.");
+        }
+
+        var log = await Db.AttendanceLogsWfh
+            .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == attendanceDate);
+
+        if (log is null)
+        {
+            log = new AttendanceLogWfh
+            {
+                EmployeeId = employee.EmployeeId,
+                AttendanceDate = attendanceDate
+            };
+            Db.AttendanceLogsWfh.Add(log);
+        }
+
+        log.IdNumber = employee.IdNumber;
+        log.LastName = employee.LastName;
+        log.FirstName = employee.FirstName;
+        log.MiddleName = employee.MiddleName;
+        log.DivisionCenterUnit = employee.DivisionCenterUnit;
+        log.Designation = employee.Designation;
+        log.WorkArrangement = "WFH";
+        log.ExceptionConditionId = null;
+        log.TagUpdatedAt = DateTime.Now;
+        log.TimeIn ??= timeIn;
+        log.TimeOut ??= timeOut;
+        log.Target = string.IsNullOrWhiteSpace(log.Target) ? target : log.Target;
+        log.Accomplishment = string.IsNullOrWhiteSpace(log.Accomplishment) ? accomplishment : log.Accomplishment;
+        log.Mov = string.IsNullOrWhiteSpace(log.Mov) ? mov ?? log.Mov : log.Mov;
+        log.Tardiness = ComputeTardinessForWfh(log);
+
+        await Db.SaveChangesAsync();
+        ShowToast(ToastType.Success, "WFH log saved", $"{employee.FirstName} {employee.LastName} WFH log was saved.");
+    }
+
+    private async Task SaveEditedOnsiteLogAsync()
+    {
+        var log = await Db.AttendanceLogs.FirstOrDefaultAsync(l => l.AttendanceLogId == editLogForm.AttendanceLogId);
+        if (log is null)
+        {
+            throw new InvalidOperationException("The onsite log no longer exists.");
+        }
+
+        var attendanceDate = log.AttendanceDate.Date;
+        log.TimeInAm = CombineDateAndTime(attendanceDate, editLogForm.OnsiteTimeInAm);
+        log.TimeOutAm = CombineDateAndTime(attendanceDate, editLogForm.OnsiteTimeOutAm);
+        log.TimeInPm = CombineDateAndTime(attendanceDate, editLogForm.OnsiteTimeInPm);
+        log.TimeOutPm = CombineDateAndTime(attendanceDate, editLogForm.OnsiteTimeOutPm);
+
+        if (!log.TimeInAm.HasValue && !log.TimeOutAm.HasValue && !log.TimeInPm.HasValue && !log.TimeOutPm.HasValue)
+        {
+            throw new InvalidOperationException("Enter at least one onsite time value.");
+        }
+
+        log.Tardiness = NormalizeStoredTardiness(editLogForm.Tardiness);
+
+        await Db.SaveChangesAsync();
+        ShowToast(ToastType.Success, "Onsite log updated", $"{log.FirstName} {log.LastName} onsite log was updated.");
+    }
+
+    private async Task SaveEditedWfhLogAsync()
+    {
+        var log = await Db.AttendanceLogsWfh
+            .Include(l => l.ExceptionCondition)
+            .FirstOrDefaultAsync(l => l.AttendanceLogWfhId == editLogForm.AttendanceLogWfhId);
+        if (log is null)
+        {
+            throw new InvalidOperationException("The WFH log no longer exists.");
+        }
+
+        var attendanceDate = log.AttendanceDate.Date;
+        var newMov = await SaveInputMovFileAsync(editLogForm.MovFile);
+
+        log.TimeIn = CombineDateAndTime(attendanceDate, editLogForm.WfhTimeIn);
+        log.TimeOut = CombineDateAndTime(attendanceDate, editLogForm.WfhTimeOut);
+        log.Target = editLogForm.Target.Trim();
+        log.Accomplishment = editLogForm.Accomplishment.Trim();
+        log.Mov = string.IsNullOrWhiteSpace(newMov) ? log.Mov : newMov;
+        log.TagUpdatedAt = DateTime.Now;
+
+        if (!log.TimeIn.HasValue
+            && !log.TimeOut.HasValue
+            && string.IsNullOrWhiteSpace(log.Target)
+            && string.IsNullOrWhiteSpace(log.Accomplishment)
+            && string.IsNullOrWhiteSpace(log.Mov))
+        {
+            throw new InvalidOperationException("Enter at least time in, time out, target, accomplishment, or means of verification for the WFH log.");
+        }
+
+        log.Tardiness = NormalizeStoredTardiness(editLogForm.Tardiness);
+
+        await Db.SaveChangesAsync();
+        ShowToast(ToastType.Success, "WFH log updated", $"{log.FirstName} {log.LastName} WFH log was updated.");
+    }
+
+    private static DateTime? CombineDateAndTime(DateTime date, string? timeText)
+    {
+        if (string.IsNullOrWhiteSpace(timeText))
+        {
+            return null;
+        }
+
+        if (!TimeOnly.TryParse(timeText, out var time))
+        {
+            throw new InvalidOperationException($"Invalid time value: {timeText}.");
+        }
+
+        return date.Date.Add(time.ToTimeSpan());
+    }
+
+    private static string FormatTimeInput(DateTime? value) => value?.ToString("HH:mm") ?? string.Empty;
+
+    private void ToggleEditTardinessMenu()
+    {
+        showEditTardinessMenu = !showEditTardinessMenu;
+    }
+
+    private void SelectEditTardiness(string value)
+    {
+        editLogForm.Tardiness = NormalizeTardinessForEdit(value);
+        showEditTardinessMenu = false;
+    }
+
+    private async Task CloseModalTransientUiAsync()
+    {
+        if (showEditTardinessMenu)
+        {
+            showEditTardinessMenu = false;
+        }
+
+        if (showInputEmployeeResults)
+        {
+            await HideInputEmployeeResults();
+        }
+    }
+
+    private IEnumerable<string> BuildEditTardinessOptions()
+    {
+        var options = new List<string>();
+        var current = DisplayEditTardiness(editLogForm.Tardiness);
+        if (!string.IsNullOrWhiteSpace(current))
+        {
+            options.Add(current);
+        }
+
+        if (editLogForm.IsWfh)
+        {
+            options.AddRange(new[] { "On Time", "Tagged", "Incomplete" });
+        }
+        else
+        {
+            options.AddRange(new[] { "On Time", "Absent", "Half-Day (AM)", "Half-Day (PM)" });
+        }
+
+        return options
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string NormalizeTardinessForEdit(string? value)
+        => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
+    private static string NormalizeStoredTardiness(string? value)
+    {
+        var normalized = NormalizeTardinessForEdit(value);
+        return string.Equals(normalized, "On Time", StringComparison.OrdinalIgnoreCase)
+            ? string.Empty
+            : normalized;
+    }
+
+    private static string DisplayEditTardiness(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "Pending" : value.Trim();
+
+    private async Task HandleInputEmployeeSearchChanged(ChangeEventArgs e)
+    {
+        inputEmployeeSearchText = e.Value?.ToString() ?? string.Empty;
+
+        if (!string.Equals(selectedInputEmployee?.IdNumber, inputEmployeeSearchText.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            selectedInputEmployee = null;
+            inputForm.EmployeeId = 0;
+        }
+
+        await SearchInputEmployeesAsync(inputEmployeeSearchText);
+    }
+
+    private async Task HandleInputEmployeeSearchFocus(FocusEventArgs _)
+    {
+        await SearchInputEmployeesAsync(selectedInputEmployee is null ? inputEmployeeSearchText : selectedInputEmployee.IdNumber);
+    }
+
+    private async Task SearchInputEmployeesAsync(string? searchText)
+    {
+        var query = (searchText ?? string.Empty).Trim();
+        var shouldShow = query.Length >= 1;
+        showInputEmployeeResults = shouldShow;
+
+        if (!showInputEmployeeResults)
+        {
+            inputEmployeeSearchResults.Clear();
+            await UnregisterInputEmployeeOutsideClickAsync();
+            return;
+        }
+
+        pendingRegisterInputEmployeeOutsideClick = true;
+
+        inputEmployeeSearchResults = await Db.Employees
+            .AsNoTracking()
+            .Where(e => e.IdNumber.Contains(query))
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .Take(12)
+            .ToListAsync();
+    }
+
+    private async Task SelectInputEmployee(Employee employee)
+    {
+        selectedInputEmployee = employee;
+        inputForm.EmployeeId = employee.EmployeeId;
+        inputEmployeeSearchText = $"{employee.IdNumber} - {FormatInputEmployeeName(employee)}";
+        showInputEmployeeResults = false;
+        await UnregisterInputEmployeeOutsideClickAsync();
+    }
+
+    private string GetInputEmployeeOverlayClass()
+        => showInputEmployeeResults ? "attendance-input-results-overlay active" : "attendance-input-results-overlay";
+
+    private string GetInputEmployeeResultClass(Employee employee)
+        => selectedInputEmployee?.EmployeeId == employee.EmployeeId ? "attendance-input-result-card selected" : "attendance-input-result-card";
+
+    private static string FormatInputEmployeeName(Employee employee)
+    {
+        var middleInitial = string.IsNullOrWhiteSpace(employee.MiddleName) ? string.Empty : $" {employee.MiddleName.Trim()[0]}.";
+        return $"{employee.FirstName} {employee.LastName}{middleInitial}";
+    }
+
+    [JSInvokable]
+    public Task HideEmployeeResults()
+        => HideInputEmployeeResults();
+
+    [JSInvokable]
+    public Task HideInputEmployeeResults()
+    {
+        if (!showInputEmployeeResults)
+        {
+            return Task.CompletedTask;
+        }
+
+        showInputEmployeeResults = false;
+        StateHasChanged();
+        return UnregisterInputEmployeeOutsideClickAsync();
+    }
+
+    private async Task RegisterInputEmployeeOutsideClickAsync()
+    {
+        try
+        {
+            inputEmployeeSearchDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("etrWorkFromHome.registerOutsideClick", inputEmployeeSearchWrapRef, inputEmployeeSearchDotNetRef);
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task UnregisterInputEmployeeOutsideClickAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("etrWorkFromHome.unregisterOutsideClick", inputEmployeeSearchWrapRef);
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task HandleInputMovSelected(InputFileChangeEventArgs e)
+    {
+        inputForm.MovFile = e.File;
+        inputForm.MovFileName = e.File?.Name ?? string.Empty;
+    }
+
+    private Task HandleEditMovSelected(InputFileChangeEventArgs e)
+    {
+        editLogForm.MovFile = e.File;
+        editLogForm.MovFileName = e.File?.Name ?? string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private async Task<string?> SaveInputMovFileAsync(IBrowserFile? file)
+    {
+        if (file is null)
+        {
+            return null;
+        }
+
+        var configuredPath = Configuration["Uploads:WfhMovPath"];
+        var safeName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Path.GetFileName(file.Name)}";
+
+        async Task<string?> WriteToPathAsync(string root, bool returnWebRelative)
+        {
+            try
+            {
+                var uploadsRootResolved = Path.IsPathRooted(root) ? root : Path.Combine(Environment.ContentRootPath, root);
+                Directory.CreateDirectory(uploadsRootResolved);
+
+                var fullPath = Path.Combine(uploadsRootResolved, safeName);
+
+                await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+                await using var fileStream = File.Create(fullPath);
+                await stream.CopyToAsync(fileStream);
+
+                if (returnWebRelative)
+                {
+                    var wwwroot = Environment.WebRootPath ?? string.Empty;
+                    var relative = Path.GetRelativePath(wwwroot, fullPath).Replace('\\', '/');
+                    return "/" + relative;
+                }
+
+                return fullPath;
+            }
+            catch (Exception ex)
+            {
+                ShowToast(ToastType.Error, "File upload failed", $"Could not save MOV to '{root}': {ex.Message}");
+                return null;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            var result = await WriteToPathAsync(configuredPath, false);
+            if (!string.IsNullOrWhiteSpace(result))
+            {
+                return result;
+            }
+
+            var fallback = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
+            return await WriteToPathAsync(fallback, true);
+        }
+
+        var defaultRoot = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
+        return await WriteToPathAsync(defaultRoot, true);
+    }
+
+    private static void UpdateTimeField(Action<string> setter, ChangeEventArgs args)
+    {
+        setter(args.Value?.ToString() ?? string.Empty);
+    }
+
+    private static string FormatDate(DateTime value) => value.ToString("MMMM dd, yyyy");
+
+    private static string FormatDateTime(DateTime? value) => value?.ToString("MMMM dd, yyyy hh:mm tt") ?? "-";
 
     private static string FormatTime(DateTime? value) => value?.ToString("MMM dd, yyyy\nhh:mm tt") ?? "-";
 
@@ -309,15 +3931,15 @@
         wfhPage = Math.Clamp(page, 1, WfhTotalPages);
     }
 
-    private static string GetEntriesText(int totalCount, int currentPage)
+    private string GetEntriesText(int totalCount, int currentPage)
     {
         if (totalCount == 0)
         {
             return "Showing 0 to 0 of 0 entries";
         }
 
-        var start = ((currentPage - 1) * PageSize) + 1;
-        var end = Math.Min(currentPage * PageSize, totalCount);
+        var start = ((currentPage - 1) * pageSize) + 1;
+        var end = Math.Min(currentPage * pageSize, totalCount);
         return $"Showing {start} to {end} of {totalCount} entries";
     }
 
@@ -355,6 +3977,10 @@
 
     private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
 
+    private static string DisplayValue(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
+
+    private static string DisplayTardiness(string? value) => DisplayValue(value, "On Time");
+
     private static string GetWorkArrangement(AttendanceLogWfh log)
         => !string.IsNullOrWhiteSpace(log.ExceptionCondition?.ConditionName)
             ? log.ExceptionCondition.ConditionName
@@ -379,6 +4005,22 @@
         }
 
         return "Submitted";
+    }
+
+    private static string GetOnsiteAttendanceStatus(AttendanceLog log)
+    {
+        if (!log.TimeInAm.HasValue && !log.TimeInPm.HasValue)
+        {
+            return "Absent";
+        }
+
+        if (string.Equals(log.Tardiness, "Half-Day (AM)", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(log.Tardiness, "Half-Day (PM)", StringComparison.OrdinalIgnoreCase))
+        {
+            return log.Tardiness;
+        }
+
+        return "Present";
     }
 
     // --- Tardiness calculation helpers ---
@@ -549,11 +4191,11 @@
             CsvValue(log.TimeOutAm),
             CsvValue(log.TimeInPm),
             CsvValue(log.TimeOutPm),
-            CsvValue(log.Tardiness),
+            CsvValue(DisplayTardiness(log.Tardiness)),
             CsvValue(log.AttendanceDate)
         })));
 
-        return string.Join(Environment.NewLine, rows);
+        return string.Join(global::System.Environment.NewLine, rows);
     }
 
     private string BuildWfhCsv()
@@ -599,11 +4241,11 @@
             CsvValue(GetWfhAttendanceStatus(log)),
             CsvValue(log.TimeIn),
             CsvValue(log.TimeOut),
-            CsvValue(log.Tardiness),
+            CsvValue(DisplayTardiness(log.Tardiness)),
             CsvValue(log.AttendanceDate)
         })));
 
-        return string.Join(Environment.NewLine, rows);
+        return string.Join(global::System.Environment.NewLine, rows);
     }
 
     private static string CsvValue(object? value)
@@ -621,6 +4263,108 @@
         };
 
         return $"\"{text.Replace("\"", "\"\"")}\"";
+    }
+
+    [JSInvokable]
+    public void ClosePeriodMenus()
+    {
+        if (!showPeriodMenu && !showPeriod2Menu)
+        {
+            return;
+        }
+
+        showPeriodMenu = false;
+        showPeriod2Menu = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void CloseTableMenus()
+    {
+        if (!showFilterMenu && !showEntriesMenu && string.IsNullOrWhiteSpace(activeFilterField))
+        {
+            return;
+        }
+
+        showFilterMenu = false;
+        showEntriesMenu = false;
+        activeFilterField = null;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SyncPeriodDismissRegistrationAsync()
+    {
+        var shouldRegister = showPeriodMenu || showPeriod2Menu;
+
+        if (shouldRegister && !periodDismissRegistered)
+        {
+            periodDropdownDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("attendanceLogs.registerPeriodDismiss", periodControlsRef, periodDropdownDotNetRef);
+            periodDismissRegistered = true;
+        }
+        else if (!shouldRegister && periodDismissRegistered)
+        {
+            await JS.InvokeVoidAsync("attendanceLogs.unregisterPeriodDismiss", periodControlsRef);
+            periodDismissRegistered = false;
+        }
+    }
+
+    private async Task SyncTableMenuDismissRegistrationAsync()
+    {
+        var shouldRegister = showFilterMenu || showEntriesMenu;
+
+        if (shouldRegister && !tableMenuDismissRegistered)
+        {
+            tableMenuDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("attendanceLogs.registerTableMenuDismiss", tableMenuControlsRef, tableMenuDotNetRef);
+            tableMenuDismissRegistered = true;
+        }
+        else if (!shouldRegister && tableMenuDismissRegistered)
+        {
+            await JS.InvokeVoidAsync("attendanceLogs.unregisterTableMenuDismiss", tableMenuControlsRef);
+            tableMenuDismissRegistered = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await UnregisterInputEmployeeOutsideClickAsync();
+
+        if (periodDismissRegistered)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("attendanceLogs.unregisterPeriodDismiss", periodControlsRef);
+            }
+            catch
+            {
+            }
+        }
+
+        if (tableMenuDismissRegistered)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("attendanceLogs.unregisterTableMenuDismiss", tableMenuControlsRef);
+            }
+            catch
+            {
+            }
+        }
+
+        periodDropdownDotNetRef?.Dispose();
+        tableMenuDotNetRef?.Dispose();
+        inputEmployeeSearchDotNetRef?.Dispose();
+    }
+
+    private void ShowToast(ToastType type, string title, string message)
+    {
+        ToastService.Show(new ToastMessage
+        {
+            Type = type,
+            Title = title,
+            Message = message
+        });
     }
 
 }

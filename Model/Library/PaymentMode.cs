@@ -8,6 +8,6 @@ namespace Financial.Model.Library
         public int PaymentModeId { get; set; }
 
         [Required, MaxLength(100)]
-        public string PaymentModeName { get; set; }
+        public string PaymentModeName { get; set; } = string.Empty;
     }
 }

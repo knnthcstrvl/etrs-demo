@@ -6,7 +6,7 @@ namespace Financial.State
 {
     public class DecryptJWTService
     {
-        public static CustomUserClaims DecryptToken(string jwtToken)
+        public static CustomUserClaims? DecryptToken(string jwtToken)
         {
             try
             {
@@ -23,17 +23,17 @@ namespace Financial.State
                 var exp = token.Claims.FirstOrDefault(_ => _.Type == "exp");
 
                 return new CustomUserClaims(
-                    Id: id.Value,
-                    FirstName: fname.Value,
-                    LastName: lname.Value,
-                    Email: email.Value!,
-                    Role: role.Value,
+                    Id: id?.Value ?? string.Empty,
+                    FirstName: fname?.Value ?? string.Empty,
+                    LastName: lname?.Value ?? string.Empty,
+                    Email: email?.Value ?? string.Empty,
+                    Role: role?.Value ?? string.Empty,
                     Jwt: jwtToken,
-                    Expiry: exp.Value);
+                    Expiry: exp?.Value ?? string.Empty);
             }
             catch
             {
-                return null!;
+                return null;
             }
         }
     }

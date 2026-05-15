@@ -7,25 +7,25 @@
 
 @rendermode InteractiveServer
 
+<PageTitle>ETRS</PageTitle>
+
 <div class="login-page">
     <div class="login-card">
         <h1 class="login-title">Welcome Back</h1>
 
         @* Errors and notifications are shown as global toasts *@
 
-        <EditForm EditContext="_editContext" OnValidSubmit="LoginSubmit">
+        <EditForm EditContext="_editContext" OnValidSubmit="HandleValidSubmit" OnInvalidSubmit="HandleInvalidSubmit">
             <DataAnnotationsValidator />
 
             <div class="login-field">
                 <label for="email" class="required-star">Email</label>
                 <InputText id="email" @bind-Value="_loginDto.Email" class="login-input focus-yellow" placeholder="Enter your Email" />
-                <ValidationMessage For="@(() => _loginDto.Email)" />
             </div>
 
             <div class="login-field">
                 <label for="password" class="required-star">Password</label>
                 <InputText id="password" @bind-Value="_loginDto.Password" class="login-input focus-yellow" type="password" placeholder="Enter your Password" />
-                <ValidationMessage For="@(() => _loginDto.Password)" />
             </div>
 
             <label class="remember-row" for="rememberMe">
@@ -85,16 +85,38 @@
 
     .login-input {
         width: 100%;
-        border: 0;
+        border: 1px solid transparent;
         border-radius: 12px;
         padding: 0.8rem 0.95rem;
         background: #f3f3f3;
         color: #1f2937;
         font-size: 0.95rem;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
     .login-input::placeholder {
         color: #9a9a9a;
+    }
+
+    .login-card .login-input:focus,
+    .login-card .login-input:focus-visible {
+        outline: 0;
+        border-color: #ebca4a !important;
+        box-shadow: none !important;
+    }
+
+    .login-input:not(:focus):not(:focus-visible) {
+        border-color: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .login-input.valid,
+    .login-input.valid.modified,
+    .login-input.invalid,
+    .login-input.invalid.modified {
+        outline: none !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
     }
 
     .remember-row {
@@ -195,6 +217,30 @@
         catch (Exception ex)
         {
             ToastService.Show(new Models.ToastMessage { Type = Models.ToastType.Error, Title = "Error", Message = ex.Message, Duration = 0 });
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        await LoginSubmit();
+    }
+
+    private void HandleInvalidSubmit(EditContext editContext)
+        => ShowValidationMessages(editContext);
+
+    private void ShowValidationMessages(EditContext? ctx)
+    {
+        if (ctx is null) return;
+
+        foreach (var message in ctx.GetValidationMessages().Distinct())
+        {
+            ToastService.Show(new Models.ToastMessage
+            {
+                Type = Models.ToastType.Warning,
+                Title = "Validation",
+                Message = message,
+                Duration = 5000
+            });
         }
     }
 }

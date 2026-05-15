@@ -30,7 +30,7 @@ namespace Financial.Repositories.Implement
             return new UserResponse(true, "Success", data);
         }
 
-        private async Task<Model.UserAccount> GetUser(string email)
+        private async Task<Model.UserAccount?> GetUser(string email)
         {
             return await _context.UserAccounts.FirstOrDefaultAsync(e => e.Email == email);
         }

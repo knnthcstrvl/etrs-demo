@@ -8,6 +8,6 @@ namespace Financial.Model.Library
         public int FundClusterId { get; set; }
 
         [Required, MaxLength(50)]
-        public string FundClusterName { get; set; }
+        public string FundClusterName { get; set; } = string.Empty;
     }
 }

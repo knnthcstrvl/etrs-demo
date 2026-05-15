@@ -40,13 +40,13 @@
         }
 
         // debug: notify browser that container initialized
-        try { JS.InvokeVoidAsync("console.log", "ToastContainer: initialized"); } catch { }
+        try { _ = JS.InvokeVoidAsync("console.log", "ToastContainer: initialized"); } catch { }
     }
 
     private void Show(ToastMessage message)
     {
         // ensure UI updates run on the renderer synchronization context
-        InvokeAsync(() => {
+        _ = InvokeAsync(() => {
             // server log for debugging
             try { Console.WriteLine($"ToastContainer: Show invoked - {message.Title} / {message.Message}"); } catch { }
             // enforce visible limit
@@ -64,10 +64,10 @@
                 // small delay to allow element to be added to DOM and painted
                 await Task.Delay(50);
                 _visible.Add(message.Id);
-                try { InvokeAsync(StateHasChanged); } catch { }
+                try { await InvokeAsync(StateHasChanged); } catch { }
             });
             // write a debug message to the browser console to help troubleshooting
-            try { JS.InvokeVoidAsync("console.log", "ToastContainer: show", message.Title, message.Message); } catch { }
+            try { _ = JS.InvokeVoidAsync("console.log", "ToastContainer: show", message.Title, message.Message); } catch { }
             StateHasChanged();
 
             if (message.Duration > 0)
@@ -94,7 +94,7 @@
         // start leave transition by removing visible flag and adding leaving flag
         _visible.Remove(id);
         _leaving.Add(id);
-        InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(StateHasChanged);
 
         // after CSS transition completes, remove from list
         _ = Task.Run(async () => {
@@ -104,7 +104,7 @@
                 _toasts.RemoveAll(t => t.Id == id);
                 _leaving.Remove(id);
                 _visible.Remove(id);
-                InvokeAsync(StateHasChanged);
+                await InvokeAsync(StateHasChanged);
             }
             catch { }
         });

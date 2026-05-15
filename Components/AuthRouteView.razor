@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Authorization
+@using Financial.Components.Pages
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavManager
 
@@ -28,10 +29,15 @@
             return;
         }
 
-        // If user is not authenticated and the page is not AllowAnonymous and not login page -> redirect to login
+        // If user is not authenticated and the page is not AllowAnonymous and not login page ->
+        // do not force a full navigation to /login here. Forcing a reload causes the app to
+        // perform a round-trip which in some cases leads to a subsequent redirect to /dashboard
+        // (because the auth state can change during the full load). Instead, allow the
+        // component to render the login UI in-place so the URL remains the same and the
+        // authentication state can stabilize.
         if (user?.Identity?.IsAuthenticated != true && !PageAllowsAnonymous(pageType) && !IsLoginPage(pageType))
         {
-            NavManager.NavigateTo("/login", true);
+            _initialized = true;
             return;
         }
 
@@ -78,7 +84,7 @@ else
         else
         {
             <LayoutView Layout="typeof(Components.Layout.BlankLayout)">
-                <Components.Pages.LoginPage />
+                <LoginPage />
             </LayoutView>
         }
     }

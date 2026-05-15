@@ -48,7 +48,6 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddCors();
 builder.Services.AddLocalization();
-builder.Services.AddSignalR();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddControllers();

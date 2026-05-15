@@ -1,5 +1,4 @@
 @page "/employees"
-@using Components.Shared
 @using Financial.Data
 @using Financial.Model.Dtr
 @using System.Text
@@ -8,7 +7,7 @@
 @inject IJSRuntime JS
 @inject Financial.Services.CurrentUserService CurrentUser
 
-<PageTitle>Employees</PageTitle>
+<PageTitle>ETRS | Employees</PageTitle>
 
 <RequireAccess RequiredAccess='@(new string[] { "View", "Edit", "Import", "Export" })'>
 <div class="dashboard-shell">

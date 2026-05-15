@@ -2,6 +2,6 @@
 {
     public class ConstantState : IConstantState
     {
-        public string JWTToken { get; set; }
+        public string JWTToken { get; set; } = string.Empty;
     }
 }

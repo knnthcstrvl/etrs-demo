@@ -21,7 +21,12 @@ namespace Financial.Data
             var exceptionTableName = exceptionEntityType?.GetTableName() ?? "ExceptionConditions";
             var exceptionSchema = exceptionEntityType?.GetSchema() ?? "dbo";
             var qualifiedExceptionTable = $"[{exceptionSchema}].[{exceptionTableName}]";
+            ValidateSqlIdentifier(schema);
+            ValidateSqlIdentifier(tableName);
+            ValidateSqlIdentifier(exceptionSchema);
+            ValidateSqlIdentifier(exceptionTableName);
 
+#pragma warning disable EF1002
             await db.Database.ExecuteSqlRawAsync($"""
                 IF OBJECT_ID(N'{exceptionSchema}.{exceptionTableName}', N'U') IS NULL
                 BEGIN
@@ -78,6 +83,15 @@ namespace Financial.Data
                     FOREIGN KEY ([ExceptionConditionId]) REFERENCES {qualifiedExceptionTable}([ExceptionConditionId]);
                 END
                 """);
+#pragma warning restore EF1002
+        }
+
+        private static void ValidateSqlIdentifier(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier) || identifier.Any(ch => !char.IsLetterOrDigit(ch) && ch != '_'))
+            {
+                throw new InvalidOperationException($"Unsafe SQL identifier detected: '{identifier}'.");
+            }
         }
     }
 }

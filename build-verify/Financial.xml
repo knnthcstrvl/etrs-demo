@@ -4,50 +4,76 @@
         <name>Financial</name>
     </assembly>
     <members>
-        <member name="M:Financial.Controllers.ProcurementController.Upsert(Financial.DTO.ProcurementCreateUpdateDto)">
-            <summary>
-            Create or update procurement details
-            </summary>
-        </member>
-        <member name="M:Financial.Controllers.ProcurementController.Get(System.Int32)">
-            <summary>
-            Get procurement details by transaction
-            </summary>
-        </member>
-        <member name="T:Financial.Migrations.initial">
+        <member name="T:Financial.Migrations.CreateBiometricDevices">
             <inheritdoc />
         </member>
-        <member name="M:Financial.Migrations.initial.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+        <member name="M:Financial.Migrations.CreateBiometricDevices.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
             <inheritdoc />
         </member>
-        <member name="M:Financial.Migrations.initial.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+        <member name="M:Financial.Migrations.CreateBiometricDevices.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
             <inheritdoc />
         </member>
-        <member name="M:Financial.Migrations.initial.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+        <member name="M:Financial.Migrations.CreateBiometricDevices.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
             <inheritdoc />
         </member>
-        <member name="T:Financial.Migrations.Added_User">
+        <member name="T:Financial.Migrations.CreateEmployees">
             <inheritdoc />
         </member>
-        <member name="M:Financial.Migrations.Added_User.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+        <member name="M:Financial.Migrations.CreateEmployees.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
             <inheritdoc />
         </member>
-        <member name="M:Financial.Migrations.Added_User.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+        <member name="M:Financial.Migrations.CreateEmployees.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
             <inheritdoc />
         </member>
-        <member name="M:Financial.Migrations.Added_User.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+        <member name="M:Financial.Migrations.CreateEmployees.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
             <inheritdoc />
         </member>
-        <member name="T:Financial.Migrations.AddDtrMonitoringModule">
+        <member name="T:Financial.Migrations.CreateAttendanceLogs">
             <inheritdoc />
         </member>
-        <member name="M:Financial.Migrations.AddDtrMonitoringModule.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+        <member name="M:Financial.Migrations.CreateAttendanceLogs.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
             <inheritdoc />
         </member>
-        <member name="M:Financial.Migrations.AddDtrMonitoringModule.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+        <member name="M:Financial.Migrations.CreateAttendanceLogs.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
             <inheritdoc />
         </member>
-        <member name="M:Financial.Migrations.AddDtrMonitoringModule.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+        <member name="M:Financial.Migrations.CreateAttendanceLogs.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Financial.Migrations.CreateAttendanceLogsWfh">
+            <inheritdoc />
+        </member>
+        <member name="M:Financial.Migrations.CreateAttendanceLogsWfh.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Financial.Migrations.CreateAttendanceLogsWfh.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Financial.Migrations.CreateAttendanceLogsWfh.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Financial.Migrations.CreateExceptionConditions">
+            <inheritdoc />
+        </member>
+        <member name="M:Financial.Migrations.CreateExceptionConditions.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Financial.Migrations.CreateExceptionConditions.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Financial.Migrations.CreateExceptionConditions.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Financial.Migrations.CreateUserAccounts">
+            <inheritdoc />
+        </member>
+        <member name="M:Financial.Migrations.CreateUserAccounts.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Financial.Migrations.CreateUserAccounts.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Financial.Migrations.CreateUserAccounts.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
             <inheritdoc />
         </member>
         <member name="P:Financial.Models.ToastMessage.Duration">

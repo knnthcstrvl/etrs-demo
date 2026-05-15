@@ -1,5 +1,5 @@
 .finance-header {
-    --etrs-frame-border: #d8dbe1;
+    --etrs-frame-border: var(--etrs-gray-300);
     --etrs-top-row-height: 74px;
     position: sticky;
     top: 0;
@@ -35,7 +35,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #6b7280;
+    color: var(--etrs-gray-700);
     font-size: 0.95rem;
     flex: 0 0 auto;
 }
@@ -46,7 +46,7 @@
     outline: none;
     background: transparent;
     padding: 0;
-    color: #6b7280;
+    color: var(--etrs-gray-700);
     box-shadow: none;
 }
 
