@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
 @using System.ComponentModel.DataAnnotations
+@using System.IO.Compression
 @inject ProcurementDbContext Db
 @inject IWebHostEnvironment Environment
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
@@ -53,7 +54,7 @@
                 </div>
             </div>
 
-            @if (!showAddPeriod && !isClosingAddPeriod)
+            @if (periods.Count > 1 && !showAddPeriod && !isClosingAddPeriod)
             {
                 <button type="button" class="btn btn-outline-secondary period-add-button" @onclick="ToggleAddPeriod">+</button>
             }
@@ -61,7 +62,7 @@
             @if (showAddPeriod || isClosingAddPeriod)
             {
                 <div class="period-range-entry @(isClosingAddPeriod ? "closing" : null)">
-                    <div class="period-to-label">to:</div>
+                    <div class="period-to-label">TO</div>
 
                     <div class="attendance-filter-select-wrap period-dropdown">
                     <button type="button" class="period-close-btn" title="Close period range" @onclick="ToggleAddPeriod">×</button>
@@ -96,7 +97,7 @@
 
             <span class="period-sep" aria-hidden="true"></span>
             <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenInputLogsModal" disabled="@(!CurrentUser.HasAccess("Edit"))">Input Logs</button>
-            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="ExportAttendanceLogsAsync" disabled=@(!CurrentUser.HasAccess("Export"))>Export</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenExportLogsModal" disabled=@(!CurrentUser.HasAccess("Export"))>Export</button>
         </div>
     </div>
 
@@ -370,9 +371,10 @@
                             <th>@SortHeader("Employee", "employee", false)</th>
                             <th>@SortHeader("Division / Unit", "division", false)</th>
                             <th>@SortHeader("Designation", "designation", false)</th>
+                            <th>Attendance Date</th>
                             <th>@SortHeader("AM", "am", false)</th>
                             <th>@SortHeader("PM", "pm", false)</th>
-                            <th>Tardiness</th>
+                            <th>Late/Undertime</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -402,15 +404,23 @@
                                 <td><span class="cell-ellipsis" title="@FormatName(log.LastName, log.FirstName, log.MiddleName)">@FormatName(log.LastName, log.FirstName, log.MiddleName)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.DivisionCenterUnit)">@DisplayValue(log.DivisionCenterUnit)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.Designation)">@DisplayValue(log.Designation)</span></td>
-                                <td class="time-cell"><span class="cell-ellipsis" title="@FormatTimeRange(log.TimeInAm, log.TimeOutAm)">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</span></td>
-                                <td class="time-cell"><span class="cell-ellipsis" title="@FormatTimeRange(log.TimeInPm, log.TimeOutPm)">@FormatTimeRange(log.TimeInPm, log.TimeOutPm)</span></td>
-                                <td><span class="cell-ellipsis" title="@DisplayTardiness(log.Tardiness)">@DisplayTardiness(log.Tardiness)</span></td>
+                                <td><span class="cell-ellipsis" title="@FormatDate(log.AttendanceDate)">@FormatDate(log.AttendanceDate)</span></td>
+                                <td class="time-cell @(IsTardinessOverride(log) ? "attendance-time-overridden" : null)"><span class="cell-ellipsis" title="@FormatTimeRange(log.TimeInAm, log.TimeOutAm)">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</span></td>
+                                <td class="time-cell @(IsTardinessOverride(log) ? "attendance-time-overridden" : null)"><span class="cell-ellipsis" title="@FormatTimeRange(GetCreditedOnsiteTimeInPm(log), log.TimeOutPm)">@FormatTimeRange(GetCreditedOnsiteTimeInPm(log), log.TimeOutPm)</span></td>
+                                <td>
+                                    <div class="attendance-tardiness-pills" title="@FormatTardinessTags(GetResolvedTardiness(log))">
+                                        @foreach (var tag in GetTardinessTags(GetResolvedTardiness(log)))
+                                        {
+                                            <span class="@GetTardinessPillClass(tag)">@tag</span>
+                                        }
+                                    </div>
+                                </td>
                             </tr>
                         }
                         @if (!PagedOnsiteLogs.Any())
                         {
                             <tr>
-                                <td colspan="8" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
+                                <td colspan="9" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
                             </tr>
                         }
                     </tbody>
@@ -426,6 +436,7 @@
                             <th>@SortHeader("Employee", "employee", true)</th>
                             <th>@SortHeader("Division / Unit", "division", true)</th>
                             <th>@SortHeader("Designation", "designation", true)</th>
+                            <th>Attendance Date</th>
                             <th>Target</th>
                             <th>Accomplishment</th>
                             <th>MOV</th>
@@ -433,7 +444,7 @@
                             <th>Status</th>
                             <th>@SortHeader("Time In", "timein", true)</th>
                             <th>@SortHeader("Time Out", "timeout", true)</th>
-                            <th>Tardiness</th>
+                            <th>Late/Undertime</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -463,6 +474,7 @@
                                 <td><span class="cell-ellipsis" title="@FormatName(log.LastName, log.FirstName, log.MiddleName)">@FormatName(log.LastName, log.FirstName, log.MiddleName)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.DivisionCenterUnit)">@DisplayValue(log.DivisionCenterUnit)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.Designation)">@DisplayValue(log.Designation)</span></td>
+                                <td><span class="cell-ellipsis" title="@FormatDate(log.AttendanceDate)">@FormatDate(log.AttendanceDate)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.Target)">@DisplayValue(log.Target)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.Accomplishment)">@DisplayValue(log.Accomplishment)</span></td>
                                 <td>
@@ -477,15 +489,22 @@
                                 </td>
                                 <td><span class="cell-ellipsis" title="@GetWorkArrangement(log)">@GetWorkArrangement(log)</span></td>
                                 <td><span class="cell-ellipsis" title="@GetWfhAttendanceStatus(log)">@GetWfhAttendanceStatus(log)</span></td>
-                                <td class="time-cell"><span class="cell-ellipsis" title="@FormatTime(log.TimeIn)">@FormatTime(log.TimeIn)</span></td>
-                                <td class="time-cell"><span class="cell-ellipsis" title="@FormatTime(log.TimeOut)">@FormatTime(log.TimeOut)</span></td>
-                                <td><span class="cell-ellipsis" title="@DisplayTardiness(log.Tardiness)">@DisplayTardiness(log.Tardiness)</span></td>
+                                <td class="time-cell @(IsTardinessOverride(log) ? "attendance-time-overridden" : null)"><span class="cell-ellipsis" title="@FormatClockTime(log.TimeIn)">@FormatClockTime(log.TimeIn)</span></td>
+                                <td class="time-cell @(IsTardinessOverride(log) ? "attendance-time-overridden" : null)"><span class="cell-ellipsis" title="@FormatClockTime(log.TimeOut)">@FormatClockTime(log.TimeOut)</span></td>
+                                <td>
+                                    <div class="attendance-tardiness-pills" title="@FormatTardinessTags(GetResolvedTardiness(log))">
+                                        @foreach (var tag in GetTardinessTags(GetResolvedTardiness(log)))
+                                        {
+                                            <span class="@GetTardinessPillClass(tag)">@tag</span>
+                                        }
+                                    </div>
+                                </td>
                             </tr>
                         }
                         @if (!PagedWfhLogs.Any())
                         {
                             <tr>
-                                <td colspan="13" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
+                                <td colspan="14" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
                             </tr>
                         }
                     </tbody>
@@ -577,7 +596,12 @@
                                 <div class="attendance-detail-eyebrow">Onsite Biometric Log</div>
                                 <div class="attendance-detail-person">@FormatName(selectedOnsiteLog.LastName, selectedOnsiteLog.FirstName, selectedOnsiteLog.MiddleName)</div>
                             </div>
-                            <div class="attendance-detail-status">@DisplayValue(selectedOnsiteLog.Tardiness, "On Time")</div>
+                            <div class="attendance-tardiness-pills attendance-tardiness-pills-detail" title="@FormatTardinessTags(GetResolvedTardiness(selectedOnsiteLog))">
+                                @foreach (var tag in GetTardinessTags(GetResolvedTardiness(selectedOnsiteLog)))
+                                {
+                                    <span class="@GetTardinessPillClass(tag)">@tag</span>
+                                }
+                            </div>
                         </div>
 
                         <div class="attendance-detail-section attendance-detail-section-primary">
@@ -605,19 +629,19 @@
                             <div class="attendance-detail-grid attendance-detail-grid-compact">
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">AM Time In</span>
-                                    <strong>@FormatDateTime(selectedOnsiteLog.TimeInAm)</strong>
+                                    <strong>@FormatClockTime(selectedOnsiteLog.TimeInAm)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">AM Time Out</span>
-                                    <strong>@FormatDateTime(selectedOnsiteLog.TimeOutAm)</strong>
+                                    <strong>@FormatClockTime(selectedOnsiteLog.TimeOutAm)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">PM Time In</span>
-                                    <strong>@FormatDateTime(selectedOnsiteLog.TimeInPm)</strong>
+                                    <strong>@FormatClockTime(GetCreditedOnsiteTimeInPm(selectedOnsiteLog))</strong>
                                 </div>
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">PM Time Out</span>
-                                    <strong>@FormatDateTime(selectedOnsiteLog.TimeOutPm)</strong>
+                                    <strong>@FormatClockTime(selectedOnsiteLog.TimeOutPm)</strong>
                                 </div>
                             </div>
                         </div>
@@ -657,15 +681,20 @@
                             <div class="attendance-detail-grid attendance-detail-grid-compact">
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">Time In</span>
-                                    <strong>@FormatDateTime(selectedWfhLog.TimeIn)</strong>
+                                    <strong>@FormatClockTime(selectedWfhLog.TimeIn)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">Time Out</span>
-                                    <strong>@FormatDateTime(selectedWfhLog.TimeOut)</strong>
+                                    <strong>@FormatClockTime(selectedWfhLog.TimeOut)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
-                                    <span class="attendance-detail-label">Tardiness</span>
-                                    <strong>@DisplayValue(selectedWfhLog.Tardiness, "On Time")</strong>
+                                    <span class="attendance-detail-label">Late/Undertime</span>
+                                    <div class="attendance-tardiness-pills attendance-tardiness-pills-field" title="@FormatTardinessTags(GetResolvedTardiness(selectedWfhLog))">
+                                        @foreach (var tag in GetTardinessTags(GetResolvedTardiness(selectedWfhLog)))
+                                        {
+                                            <span class="@GetTardinessPillClass(tag)">@tag</span>
+                                        }
+                                    </div>
                                 </div>
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">MOV</span>
@@ -848,6 +877,116 @@
         </div>
     }
 
+    @if (showExportLogsModal)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseExportLogsModal">
+            <div class="attendance-detail-modal attendance-export-modal" @onclick="CloseModalTransientUiAsync" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Export Logs</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseExportLogsModal" aria-label="Close export attendance logs">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body attendance-input-body">
+                    <div class="attendance-detail-section attendance-detail-hero">
+                        <div>
+                            <div class="attendance-detail-eyebrow">CSV Export</div>
+                            <div class="attendance-detail-person">Select the period range to include in the export.</div>
+                            <div class="attendance-detail-meta">This export downloads a ZIP file with separate onsite and WFH CSV files.</div>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-section attendance-detail-section-primary">
+                        <div class="attendance-export-periods">
+                            <div class="attendance-export-period-row @(showExportPeriodMenu ? "menu-open" : null)">
+                                <span class="attendance-detail-label">From</span>
+                                <div class="attendance-filter-select-wrap period-dropdown attendance-export-period-dropdown @(showExportPeriodMenu ? "menu-open" : null)" @onclick:stopPropagation="true">
+                                    <button type="button" class="attendance-filter-select-trigger period-button @(showExportPeriodMenu ? "active" : null)" @ref="exportPeriodButtonRef" @onclick="ToggleExportPeriodMenu">
+                                        <span class="period-button-content">
+                                            <span class="period-label">Period:</span>
+                                            <span class="period-selected">@ExportSelectedPeriodLabel</span>
+                                            @if (exportSelectedPeriod?.IsCurrent == true)
+                                            {
+                                                <span class="period-current-text">(Current)</span>
+                                            }
+                                        </span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="@GetExportPeriodMenuClass(showExportPeriodMenu, openExportPeriodMenuUpward)" @onclick:stopPropagation="true">
+                                        @foreach (var p in periods)
+                                        {
+                                            var itemId = exportSelectedPeriod == p ? "export-period-1-selected-item" : null;
+                                            <button type="button" class="attendance-filter-select-option period-option @(exportSelectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectExportPeriod(p)">
+                                                <span class="period-option-label">@p.Label</span>
+                                                @if (p.IsCurrent)
+                                                {
+                                                    <span class="period-current-text">(Current)</span>
+                                                }
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if (periods.Count > 1 && !showExportAddPeriod && !isClosingExportAddPeriod)
+                            {
+                                <button type="button" class="btn btn-outline-secondary period-add-button attendance-export-period-add" @onclick="ToggleExportAddPeriod">
+                                    <span class="attendance-export-period-add-icon" aria-hidden="true">+</span>
+                                    <span>Add a period</span>
+                                </button>
+                            }
+
+                            @if (showExportAddPeriod || isClosingExportAddPeriod)
+                            {
+                                <div class="period-range-entry attendance-export-range-entry @(isClosingExportAddPeriod ? "closing" : null) @(showExportPeriod2Menu ? "menu-open" : null)">
+                                    <div class="period-to-label">TO</div>
+
+                                    <div class="attendance-filter-select-wrap period-dropdown attendance-export-period-dropdown @(showExportPeriod2Menu ? "menu-open" : null)" @onclick:stopPropagation="true">
+                                        <button type="button" class="period-close-btn" title="Close export period range" @onclick="ToggleExportAddPeriod">×</button>
+                                        <button type="button" class="attendance-filter-select-trigger period-button @(showExportPeriod2Menu ? "active" : null)" @ref="exportPeriod2ButtonRef" @onclick="ToggleExportPeriod2Menu">
+                                            <span class="period-button-content">
+                                                <span class="period-label">Period:</span>
+                                                <span class="period-selected">@ExportSelectedPeriod2Label</span>
+                                                @if (exportSecondSelectedPeriod?.IsCurrent == true)
+                                                {
+                                                    <span class="period-current-text">(Current)</span>
+                                                }
+                                            </span>
+                                            <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                        </button>
+
+                                        <div class="@GetExportPeriodMenuClass(showExportPeriod2Menu, openExportPeriod2MenuUpward)" @onclick:stopPropagation="true">
+                                            @foreach (var p in periods)
+                                            {
+                                                var itemId = exportSecondSelectedPeriod == p ? "export-period-2-selected-item" : null;
+                                                <button type="button" class="attendance-filter-select-option period-option @(exportSecondSelectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectExportSecondPeriod(p)">
+                                                    <span class="period-option-label">@p.Label</span>
+                                                    @if (p.IsCurrent)
+                                                    {
+                                                        <span class="period-current-text">(Current)</span>
+                                                    }
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseExportLogsModal" disabled="@isExportingLogs">Cancel</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@isExportingLogs">@(isExportingLogs ? "Exporting..." : "Export")</button>
+                </div>
+            </div>
+        </div>
+    }
+
     @if (showEditLogsModal)
     {
         <div class="attendance-detail-overlay" @onclick="CloseEditLogsModal">
@@ -877,7 +1016,7 @@
                                 <input class="form-control attendance-input-control attendance-input-control-readonly" value="@FormatDate(editLogForm.AttendanceDate)" readonly />
                             </div>
                             <div class="attendance-input-field">
-                                <span class="attendance-detail-label">Tardiness</span>
+                                <span class="attendance-detail-label">Late/Undertime</span>
                                 <div class="attendance-filter-select-wrap attendance-input-select-wrap" @onclick:stopPropagation="true">
                                     <button type="button"
                                             class="attendance-filter-select-trigger attendance-input-control @(showEditTardinessMenu ? "active" : null)"
@@ -977,6 +1116,133 @@
     .attendance-logs-export-btn {
         align-self: center;
         white-space: nowrap;
+    }
+
+    .attendance-detail-modal.attendance-export-modal {
+        width: min(100%, 600px);
+        max-height: none;
+        overflow: visible;
+        position: relative;
+        z-index: 1201;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+    }
+
+    .attendance-detail-modal.attendance-export-modal::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300) 88%, white);
+        border-radius: 10px;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    .attendance-export-modal > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .attendance-export-modal .attendance-detail-body {
+        flex: 0 0 auto;
+        overflow: visible;
+        padding-bottom: 0.5rem;
+        position: relative;
+        z-index: 4;
+    }
+
+    .attendance-export-modal .attendance-detail-header {
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+
+    .attendance-export-modal .attendance-detail-footer {
+        padding-top: 1rem;
+        position: relative;
+        z-index: 1;
+        border-bottom-left-radius: 10px;
+        border-bottom-right-radius: 10px;
+    }
+
+    .attendance-export-periods {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+    }
+
+    .attendance-export-period-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        position: relative;
+        z-index: 5;
+    }
+
+    .attendance-export-period-row.menu-open {
+        z-index: 40;
+    }
+
+    .attendance-export-period-dropdown {
+        width: 100%;
+        z-index: 25;
+    }
+
+    .attendance-export-period-dropdown.menu-open {
+        z-index: 45;
+    }
+
+    .attendance-export-period-dropdown .period-button {
+        width: 100%;
+    }
+
+    .attendance-export-period-dropdown .attendance-filter-select-menu {
+        z-index: 1302;
+    }
+
+    .attendance-export-period-dropdown .attendance-filter-select-menu.open-upward {
+        top: auto;
+        bottom: calc(100% + 0.35rem);
+        transform: translateY(6px);
+    }
+
+    .attendance-export-period-dropdown .attendance-filter-select-menu.open-upward.show {
+        transform: translateY(0);
+    }
+
+    .period-add-button.attendance-export-period-add {
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        min-height: 42px;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        margin-left: 0;
+        padding: 0.7rem 0.9rem;
+        white-space: nowrap;
+        flex-wrap: nowrap;
+        box-sizing: border-box;
+    }
+
+    .attendance-export-period-add-icon {
+        font-size: 1rem;
+        line-height: 1;
+        font-weight: 600;
+    }
+
+    .attendance-export-range-entry {
+        align-self: stretch;
+        position: relative;
+        z-index: 5;
+    }
+
+    .attendance-export-range-entry.menu-open {
+        z-index: 40;
     }
 
     .attendance-view-tabs {
@@ -1395,6 +1661,79 @@
         max-width: 11rem;
     }
 
+    .attendance-table .attendance-time-overridden .cell-ellipsis {
+        color: var(--finance-text-muted);
+        text-decoration: line-through;
+        text-decoration-thickness: 1.5px;
+    }
+
+    .attendance-tardiness-pills {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        min-width: 9rem;
+    }
+
+    .attendance-tardiness-pills-detail {
+        justify-content: flex-end;
+        min-width: 0;
+    }
+
+    .attendance-tardiness-pills-detail .attendance-tardiness-pill {
+        padding: 0.7rem 1rem;
+        font-size: 0.94rem;
+    }
+
+    .attendance-tardiness-pills-field {
+        min-width: 0;
+        margin-top: 0.2rem;
+    }
+
+    .attendance-tardiness-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 1.75rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        line-height: 1;
+        border: 1px solid transparent;
+        white-space: nowrap;
+    }
+
+    .attendance-tardiness-pill-on-time {
+        border-color: #b7e4c7;
+        background: #e9f8ef;
+        color: #17643a;
+    }
+
+    .attendance-tardiness-pill-absent {
+        border-color: #fecaca;
+        background: #fef2f2;
+        color: #b42318;
+    }
+
+    .attendance-tardiness-pill-late {
+        border-color: #fde68a;
+        background: #fffbeb;
+        color: #92400e;
+    }
+
+    .attendance-tardiness-pill-undertime {
+        border-color: #ddd6fe;
+        background: #f5f3ff;
+        color: #5b21b6;
+    }
+
+    .attendance-tardiness-pill-half-day {
+        border-color: #bfdbfe;
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
     .attendance-actions-column {
         min-width: 8.5rem;
     }
@@ -1442,6 +1781,8 @@
         display:flex;
         align-items:center;
         gap:0.5rem;
+        position: relative;
+        z-index: 30;
     }
 
     .date-filter {
@@ -1462,6 +1803,7 @@
     .period-dropdown {
         display:inline-block;
         min-width: 260px; /* controls default field width */
+        overflow: visible;
     }
 
     .period-button {
@@ -1533,8 +1875,11 @@
         align-items:center;
         padding:0 0.15rem;
         margin:0 0.05rem;
-        color:var(--finance-text-muted);
-        font-weight:500;
+        color: var(--etrs-gray-700);
+        font-size: 0.82rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
     }
 
     .period-range-entry {
@@ -1543,6 +1888,7 @@
         gap: 0.5rem;
         animation: period-range-enter 180ms ease-out;
         transform-origin: left center;
+        overflow: visible;
     }
 
     .period-range-entry.closing {
@@ -1714,6 +2060,7 @@
         border: 1px solid var(--etrs-gray-200);
         border-radius: 8px;
         background: rgba(255, 255, 255, 0.9);
+        overflow: visible;
     }
 
     .attendance-detail-hero {
@@ -2272,6 +2619,7 @@
         public int AttendanceLogWfhId { get; set; }
         public DateTime AttendanceDate { get; set; } = DateTime.Today;
         public string EmployeeName { get; set; } = string.Empty;
+        public string? EmployeeStatus { get; set; }
         public string LogTypeLabel => IsWfh ? "WFH" : "Onsite";
         public string Tardiness { get; set; } = string.Empty;
         public string OnsiteTimeInAm { get; set; } = string.Empty;
@@ -2321,6 +2669,8 @@
     private bool isSavingInputLog;
     private InputLogMode inputLogMode = InputLogMode.Onsite;
     private ManualInputForm inputForm = new();
+    private bool showExportLogsModal;
+    private bool isExportingLogs;
     private bool showEditLogsModal;
     private bool isSavingEditLog;
     private EditLogForm editLogForm = new();
@@ -2348,6 +2698,16 @@
     private bool isClosingAddPeriod;
     private Period? secondSelectedPeriod;
     private bool showPeriod2Menu;
+    private Period? exportSelectedPeriod;
+    private bool showExportPeriodMenu;
+    private bool openExportPeriodMenuUpward;
+    private bool showExportAddPeriod;
+    private bool isClosingExportAddPeriod;
+    private Period? exportSecondSelectedPeriod;
+    private bool showExportPeriod2Menu;
+    private bool openExportPeriod2MenuUpward;
+    private ElementReference exportPeriodButtonRef;
+    private ElementReference exportPeriod2ButtonRef;
     private ElementReference periodControlsRef;
     private DotNetObjectReference<AttendanceLogs>? periodDropdownDotNetRef;
     private bool periodDismissRegistered;
@@ -2357,8 +2717,12 @@
     private string? activeFilterField;
 
     private string SelectedPeriod2Label => secondSelectedPeriod?.Label ?? "Select a period";
+    private string ExportSelectedPeriodLabel => exportSelectedPeriod?.Label ?? "No periods available";
+    private string ExportSelectedPeriod2Label => exportSecondSelectedPeriod?.Label ?? "Select a period";
+    private static string GetExportPeriodMenuClass(bool isVisible, bool openUpward)
+        => $"attendance-filter-select-menu period-menu{(isVisible ? " show" : string.Empty)}{(openUpward ? " open-upward" : string.Empty)}";
 
-    private string SelectedPeriodLabel => selectedPeriod?.Label ?? "";
+    private string SelectedPeriodLabel => selectedPeriod?.Label ?? "No periods available";
     private string InputLogModeLabel => inputLogMode == InputLogMode.Onsite ? "Onsite" : "WFH";
     private IEnumerable<string> EditTardinessOptions => BuildEditTardinessOptions();
     private AttendanceTableState CurrentTableState => viewMode == "onsite" ? onsiteTableState : wfhTableState;
@@ -2501,6 +2865,40 @@
         await LoadLogsAsync();
     }
 
+    private async Task ToggleExportPeriodMenu()
+    {
+        if (showExportPeriodMenu)
+        {
+            showExportPeriodMenu = false;
+            return;
+        }
+
+        openExportPeriodMenuUpward = await ShouldOpenExportMenuUpwardAsync(exportPeriodButtonRef);
+        showExportPeriodMenu = true;
+        showExportPeriod2Menu = false;
+        await ScrollSelectedPeriodIntoViewAsync("export-period-1-selected-item");
+    }
+
+    private Task SelectExportPeriod(Period p)
+    {
+        exportSelectedPeriod = p;
+        NormalizeSelectedPeriods(ref exportSelectedPeriod, ref exportSecondSelectedPeriod);
+        showExportPeriodMenu = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task<bool> ShouldOpenExportMenuUpwardAsync(ElementReference triggerRef)
+    {
+        try
+        {
+            return await JS.InvokeAsync<bool>("attendanceLogs.shouldOpenMenuUpward", triggerRef, 220, 16);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private async Task ToggleAddPeriod()
     {
         if (!showAddPeriod && !isClosingAddPeriod)
@@ -2534,6 +2932,7 @@
         {
             filterStart = selectedPeriod.Start;
             filterEnd = selectedPeriod.End;
+            await RefreshAvailablePeriodsAsync();
             await LoadLogsAsync();
         }
     }
@@ -2551,6 +2950,31 @@
         }
     }
 
+    private async Task ToggleExportAddPeriod()
+    {
+        if (!showExportAddPeriod && !isClosingExportAddPeriod)
+        {
+            isClosingExportAddPeriod = false;
+            showExportAddPeriod = true;
+            return;
+        }
+
+        if (isClosingExportAddPeriod)
+        {
+            return;
+        }
+
+        isClosingExportAddPeriod = true;
+        showExportPeriod2Menu = false;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(180);
+
+        showExportAddPeriod = false;
+        isClosingExportAddPeriod = false;
+        exportSecondSelectedPeriod = null;
+        showExportPeriod2Menu = false;
+    }
+
     private async Task SelectSecondPeriod(Period p)
     {
         secondSelectedPeriod = p;
@@ -2562,14 +2986,41 @@
 
     private void NormalizeSelectedPeriods()
     {
-        if (selectedPeriod == null || secondSelectedPeriod == null)
+        NormalizeSelectedPeriods(ref selectedPeriod, ref secondSelectedPeriod);
+    }
+
+    private async Task ToggleExportPeriod2Menu()
+    {
+        if (showExportPeriod2Menu)
+        {
+            showExportPeriod2Menu = false;
+            return;
+        }
+
+        openExportPeriod2MenuUpward = await ShouldOpenExportMenuUpwardAsync(exportPeriod2ButtonRef);
+        showExportPeriod2Menu = true;
+        showExportPeriodMenu = false;
+        await ScrollSelectedPeriodIntoViewAsync("export-period-2-selected-item");
+    }
+
+    private Task SelectExportSecondPeriod(Period p)
+    {
+        exportSecondSelectedPeriod = p;
+        NormalizeSelectedPeriods(ref exportSelectedPeriod, ref exportSecondSelectedPeriod);
+        showExportPeriod2Menu = false;
+        return Task.CompletedTask;
+    }
+
+    private static void NormalizeSelectedPeriods(ref Period? firstPeriod, ref Period? secondPeriod)
+    {
+        if (firstPeriod == null || secondPeriod == null)
         {
             return;
         }
 
-        if (secondSelectedPeriod.Start < selectedPeriod.Start)
+        if (secondPeriod.Start < firstPeriod.Start)
         {
-            (selectedPeriod, secondSelectedPeriod) = (secondSelectedPeriod, selectedPeriod);
+            (firstPeriod, secondPeriod) = (secondPeriod, firstPeriod);
         }
     }
 
@@ -2617,6 +3068,7 @@
     private List<AttendanceLogWfh> wfhLogs = new();
     private List<AttendanceLog> filteredOnsiteLogs = new();
     private List<AttendanceLogWfh> filteredWfhLogs = new();
+    private Dictionary<string, string> employeeStatusesByIdNumber = new(StringComparer.OrdinalIgnoreCase);
     private int onsitePage = 1;
     private int wfhPage = 1;
 
@@ -2634,17 +3086,7 @@
     protected override async Task OnInitializedAsync()
     {
         employeeCount = await Db.Employees.CountAsync();
-        // build period list starting from March 2026 to current month (chronological)
-        BuildPeriods(DateTime.Today);
-
-        // select current cutoff by default (do not reorder the list)
-        selectedPeriod = periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
-        if (selectedPeriod != null)
-        {
-            filterStart = selectedPeriod.Start;
-            filterEnd = selectedPeriod.End;
-        }
-
+        await RefreshAvailablePeriodsAsync(preserveSelections: false);
         await LoadLogsAsync();
 
         // Exceptions Today should reflect today's data across all records
@@ -2669,38 +3111,183 @@
         }
     }
 
-    private void BuildPeriods(DateTime now)
+    private async Task RefreshAvailablePeriodsAsync(bool preserveSelections = true)
     {
-        periods.Clear();
-        var startMonth = new DateTime(2026, 3, 1);
-        var currentMonth = new DateTime(now.Year, now.Month, 1);
+        var previousSelectedPeriod = preserveSelections ? selectedPeriod : null;
+        var previousSecondSelectedPeriod = preserveSelections ? secondSelectedPeriod : null;
+        var previousExportSelectedPeriod = preserveSelections ? exportSelectedPeriod : null;
+        var previousExportSecondSelectedPeriod = preserveSelections ? exportSecondSelectedPeriod : null;
 
-        for (var month = startMonth; month <= currentMonth; month = month.AddMonths(1))
+        periods = await GetAvailablePeriodsAsync(DateTime.Today);
+
+        if (!preserveSelections)
         {
-            var firstStart = new DateTime(month.Year, month.Month, 1);
-            var firstEnd = firstStart.AddDays(14); // 1-15
-            var secondStart = firstStart.AddDays(15); // 16th
-            var secondEnd = new DateTime(month.Year, month.Month, DateTime.DaysInMonth(month.Year, month.Month));
-
-            var p1 = new Period
-            {
-                Start = firstStart,
-                End = firstEnd,
-                Label = $"{firstStart:MMM dd} - {firstEnd:dd}, {firstEnd:yyyy}",
-                IsCurrent = now.Date >= firstStart.Date && now.Date <= firstEnd.Date
-            };
-
-            var p2 = new Period
-            {
-                Start = secondStart,
-                End = secondEnd,
-                Label = $"{secondStart:MMM dd} - {secondEnd:dd}, {secondEnd:yyyy}",
-                IsCurrent = now.Date >= secondStart.Date && now.Date <= secondEnd.Date
-            };
-
-            periods.Add(p1);
-            periods.Add(p2);
+            selectedPeriod = periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
+            secondSelectedPeriod = null;
+            exportSelectedPeriod = null;
+            exportSecondSelectedPeriod = null;
+            showAddPeriod = false;
+            showExportAddPeriod = false;
         }
+        else
+        {
+            selectedPeriod = FindMatchingPeriod(previousSelectedPeriod);
+            secondSelectedPeriod = FindMatchingPeriod(previousSecondSelectedPeriod);
+            exportSelectedPeriod = FindMatchingPeriod(previousExportSelectedPeriod);
+            exportSecondSelectedPeriod = FindMatchingPeriod(previousExportSecondSelectedPeriod);
+
+            if (selectedPeriod is null && secondSelectedPeriod is not null)
+            {
+                selectedPeriod = secondSelectedPeriod;
+                secondSelectedPeriod = null;
+            }
+
+            if (selectedPeriod is null)
+            {
+                selectedPeriod = periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
+            }
+
+            if (exportSelectedPeriod is null && exportSecondSelectedPeriod is not null)
+            {
+                exportSelectedPeriod = exportSecondSelectedPeriod;
+                exportSecondSelectedPeriod = null;
+            }
+
+            NormalizeSelectedPeriods();
+            NormalizeSelectedPeriods(ref exportSelectedPeriod, ref exportSecondSelectedPeriod);
+            showAddPeriod = secondSelectedPeriod is not null;
+            showExportAddPeriod = exportSecondSelectedPeriod is not null;
+        }
+
+        if (selectedPeriod != null)
+        {
+            ApplySelectedPeriodRange();
+        }
+        else
+        {
+            filterStart = DateTime.Today;
+            filterEnd = DateTime.Today;
+        }
+    }
+
+    private async Task<List<Period>> GetAvailablePeriodsAsync(DateTime now)
+    {
+        var onsiteDates = await Db.AttendanceLogs
+            .AsNoTracking()
+            .Select(l => l.AttendanceDate)
+            .Distinct()
+            .ToListAsync();
+
+        var wfhDates = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Where(l => l.ExceptionConditionId == null
+                && l.WorkArrangement == "WFH"
+                && (l.TimeIn.HasValue
+                    || l.TimeOut.HasValue
+                    || !string.IsNullOrWhiteSpace(l.Target)
+                    || !string.IsNullOrWhiteSpace(l.Accomplishment)
+                    || !string.IsNullOrWhiteSpace(l.Mov)))
+            .Select(l => l.AttendanceDate)
+            .Distinct()
+            .ToListAsync();
+
+        return onsiteDates
+            .Concat(wfhDates)
+            .Select(date => BuildPeriodForDate(date.Date, now))
+            .GroupBy(period => new { period.Start, period.End })
+            .Select(group => group.First())
+            .OrderBy(period => period.Start)
+            .ToList();
+    }
+
+    private Period? FindMatchingPeriod(Period? period)
+        => period is null
+            ? null
+            : periods.FirstOrDefault(p => p.Start.Date == period.Start.Date && p.End.Date == period.End.Date);
+
+    private static Period BuildPeriodForDate(DateTime date, DateTime now)
+    {
+        var start = date.Day <= 15
+            ? new DateTime(date.Year, date.Month, 1)
+            : new DateTime(date.Year, date.Month, 16);
+        var end = date.Day <= 15
+            ? new DateTime(date.Year, date.Month, 15)
+            : new DateTime(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month));
+
+        return new Period
+        {
+            Start = start,
+            End = end,
+            Label = $"{start:MMM dd} - {end:dd}, {end:yyyy}",
+            IsCurrent = now.Date >= start.Date && now.Date <= end.Date
+        };
+    }
+
+    private void EnsurePeriodsIncludeDate(DateTime attendanceDate)
+    {
+        var targetDate = attendanceDate.Date;
+
+        var matchingPeriod = BuildPeriodForDate(targetDate, DateTime.Today);
+        if (!periods.Any(p => p.Start.Date == matchingPeriod.Start.Date && p.End.Date == matchingPeriod.End.Date))
+        {
+            periods.Add(matchingPeriod);
+            periods = periods.OrderBy(p => p.Start).ToList();
+        }
+    }
+
+    private void EnsureSavedDateIsVisible(DateTime attendanceDate)
+    {
+        var targetDate = attendanceDate.Date;
+        EnsurePeriodsIncludeDate(targetDate);
+
+        if (filterStart != default && filterEnd != default
+            && targetDate >= filterStart.Date
+            && targetDate <= filterEnd.Date)
+        {
+            return;
+        }
+
+        var matchingPeriod = periods.FirstOrDefault(p => targetDate >= p.Start.Date && targetDate <= p.End.Date);
+        if (matchingPeriod is null)
+        {
+            return;
+        }
+
+        if (selectedPeriod is null && secondSelectedPeriod is null)
+        {
+            selectedPeriod = matchingPeriod;
+            showAddPeriod = false;
+        }
+        else if (selectedPeriod is not null && secondSelectedPeriod is null)
+        {
+            if (matchingPeriod.Start != selectedPeriod.Start || matchingPeriod.End != selectedPeriod.End)
+            {
+                secondSelectedPeriod = matchingPeriod;
+                showAddPeriod = true;
+            }
+        }
+        else
+        {
+            selectedPeriod ??= matchingPeriod;
+            secondSelectedPeriod ??= matchingPeriod;
+
+            if (matchingPeriod.Start < selectedPeriod.Start)
+            {
+                selectedPeriod = matchingPeriod;
+            }
+            else if (matchingPeriod.End > secondSelectedPeriod.End)
+            {
+                secondSelectedPeriod = matchingPeriod;
+            }
+
+            showAddPeriod = secondSelectedPeriod is not null;
+        }
+
+        NormalizeSelectedPeriods();
+        isClosingAddPeriod = false;
+        showPeriodMenu = false;
+        showPeriod2Menu = false;
+        ApplySelectedPeriodRange();
     }
 
     private static (DateTime Start, DateTime End) GetCurrentCutoffRange(DateTime now)
@@ -2728,14 +3315,18 @@
 
         var start = filterStart.Date;
         var endExclusive = filterEnd.Date.AddDays(1);
+        await RefreshEmployeeStatusLookupAsync();
 
         onsiteLogs = await Db.AttendanceLogs
             .AsNoTracking()
+            .Include(l => l.Employee)
             .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .OrderByDescending(l => l.AttendanceDate)
             .ThenBy(l => l.LastName)
             .ThenBy(l => l.FirstName)
             .ToListAsync();
+
+        await PersistCreditedOnsiteTimeInPmAsync(onsiteLogs);
 
         wfhTaggedCount = await Db.AttendanceLogsWfh
             .AsNoTracking()
@@ -2744,6 +3335,7 @@
 
         wfhLogs = await Db.AttendanceLogsWfh
             .AsNoTracking()
+            .Include(l => l.Employee)
             .Include(l => l.ExceptionCondition)
             .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .Where(l => l.ExceptionConditionId == null
@@ -2758,21 +3350,64 @@
             .ThenBy(l => l.FirstName)
             .ToListAsync();
 
-        // Compute tardiness/absent labels in-memory according to rules
+        // Compute only when no saved edit tag exists.
         foreach (var log in wfhLogs)
         {
-            log.Tardiness = ComputeTardinessForWfh(log);
+            log.Tardiness = ResolveTardiness(log.Tardiness, () => ComputeTardinessForWfh(log, ResolveEmployeeStatus(log)));
         }
 
         foreach (var log in onsiteLogs)
         {
-            log.Tardiness = ComputeTardinessForOnsite(log);
+            log.Tardiness = ResolveTardiness(log.Tardiness, () => ComputeTardinessForOnsite(log, ResolveEmployeeStatus(log)));
         }
 
         RefreshFilteredLogs(resetPaging: true);
 
         StateHasChanged();
     }
+
+    private async Task RefreshEmployeeStatusLookupAsync()
+    {
+        var employees = await Db.Employees
+            .AsNoTracking()
+            .Where(e => !string.IsNullOrWhiteSpace(e.IdNumber))
+            .Select(e => new { e.IdNumber, e.Status })
+            .ToListAsync();
+
+        employeeStatusesByIdNumber = employees
+            .GroupBy(e => e.IdNumber.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Status,
+                StringComparer.OrdinalIgnoreCase);
+    }
+
+    private string? ResolveEmployeeStatus(AttendanceLog log)
+        => ResolveEmployeeStatus(log.IdNumber, log.Employee?.Status);
+
+    private string? ResolveEmployeeStatus(AttendanceLogWfh log)
+        => ResolveEmployeeStatus(log.IdNumber, log.Employee?.Status);
+
+    private string? ResolveEmployeeStatus(string? idNumber, string? fallbackStatus)
+    {
+        if (!string.IsNullOrWhiteSpace(idNumber)
+            && employeeStatusesByIdNumber.TryGetValue(idNumber.Trim(), out var employeeStatus))
+        {
+            return employeeStatus;
+        }
+
+        return fallbackStatus;
+    }
+
+    private string GetResolvedTardiness(AttendanceLog log)
+        => ResolveTardiness(
+            log.Tardiness,
+            () => ComputeTardinessForOnsite(log, ResolveEmployeeStatus(log)));
+
+    private string GetResolvedTardiness(AttendanceLogWfh log)
+        => ResolveTardiness(
+            log.Tardiness,
+            () => ComputeTardinessForWfh(log, ResolveEmployeeStatus(log)));
 
     private void RefreshFilteredLogs(bool resetPaging = false)
     {
@@ -3172,6 +3807,33 @@
         RefreshFilteredLogs();
     }
 
+    private void OpenExportLogsModal()
+    {
+        exportSelectedPeriod = selectedPeriod;
+        exportSecondSelectedPeriod = secondSelectedPeriod;
+        showExportAddPeriod = exportSecondSelectedPeriod is not null;
+        isClosingExportAddPeriod = false;
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
+        openExportPeriodMenuUpward = false;
+        openExportPeriod2MenuUpward = false;
+        showExportLogsModal = true;
+    }
+
+    private void CloseExportLogsModal()
+    {
+        if (isExportingLogs)
+        {
+            return;
+        }
+
+        showExportLogsModal = false;
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
+        openExportPeriodMenuUpward = false;
+        openExportPeriod2MenuUpward = false;
+    }
+
     private void ClearSorting(bool isWfh)
     {
         var state = isWfh ? wfhTableState : onsiteTableState;
@@ -3210,7 +3872,7 @@
                 .ThenBy(log => log.TimeOutAm ?? DateTime.MinValue)
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "pm" => OrderByDirection(logs, descending, log => log.TimeInPm ?? DateTime.MinValue)
+            "pm" => OrderByDirection(logs, descending, log => GetCreditedOnsiteTimeInPm(log) ?? DateTime.MinValue)
                 .ThenBy(log => log.TimeOutPm ?? DateTime.MinValue)
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
@@ -3327,7 +3989,8 @@
             AttendanceLogId = log.AttendanceLogId,
             AttendanceDate = log.AttendanceDate,
             EmployeeName = FormatName(log.LastName, log.FirstName, log.MiddleName),
-            Tardiness = NormalizeTardinessForEdit(log.Tardiness),
+            EmployeeStatus = ResolveEmployeeStatus(log),
+            Tardiness = NormalizeTardinessForEdit(GetStoredTardinessDisplayValue(log.Tardiness)),
             OnsiteTimeInAm = FormatTimeInput(log.TimeInAm),
             OnsiteTimeOutAm = FormatTimeInput(log.TimeOutAm),
             OnsiteTimeInPm = FormatTimeInput(log.TimeInPm),
@@ -3348,7 +4011,8 @@
             AttendanceLogWfhId = log.AttendanceLogWfhId,
             AttendanceDate = log.AttendanceDate,
             EmployeeName = FormatName(log.LastName, log.FirstName, log.MiddleName),
-            Tardiness = NormalizeTardinessForEdit(log.Tardiness),
+            EmployeeStatus = ResolveEmployeeStatus(log),
+            Tardiness = NormalizeTardinessForEdit(GetStoredTardinessDisplayValue(log.Tardiness)),
             WfhTimeIn = FormatTimeInput(log.TimeIn),
             WfhTimeOut = FormatTimeInput(log.TimeOut),
             Target = log.Target,
@@ -3475,6 +4139,12 @@
             return;
         }
 
+        if (!IsActiveEmployeeStatus(employee.Status))
+        {
+            ShowToast(ToastType.Warning, "Inactive employee", $"{employee.FirstName} {employee.LastName} is inactive and cannot be manually encoded.");
+            return;
+        }
+
         isSavingInputLog = true;
 
         try
@@ -3488,6 +4158,8 @@
                 await SaveWfhInputLogAsync(employee);
             }
 
+            await RefreshAvailablePeriodsAsync();
+            EnsureSavedDateIsVisible(inputForm.AttendanceDate);
             await LoadLogsAsync();
             CloseInputLogsModal();
         }
@@ -3522,6 +4194,16 @@
             throw new InvalidOperationException("Enter at least one onsite time value.");
         }
 
+        var wfhTag = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Include(l => l.ExceptionCondition)
+            .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == attendanceDate);
+
+        if (wfhTag is not null && string.Equals(GetWorkArrangement(wfhTag), "WFH", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"{employee.FirstName} {employee.LastName} is tagged as WFH for {attendanceDate:MMMM dd, yyyy} and cannot be manually encoded as onsite.");
+        }
+
         var log = await Db.AttendanceLogs
             .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == attendanceDate);
 
@@ -3545,7 +4227,8 @@
         log.TimeOutAm ??= newTimeOutAm;
         log.TimeInPm ??= newTimeInPm;
         log.TimeOutPm ??= newTimeOutPm;
-        log.Tardiness = ComputeTardinessForOnsite(log);
+        ApplyCreditedOnsiteTimeInPm(log);
+        log.Tardiness = ComputeTardinessForOnsite(log, employee.Status);
 
         await Db.SaveChangesAsync();
         ShowToast(ToastType.Success, "Onsite log saved", $"{employee.FirstName} {employee.LastName} onsite log was saved.");
@@ -3592,7 +4275,7 @@
         log.Target = string.IsNullOrWhiteSpace(log.Target) ? target : log.Target;
         log.Accomplishment = string.IsNullOrWhiteSpace(log.Accomplishment) ? accomplishment : log.Accomplishment;
         log.Mov = string.IsNullOrWhiteSpace(log.Mov) ? mov ?? log.Mov : log.Mov;
-        log.Tardiness = ComputeTardinessForWfh(log);
+        log.Tardiness = ComputeTardinessForWfh(log, employee.Status);
 
         await Db.SaveChangesAsync();
         ShowToast(ToastType.Success, "WFH log saved", $"{employee.FirstName} {employee.LastName} WFH log was saved.");
@@ -3617,7 +4300,10 @@
             throw new InvalidOperationException("Enter at least one onsite time value.");
         }
 
-        log.Tardiness = NormalizeStoredTardiness(editLogForm.Tardiness);
+        ApplyCreditedOnsiteTimeInPm(log);
+
+        var computedLateUndertime = ComputeTardinessForOnsite(log, editLogForm.EmployeeStatus);
+        log.Tardiness = NormalizeStoredTardiness(editLogForm.Tardiness, computedLateUndertime);
 
         await Db.SaveChangesAsync();
         ShowToast(ToastType.Success, "Onsite log updated", $"{log.FirstName} {log.LastName} onsite log was updated.");
@@ -3652,7 +4338,8 @@
             throw new InvalidOperationException("Enter at least time in, time out, target, accomplishment, or means of verification for the WFH log.");
         }
 
-        log.Tardiness = NormalizeStoredTardiness(editLogForm.Tardiness);
+        var computedLateUndertime = ComputeTardinessForWfh(log, editLogForm.EmployeeStatus);
+        log.Tardiness = NormalizeStoredTardiness(editLogForm.Tardiness, computedLateUndertime);
 
         await Db.SaveChangesAsync();
         ShowToast(ToastType.Success, "WFH log updated", $"{log.FirstName} {log.LastName} WFH log was updated.");
@@ -3682,7 +4369,7 @@
 
     private void SelectEditTardiness(string value)
     {
-        editLogForm.Tardiness = NormalizeTardinessForEdit(value);
+        editLogForm.Tardiness = ResolveEditTardinessSelection(value);
         showEditTardinessMenu = false;
     }
 
@@ -3693,6 +4380,18 @@
             showEditTardinessMenu = false;
         }
 
+        if (showExportPeriodMenu)
+        {
+            showExportPeriodMenu = false;
+            openExportPeriodMenuUpward = false;
+        }
+
+        if (showExportPeriod2Menu)
+        {
+            showExportPeriod2Menu = false;
+            openExportPeriod2MenuUpward = false;
+        }
+
         if (showInputEmployeeResults)
         {
             await HideInputEmployeeResults();
@@ -3700,41 +4399,223 @@
     }
 
     private IEnumerable<string> BuildEditTardinessOptions()
+        => new[] { DefaultTardinessOption }.Concat(EditTardinessStatusOptions);
+
+    private const string DefaultTardinessOption = "Default";
+    private const string DefaultTardinessSentinel = "__DEFAULT__";
+    private const string ManualTardinessPrefix = "[Manual] ";
+
+    private static readonly string[] EditTardinessStatusOptions = new[]
     {
-        var options = new List<string>();
-        var current = DisplayEditTardiness(editLogForm.Tardiness);
-        if (!string.IsNullOrWhiteSpace(current))
-        {
-            options.Add(current);
-        }
-
-        if (editLogForm.IsWfh)
-        {
-            options.AddRange(new[] { "On Time", "Tagged", "Incomplete" });
-        }
-        else
-        {
-            options.AddRange(new[] { "On Time", "Absent", "Half-Day (AM)", "Half-Day (PM)" });
-        }
-
-        return options
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
+        "On Time",
+        "Absent",
+        "Half-Day (AM)",
+        "Half-Day (PM)",
+        "Late",
+        "Undertime",
+        "Late with Undertime"
+    };
 
     private static string NormalizeTardinessForEdit(string? value)
         => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 
-    private static string NormalizeStoredTardiness(string? value)
+    private static string NormalizeStoredTardiness(string? value, string? computedValue)
     {
         var normalized = NormalizeTardinessForEdit(value);
-        return string.Equals(normalized, "On Time", StringComparison.OrdinalIgnoreCase)
-            ? string.Empty
+        if (string.Equals(normalized, DefaultTardinessSentinel, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, DefaultTardinessOption, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        var displayValue = string.IsNullOrWhiteSpace(normalized)
+            ? "On Time"
+            : string.Join("; ", normalized
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(NormalizeTardinessPillText));
+
+        if (IsSameLateUndertimeTag(displayValue, computedValue))
+        {
+            return string.Empty;
+        }
+
+        return $"{ManualTardinessPrefix}{displayValue}";
+    }
+
+    private static bool IsSameLateUndertimeTag(string? selectedValue, string? computedValue)
+        => string.Equals(
+            GetTardinessStatusTag(selectedValue),
+            GetTardinessStatusTag(computedValue),
+            StringComparison.OrdinalIgnoreCase);
+
+    private static string ResolveTardiness(string? savedValue, Func<string> computeValue)
+    {
+        return IsManualTardinessOverride(savedValue)
+            ? GetStoredTardinessDisplayValue(savedValue)
+            : computeValue();
+    }
+
+    private static bool HasManualTardinessTag(string? value)
+    {
+        var normalized = NormalizeTardinessForEdit(GetStoredTardinessDisplayValue(value));
+        var statusTag = GetTardinessStatusTag(normalized);
+        return EditTardinessStatusOptions.Any(option =>
+            string.Equals(statusTag, option, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsManualTardinessOverride(string? value)
+        => NormalizeTardinessForEdit(value).StartsWith(ManualTardinessPrefix, StringComparison.OrdinalIgnoreCase);
+
+    private static string GetStoredTardinessDisplayValue(string? value)
+    {
+        var normalized = NormalizeTardinessForEdit(value);
+        return normalized.StartsWith(ManualTardinessPrefix, StringComparison.OrdinalIgnoreCase)
+            ? normalized[ManualTardinessPrefix.Length..].Trim()
             : normalized;
     }
 
+    private string ResolveEditTardinessSelection(string value)
+    {
+        var computedValue = ComputeEditFormTardiness();
+
+        if (string.Equals(value, DefaultTardinessOption, StringComparison.OrdinalIgnoreCase))
+        {
+            return DefaultTardinessSentinel;
+        }
+
+        var selectedTag = GetTardinessStatusTag(value);
+
+        if (string.Equals(selectedTag, "Late", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetTardinessSegment(computedValue, "late") ?? selectedTag;
+        }
+
+        if (string.Equals(selectedTag, "Undertime", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetTardinessSegment(computedValue, "undertime") ?? selectedTag;
+        }
+
+        if (string.Equals(selectedTag, "Late with Undertime", StringComparison.OrdinalIgnoreCase))
+        {
+            var parts = new[]
+            {
+                GetTardinessSegment(computedValue, "late") ?? "Late",
+                GetTardinessSegment(computedValue, "undertime") ?? "Undertime"
+            };
+
+            return string.Join("; ", parts);
+        }
+
+        return NormalizeTardinessForEdit(value);
+    }
+
+    private string ComputeEditFormTardiness()
+    {
+        var attendanceDate = editLogForm.AttendanceDate.Date;
+
+        if (editLogForm.IsWfh)
+        {
+            var log = new AttendanceLogWfh
+            {
+                AttendanceDate = attendanceDate,
+                TimeIn = CombineDateAndTime(attendanceDate, editLogForm.WfhTimeIn),
+                TimeOut = CombineDateAndTime(attendanceDate, editLogForm.WfhTimeOut),
+                WorkArrangement = "WFH"
+            };
+
+            return ComputeTardinessForWfh(log, editLogForm.EmployeeStatus);
+        }
+
+        var onsiteLog = new AttendanceLog
+        {
+            AttendanceDate = attendanceDate,
+            TimeInAm = CombineDateAndTime(attendanceDate, editLogForm.OnsiteTimeInAm),
+            TimeOutAm = CombineDateAndTime(attendanceDate, editLogForm.OnsiteTimeOutAm),
+            TimeInPm = CombineDateAndTime(attendanceDate, editLogForm.OnsiteTimeInPm),
+            TimeOutPm = CombineDateAndTime(attendanceDate, editLogForm.OnsiteTimeOutPm)
+        };
+        ApplyCreditedOnsiteTimeInPm(onsiteLog);
+
+        return ComputeTardinessForOnsite(onsiteLog, editLogForm.EmployeeStatus);
+    }
+
+    private static string? GetTardinessSegment(string? value, string keyword)
+    {
+        var normalized = NormalizeTardinessForEdit(value);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
+        }
+
+        return normalized
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault(part => part.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool IsTardinessOverride(AttendanceLog log)
+        => IsTardinessOverride(
+            log.Tardiness,
+            ComputeTardinessForOnsite(log, ResolveEmployeeStatus(log)));
+
+    private bool IsTardinessOverride(AttendanceLogWfh log)
+        => IsTardinessOverride(
+            log.Tardiness,
+            ComputeTardinessForWfh(log, ResolveEmployeeStatus(log)));
+
+    private static bool IsTardinessOverride(string? savedValue, string computedValue)
+    {
+        if (!IsManualTardinessOverride(savedValue))
+        {
+            return false;
+        }
+
+        return !string.Equals(
+            GetTardinessStatusTag(savedValue),
+            GetTardinessStatusTag(computedValue),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string DisplayEditTardiness(string? value)
-        => string.IsNullOrWhiteSpace(value) ? "Pending" : value.Trim();
+    {
+        var normalized = NormalizeTardinessForEdit(value);
+        return string.Equals(normalized, DefaultTardinessSentinel, StringComparison.OrdinalIgnoreCase)
+            ? DefaultTardinessOption
+            : GetTardinessStatusTag(GetStoredTardinessDisplayValue(value));
+    }
+
+    private static string GetTardinessStatusTag(string? value)
+    {
+        var normalized = NormalizeTardinessForEdit(GetStoredTardinessDisplayValue(value));
+        if (string.IsNullOrWhiteSpace(normalized)
+            || string.Equals(normalized, "On Time", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "Pending", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "Tagged", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "Incomplete", StringComparison.OrdinalIgnoreCase))
+        {
+            return "On Time";
+        }
+
+        if (string.Equals(normalized, "Absent", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Absent";
+        }
+
+        if (IsHalfDayTag(normalized))
+        {
+            return GetHalfDayStatus(normalized);
+        }
+
+        var hasLate = normalized.Contains("late", StringComparison.OrdinalIgnoreCase);
+        var hasUndertime = normalized.Contains("undertime", StringComparison.OrdinalIgnoreCase);
+
+        return (hasLate, hasUndertime) switch
+        {
+            (true, true) => "Late with Undertime",
+            (true, false) => "Late",
+            (false, true) => "Undertime",
+            _ => "On Time"
+        };
+    }
 
     private async Task HandleInputEmployeeSearchChanged(ChangeEventArgs e)
     {
@@ -3772,6 +4653,7 @@
         inputEmployeeSearchResults = await Db.Employees
             .AsNoTracking()
             .Where(e => e.IdNumber.Contains(query))
+            .Where(e => e.Status.StartsWith("Active"))
             .OrderBy(e => e.LastName)
             .ThenBy(e => e.FirstName)
             .Take(12)
@@ -3916,10 +4798,12 @@
 
     private static string FormatDateTime(DateTime? value) => value?.ToString("MMMM dd, yyyy hh:mm tt") ?? "-";
 
+    private static string FormatClockTime(DateTime? value) => value?.ToString("hh:mm tt") ?? "-";
+
     private static string FormatTime(DateTime? value) => value?.ToString("MMM dd, yyyy\nhh:mm tt") ?? "-";
 
     private static string FormatTimeRange(DateTime? start, DateTime? end)
-        => $"{(start?.ToString("hh:mm tt") ?? "-")} / {(end?.ToString("hh:mm tt") ?? "-")}";
+        => $"{FormatClockTime(start)} / {FormatClockTime(end)}";
 
     private void ChangeOnsitePage(int page)
     {
@@ -3979,7 +4863,113 @@
 
     private static string DisplayValue(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
 
-    private static string DisplayTardiness(string? value) => DisplayValue(value, "On Time");
+    private static string DisplayTardiness(string? value) => DisplayValue(GetStoredTardinessDisplayValue(value), "On Time");
+
+    private static IReadOnlyList<string> GetTardinessTags(string? value)
+    {
+        var normalized = NormalizeTardinessForEdit(GetStoredTardinessDisplayValue(value));
+        if (string.IsNullOrWhiteSpace(normalized)
+            || string.Equals(normalized, "On Time", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "Pending", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "Tagged", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "Incomplete", StringComparison.OrdinalIgnoreCase))
+        {
+            return new[] { "On Time" };
+        }
+
+        if (string.Equals(normalized, "Absent", StringComparison.OrdinalIgnoreCase))
+        {
+            return new[] { "Absent" };
+        }
+
+        var tags = normalized
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(NormalizeTardinessPillText)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .ToList();
+
+        if (tags.Count == 0)
+        {
+            var statusTag = GetTardinessStatusTag(normalized);
+            if (string.Equals(statusTag, "Late with Undertime", StringComparison.OrdinalIgnoreCase))
+            {
+                tags.Add("Late");
+                tags.Add("Undertime");
+            }
+            else
+            {
+                tags.Add(statusTag);
+            }
+        }
+
+        return tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private static string NormalizeTardinessPillText(string value)
+    {
+        if (IsHalfDayTag(value))
+        {
+            return GetHalfDayStatus(value);
+        }
+
+        return NormalizeDurationTagText(value.Trim());
+    }
+
+    private static string NormalizeDurationTagText(string value)
+    {
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length < 2)
+        {
+            return value;
+        }
+
+        var durationText = parts[0];
+        var statusText = string.Join(" ", parts.Skip(1));
+        var minuteSuffixes = new[] { "minute(s)", "minutes", "minute", "mins", "min", "m" };
+        if (IsDurationTardinessStatus(statusText))
+        {
+            foreach (var suffix in minuteSuffixes)
+            {
+                if (durationText.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+                    && int.TryParse(durationText[..^suffix.Length], out var minutes))
+                {
+                    return $"{FormatDurationCompact(TimeSpan.FromMinutes(minutes))} {statusText}";
+                }
+            }
+        }
+
+        if (parts.Length >= 3
+            && int.TryParse(parts[0], out var spacedMinutes)
+            && minuteSuffixes.Contains(parts[1], StringComparer.OrdinalIgnoreCase)
+            && IsDurationTardinessStatus(string.Join(" ", parts.Skip(2))))
+        {
+            return $"{FormatDurationCompact(TimeSpan.FromMinutes(spacedMinutes))} {string.Join(" ", parts.Skip(2))}";
+        }
+
+        return value;
+    }
+
+    private static bool IsDurationTardinessStatus(string value)
+        => string.Equals(value, "late", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "undertime", StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatTardinessTags(string? value)
+        => string.Join(", ", GetTardinessTags(value));
+
+    private static string GetTardinessPillClass(string tag)
+    {
+        var variant = tag switch
+        {
+            "On Time" => "on-time",
+            "Absent" => "absent",
+            "Half-Day (AM)" or "Half-Day (PM)" => "half-day",
+            _ when tag.Contains("late", StringComparison.OrdinalIgnoreCase) => "late",
+            _ when tag.Contains("undertime", StringComparison.OrdinalIgnoreCase) => "undertime",
+            _ => "on-time"
+        };
+
+        return $"attendance-tardiness-pill attendance-tardiness-pill-{variant}";
+    }
 
     private static string GetWorkArrangement(AttendanceLogWfh log)
         => !string.IsNullOrWhiteSpace(log.ExceptionCondition?.ConditionName)
@@ -4014,21 +5004,28 @@
             return "Absent";
         }
 
-        if (string.Equals(log.Tardiness, "Half-Day (AM)", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(log.Tardiness, "Half-Day (PM)", StringComparison.OrdinalIgnoreCase))
+        if (IsHalfDayTag(log.Tardiness))
         {
-            return log.Tardiness;
+            return GetHalfDayStatus(log.Tardiness);
         }
 
         return "Present";
     }
 
-    // --- Tardiness calculation helpers ---
-    private static string ComputeTardinessForWfh(AttendanceLogWfh log)
+    // --- Late/undertime calculation helpers ---
+    private static string ComputeTardinessForWfh(AttendanceLogWfh log, string? employeeStatus)
     {
         if (!string.Equals(GetWorkArrangement(log), "WFH", StringComparison.OrdinalIgnoreCase))
         {
             return string.Empty;
+        }
+
+        var date = log.AttendanceDate.Date;
+        if (log.TimeIn.HasValue && !log.TimeOut.HasValue)
+        {
+            return IsPastAttendanceCutoff(date)
+                ? "Absent"
+                : FormatLateUndertime(CalculateLateDuration(date, log.TimeIn.Value, employeeStatus), TimeSpan.Zero);
         }
 
         if (!log.TimeIn.HasValue || !log.TimeOut.HasValue)
@@ -4036,123 +5033,579 @@
             return string.Empty;
         }
 
-        var date = log.AttendanceDate.Date;
-        var timeIn = log.TimeIn.Value;
-
-        // Only consider morning in window for tardiness
-        var sevenAm = date.AddHours(7);
-        var eightAm = date.AddHours(8);
-
-        // Any log before 7:00 treated as 7:00
-        if (timeIn < sevenAm) timeIn = sevenAm;
-
-        // If within flexible window 7:00 - 8:00 => not late
-        if (timeIn >= sevenAm && timeIn <= eightAm)
+        if (IsMorningHalfDay(log.TimeIn, log.TimeOut, date, allowLunchWindowTimeOut: true))
         {
-            return string.Empty; // show as '-' in UI
+            return FormatHalfDayLateUndertime(
+                "Half-Day (AM)",
+                CalculateLateDuration(date, log.TimeIn.Value, employeeStatus),
+                CalculateMorningHalfDayUndertime(date, log.TimeOut.Value));
         }
 
-        // Late if strictly after 8:00:00
-        if (timeIn > eightAm)
+        if (IsAfternoonHalfDay(log.TimeIn, log.TimeOut))
         {
-            var diff = timeIn - eightAm;
-            return FormatLateSpan(diff);
+            var afternoonLate = CalculateAfternoonHalfDayLate(date, log.TimeIn.Value);
+            return FormatHalfDayLateUndertime(
+                "Half-Day (PM)",
+                afternoonLate,
+                CalculateAfternoonHalfDayUndertime(date, log.TimeOut.Value, employeeStatus));
         }
 
-        return string.Empty;
+        var late = CalculateLateDuration(date, log.TimeIn.Value, employeeStatus);
+        var worked = CalculateWorkedDuration(new[] { (log.TimeIn, log.TimeOut) }, date);
+        var undertime = CalculateUndertime(worked, late, date, log.TimeIn.Value, log.TimeOut, employeeStatus);
+
+        return FormatLateUndertime(late, undertime);
     }
 
-    private static string ComputeTardinessForOnsite(AttendanceLog log)
+    private static string ComputeTardinessForOnsite(AttendanceLog log, string? employeeStatus)
     {
-        // Determine morning in candidate
         var date = log.AttendanceDate.Date;
-
         var timeInAm = log.TimeInAm;
         var timeInPm = log.TimeInPm;
+        var creditedTimeInPm = GetCreditedOnsiteTimeInPm(log);
 
-        // Absent if no in times recorded for the day
-        if (!timeInAm.HasValue && !timeInPm.HasValue)
+        if (!timeInAm.HasValue && !creditedTimeInPm.HasValue)
         {
             return "Absent";
         }
 
-        // Half-Day AM: TimeInAm exists and TimeOutAm recorded between 12:00 and 13:00
-        if (timeInAm.HasValue && log.TimeOutAm.HasValue)
+        if (!timeInAm.HasValue
+            && (!log.TimeOutAm.HasValue || IsLunchBreakOut(log.TimeOutAm))
+            && creditedTimeInPm.HasValue
+            && IsAfternoonHalfDay(creditedTimeInPm, log.TimeOutPm))
         {
-            var outAm = log.TimeOutAm.Value.TimeOfDay;
-            if (outAm >= TimeSpan.FromHours(12) && outAm <= TimeSpan.FromHours(13))
-            {
-                return "Half-Day (AM)";
-            }
+            var afternoonLate = CalculateAfternoonHalfDayLate(date, creditedTimeInPm.Value);
+            return FormatHalfDayLateUndertime(
+                "Half-Day (PM)",
+                afternoonLate,
+                CalculateAfternoonHalfDayUndertime(date, log.TimeOutPm!.Value, employeeStatus));
         }
 
-        // Half-Day PM: TimeInPm at or after 13:00 and TimeOutPm at 17:00
-        if (timeInPm.HasValue && log.TimeOutPm.HasValue)
+        if (IsMissingRequiredOnsiteOut(log) && IsPastAttendanceCutoff(date))
         {
-            var inPm = timeInPm.Value.TimeOfDay;
-            var outPm = log.TimeOutPm.Value.TimeOfDay;
-            if (inPm >= TimeSpan.FromHours(13) && outPm == TimeSpan.FromHours(17))
-            {
-                return "Half-Day (PM)";
-            }
+            return "Absent";
         }
 
-        // Use AM time if available for tardiness calculation, otherwise use first available timeIn
-        var timeIn = timeInAm ?? timeInPm!.Value;
+        var timeIn = timeInAm ?? creditedTimeInPm!.Value;
 
-        var sevenAm = date.AddHours(7);
-        var eightAm = date.AddHours(8);
-
-        if (timeIn < sevenAm) timeIn = sevenAm;
-
-        if (timeIn >= sevenAm && timeIn <= eightAm)
+        if (IsMorningHalfDay(timeInAm, log.TimeOutAm, date, allowLunchWindowTimeOut: true)
+            && !creditedTimeInPm.HasValue)
         {
-            return string.Empty;
+            return FormatHalfDayLateUndertime(
+                "Half-Day (AM)",
+                CalculateLateDuration(date, timeInAm!.Value, employeeStatus),
+                CalculateMorningHalfDayUndertime(date, log.TimeOutAm!.Value));
         }
 
-        if (timeIn > eightAm)
+        if (!timeInAm.HasValue
+            && (!log.TimeOutAm.HasValue || IsLunchBreakOut(log.TimeOutAm))
+            && IsAfternoonHalfDay(creditedTimeInPm, log.TimeOutPm))
         {
-            var diff = timeIn - eightAm;
-            return FormatLateSpan(diff);
+            var afternoonLate = CalculateAfternoonHalfDayLate(date, creditedTimeInPm!.Value);
+            return FormatHalfDayLateUndertime(
+                "Half-Day (PM)",
+                afternoonLate,
+                CalculateAfternoonHalfDayUndertime(date, log.TimeOutPm!.Value, employeeStatus));
         }
 
-        return string.Empty;
+        var late = CalculateLateDuration(date, timeIn, employeeStatus);
+        if (HasOpenOnsiteInterval(log))
+        {
+            return FormatLateUndertime(late, TimeSpan.Zero);
+        }
+
+        var worked = CalculateWorkedDuration(new[]
+        {
+            (timeInAm, log.TimeOutAm),
+            (creditedTimeInPm, log.TimeOutPm)
+        }, date);
+        var latestTimeOut = log.TimeOutPm ?? log.TimeOutAm;
+        var undertime = CalculateUndertime(worked, late, date, timeIn, latestTimeOut, employeeStatus);
+
+        return FormatLateUndertime(late, undertime);
     }
 
-    private static string FormatLateSpan(TimeSpan diff)
+    private static readonly TimeSpan RequiredWorkDuration = TimeSpan.FromHours(8);
+
+    private static TimeSpan CalculateLateDuration(DateTime date, DateTime actualTimeIn, string? employeeStatus)
     {
-        // Round up seconds to minutes (any seconds > 0 counts as next minute)
+        var officialTimeIn = GetOfficialTimeIn(date, actualTimeIn);
+        var lateThreshold = IsFixedEightAmEmployee(employeeStatus)
+            ? date.AddHours(8)
+            : date.AddHours(9);
+
+        return officialTimeIn > lateThreshold
+            ? CalculateDurationExcludingLunch(date, lateThreshold, officialTimeIn)
+            : TimeSpan.Zero;
+    }
+
+    private static TimeSpan CalculateAfternoonHalfDayLate(DateTime date, DateTime actualTimeIn)
+    {
+        actualTimeIn = NormalizeAttendanceTime(date, actualTimeIn);
+        var lateThreshold = date.AddHours(13);
+        return actualTimeIn > lateThreshold
+            ? actualTimeIn - lateThreshold
+            : TimeSpan.Zero;
+    }
+
+    private static TimeSpan CalculateMorningHalfDayUndertime(DateTime date, DateTime actualTimeOut)
+    {
+        actualTimeOut = NormalizeAttendanceTime(date, actualTimeOut);
+        if (actualTimeOut.TimeOfDay >= TimeSpan.FromHours(23)
+            && actualTimeOut.TimeOfDay < TimeSpan.FromHours(24))
+        {
+            actualTimeOut = actualTimeOut.AddHours(-12);
+        }
+
+        var requiredOut = date.AddHours(12);
+        return actualTimeOut < requiredOut
+            ? requiredOut - actualTimeOut
+            : TimeSpan.Zero;
+    }
+
+    private static TimeSpan CalculateAfternoonHalfDayUndertime(DateTime date, DateTime actualTimeOut, string? employeeStatus)
+    {
+        actualTimeOut = NormalizeAttendanceTime(date, actualTimeOut);
+        var requiredOut = IsFixedEightAmEmployee(employeeStatus)
+            ? date.AddHours(17)
+            : date.AddHours(18);
+        return actualTimeOut < requiredOut
+            ? requiredOut - actualTimeOut
+            : TimeSpan.Zero;
+    }
+
+    private static DateTime GetOfficialTimeIn(DateTime date, DateTime actualTimeIn)
+    {
+        actualTimeIn = NormalizeAttendanceTime(date, actualTimeIn);
+        var sevenAm = date.AddHours(7);
+        return actualTimeIn < sevenAm ? sevenAm : actualTimeIn;
+    }
+
+    private static DateTime NormalizeAttendanceTime(DateTime date, DateTime value)
+        => date.Date.Add(value.TimeOfDay);
+
+    private static DateTime? GetCreditedOnsiteTimeInPm(AttendanceLog log)
+    {
+        if (log.TimeInPm.HasValue)
+        {
+            return log.TimeInPm;
+        }
+
+        var date = log.AttendanceDate.Date;
+        if (!IsLunchBreakOut(log.TimeOutAm)
+            || !log.TimeOutPm.HasValue
+            || log.TimeOutPm.Value.TimeOfDay < TimeSpan.FromHours(17))
+        {
+            return null;
+        }
+
+        return date.AddHours(13);
+    }
+
+    private static bool ApplyCreditedOnsiteTimeInPm(AttendanceLog log)
+    {
+        var creditedTimeInPm = GetCreditedOnsiteTimeInPm(log);
+        if (!creditedTimeInPm.HasValue || log.TimeInPm.HasValue)
+        {
+            return false;
+        }
+
+        log.TimeInPm = creditedTimeInPm;
+        return true;
+    }
+
+    private async Task PersistCreditedOnsiteTimeInPmAsync(List<AttendanceLog> logs)
+    {
+        var logsToUpdate = logs
+            .Where(log => !log.TimeInPm.HasValue && GetCreditedOnsiteTimeInPm(log).HasValue)
+            .ToList();
+
+        if (logsToUpdate.Count == 0)
+        {
+            return;
+        }
+
+        var idsToUpdate = logsToUpdate.Select(log => log.AttendanceLogId).ToList();
+        var trackedLogs = await Db.AttendanceLogs
+            .Where(log => idsToUpdate.Contains(log.AttendanceLogId))
+            .ToListAsync();
+
+        foreach (var log in trackedLogs)
+        {
+            ApplyCreditedOnsiteTimeInPm(log);
+        }
+
+        await Db.SaveChangesAsync();
+
+        foreach (var log in logsToUpdate)
+        {
+            ApplyCreditedOnsiteTimeInPm(log);
+        }
+    }
+
+    private static bool IsFixedEightAmEmployee(string? employeeStatus)
+    {
+        if (string.IsNullOrWhiteSpace(employeeStatus))
+        {
+            return false;
+        }
+
+        var status = employeeStatus.Trim();
+        return ContainsStatusToken(status, "COS")
+            || ContainsStatusToken(status, "JO")
+            || ContainsStatusToken(status, "Casual")
+            || ContainsStatusToken(status, "Intern");
+    }
+
+    private static bool IsActiveEmployeeStatus(string? employeeStatus)
+    {
+        if (string.IsNullOrWhiteSpace(employeeStatus))
+        {
+            return false;
+        }
+
+        var activity = GetFirstStatusToken(employeeStatus);
+        return string.Equals(activity, "Active", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetFirstStatusToken(string status)
+    {
+        var normalizedStatus = status.Trim();
+        var separatorIndex = normalizedStatus.IndexOf(',');
+        if (separatorIndex < 0)
+        {
+            separatorIndex = normalizedStatus.IndexOf(' ');
+        }
+
+        return separatorIndex < 0
+            ? normalizedStatus
+            : normalizedStatus[..separatorIndex].Trim();
+    }
+
+    private static bool ContainsStatusToken(string value, string token)
+        => value
+            .Split(new[] { ' ', ',', '/', '-', ';', ':' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(part => string.Equals(part, token, StringComparison.OrdinalIgnoreCase));
+
+    private static TimeSpan CalculateWorkedDuration(IEnumerable<(DateTime? Start, DateTime? End)> intervals, DateTime date)
+    {
+        var total = TimeSpan.Zero;
+
+        foreach (var (startValue, endValue) in intervals)
+        {
+            if (!startValue.HasValue || !endValue.HasValue || endValue.Value <= startValue.Value)
+            {
+                continue;
+            }
+
+            var start = GetOfficialTimeIn(date, startValue.Value);
+            var end = NormalizeAttendanceTime(date, endValue.Value);
+            if (end <= start)
+            {
+                continue;
+            }
+
+            total += CalculateDurationExcludingLunch(date, start, end);
+        }
+
+        return total > RequiredWorkDuration ? RequiredWorkDuration : total;
+    }
+
+    private static TimeSpan CalculateDurationExcludingLunch(DateTime date, DateTime start, DateTime end)
+    {
+        start = NormalizeAttendanceTime(date, start);
+        end = NormalizeAttendanceTime(date, end);
+
+        if (end <= start)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var duration = end - start;
+        var lunchStart = date.AddHours(12);
+        var lunchEnd = date.AddHours(13);
+        var overlapStart = start > lunchStart ? start : lunchStart;
+        var overlapEnd = end < lunchEnd ? end : lunchEnd;
+
+        if (overlapEnd > overlapStart)
+        {
+            duration -= overlapEnd - overlapStart;
+        }
+
+        return duration > TimeSpan.Zero ? duration : TimeSpan.Zero;
+    }
+
+    private static TimeSpan CalculateUndertime(
+        TimeSpan worked,
+        TimeSpan late,
+        DateTime date,
+        DateTime actualTimeIn,
+        DateTime? actualTimeOut,
+        string? employeeStatus)
+    {
+        var shortage = RequiredWorkDuration - worked;
+        if (shortage <= TimeSpan.Zero)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var undertime = shortage - late;
+        if (!IsFixedEightAmEmployee(employeeStatus) && actualTimeOut.HasValue)
+        {
+            var requiredEndTime = CalculateRequiredEndTime(date, actualTimeIn);
+            var endTimeShortage = requiredEndTime - NormalizeAttendanceTime(date, actualTimeOut.Value);
+            if (endTimeShortage > undertime)
+            {
+                undertime = endTimeShortage;
+            }
+        }
+
+        return undertime > TimeSpan.Zero ? undertime : TimeSpan.Zero;
+    }
+
+    private static DateTime CalculateRequiredEndTime(DateTime date, DateTime actualTimeIn)
+    {
+        var current = GetOfficialTimeIn(date, actualTimeIn);
+        var remaining = RequiredWorkDuration;
+        var lunchStart = date.AddHours(12);
+        var lunchEnd = date.AddHours(13);
+
+        if (current < lunchStart)
+        {
+            var beforeLunch = lunchStart - current;
+            if (beforeLunch >= remaining)
+            {
+                return current + remaining;
+            }
+
+            remaining -= beforeLunch;
+            current = lunchEnd;
+        }
+        else if (current < lunchEnd)
+        {
+            current = lunchEnd;
+        }
+
+        return current + remaining;
+    }
+
+    private static bool IsNoon(DateTime? value)
+        => value.HasValue && value.Value.TimeOfDay == TimeSpan.FromHours(12);
+
+    private static bool IsLunchBreakOut(DateTime? value)
+        => value.HasValue
+            && value.Value.TimeOfDay >= TimeSpan.FromHours(12)
+            && value.Value.TimeOfDay <= TimeSpan.FromHours(13);
+
+    private static bool IsPastAttendanceCutoff(DateTime date)
+        => DateTime.Now >= date.Date.AddDays(1).AddMinutes(-1);
+
+    private static bool HasOpenOnsiteInterval(AttendanceLog log)
+        => (log.TimeInAm.HasValue && !log.TimeOutAm.HasValue)
+            || (log.TimeInPm.HasValue && !log.TimeOutPm.HasValue);
+
+    private static bool IsMissingRequiredOnsiteOut(AttendanceLog log)
+        => HasOpenOnsiteInterval(log);
+
+    private static bool IsAfternoonStart(DateTime value)
+        => value.TimeOfDay >= TimeSpan.FromHours(12);
+
+    private static bool IsMorningHalfDay(DateTime? timeIn, DateTime? timeOut, DateTime date, bool allowLunchWindowTimeOut)
+    {
+        if (!timeIn.HasValue || !timeOut.HasValue)
+        {
+            return false;
+        }
+
+        var timeInClock = timeIn.Value.TimeOfDay;
+        var timeOutClock = NormalizeHalfDayTimeOutClock(timeInClock, timeOut.Value.TimeOfDay);
+        var isLunchOut = allowLunchWindowTimeOut
+            ? timeOutClock <= TimeSpan.FromHours(13)
+            : timeOutClock == TimeSpan.FromHours(12);
+
+        return timeInClock < TimeSpan.FromHours(12)
+            && isLunchOut
+            && timeOutClock > timeInClock;
+    }
+
+    private static bool IsAfternoonHalfDay(DateTime? timeIn, DateTime? timeOut)
+    {
+        if (!timeIn.HasValue || !timeOut.HasValue)
+        {
+            return false;
+        }
+
+        return IsAfternoonStart(timeIn.Value)
+            && timeOut.Value.TimeOfDay > timeIn.Value.TimeOfDay;
+    }
+
+    private static TimeSpan NormalizeHalfDayTimeOutClock(TimeSpan timeInClock, TimeSpan timeOutClock)
+    {
+        if (timeInClock < TimeSpan.FromHours(12)
+            && timeOutClock >= TimeSpan.FromHours(23)
+            && timeOutClock < TimeSpan.FromHours(24))
+        {
+            return timeOutClock - TimeSpan.FromHours(12);
+        }
+
+        return timeOutClock;
+    }
+
+    private static string FormatLateUndertime(TimeSpan late, TimeSpan undertime)
+    {
+        var parts = new List<string>();
+        if (late > TimeSpan.Zero)
+        {
+            parts.Add($"{FormatDurationCompact(late)} late");
+        }
+
+        if (undertime > TimeSpan.Zero)
+        {
+            parts.Add($"{FormatDurationCompact(undertime)} undertime");
+        }
+
+        return string.Join("; ", parts);
+    }
+
+    private static string FormatHalfDayLateUndertime(string halfDayTag, TimeSpan late, TimeSpan undertime)
+    {
+        var lateUndertime = FormatLateUndertime(late, undertime);
+        return string.IsNullOrWhiteSpace(lateUndertime)
+            ? halfDayTag
+            : $"{halfDayTag}; {lateUndertime}";
+    }
+
+    private static bool IsHalfDayTag(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+            && (value.StartsWith("Half-Day (AM)", StringComparison.OrdinalIgnoreCase)
+                || value.StartsWith("Half-Day (PM)", StringComparison.OrdinalIgnoreCase));
+
+    private static string GetHalfDayStatus(string value)
+        => value.StartsWith("Half-Day (AM)", StringComparison.OrdinalIgnoreCase)
+            ? "Half-Day (AM)"
+            : "Half-Day (PM)";
+
+    private static string FormatDurationCompact(TimeSpan diff)
+    {
         var totalMinutes = (int)Math.Ceiling(diff.TotalSeconds / 60.0);
         if (totalMinutes <= 0) totalMinutes = 1;
 
         if (totalMinutes < 60)
         {
-            return totalMinutes == 1 ? "1min late" : $"{totalMinutes}mins late";
+            return $"{totalMinutes}m";
         }
 
         var hours = totalMinutes / 60;
         var minutes = totalMinutes % 60;
-
-        var hourPart = hours == 1 ? "1hr" : $"{hours}hrs";
-        if (minutes == 0)
-            return $"{hourPart} late";
-
-        var minutePart = minutes == 1 ? "1min" : $"{minutes}mins";
-        return $"{hourPart} and {minutePart} late";
+        return minutes == 0 ? $"{hours}h" : $"{hours}h {minutes}m";
     }
 
     private async Task ExportAttendanceLogsAsync()
     {
-        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        if (isExportingLogs)
+        {
+            return;
+        }
 
-        var onsiteCsv = BuildOnsiteCsv();
-        var wfhCsv = BuildWfhCsv();
+        var (start, end) = GetExportPeriodRange();
+        var startDate = start.Date;
+        var endExclusive = end.Date.AddDays(1);
 
-        await JS.InvokeVoidAsync("attendanceLogs.downloadCsv", $"attendance_logs_onsite_{timestamp}.csv", onsiteCsv);
-        await JS.InvokeVoidAsync("attendanceLogs.downloadCsv", $"attendance_logs_wfh_{timestamp}.csv", wfhCsv);
+        isExportingLogs = true;
+
+        try
+        {
+            await RefreshEmployeeStatusLookupAsync();
+
+            var exportOnsiteLogs = await Db.AttendanceLogs
+                .AsNoTracking()
+                .Include(l => l.Employee)
+                .Where(l => l.AttendanceDate >= startDate && l.AttendanceDate < endExclusive)
+                .OrderByDescending(l => l.AttendanceDate)
+                .ThenBy(l => l.LastName)
+                .ThenBy(l => l.FirstName)
+                .ToListAsync();
+
+            var exportWfhLogs = await Db.AttendanceLogsWfh
+                .AsNoTracking()
+                .Include(l => l.Employee)
+                .Include(l => l.ExceptionCondition)
+                .Where(l => l.AttendanceDate >= startDate && l.AttendanceDate < endExclusive)
+                .Where(l => l.ExceptionConditionId == null
+                    && l.WorkArrangement == "WFH"
+                    && (l.TimeIn.HasValue
+                        || l.TimeOut.HasValue
+                        || !string.IsNullOrWhiteSpace(l.Target)
+                        || !string.IsNullOrWhiteSpace(l.Accomplishment)
+                        || !string.IsNullOrWhiteSpace(l.Mov)))
+                .OrderByDescending(l => l.AttendanceDate)
+                .ThenBy(l => l.LastName)
+                .ThenBy(l => l.FirstName)
+                .ToListAsync();
+
+            foreach (var log in exportOnsiteLogs)
+            {
+                log.Tardiness = ResolveTardiness(log.Tardiness, () => ComputeTardinessForOnsite(log, ResolveEmployeeStatus(log)));
+            }
+
+            foreach (var log in exportWfhLogs)
+            {
+                log.Tardiness = ResolveTardiness(log.Tardiness, () => ComputeTardinessForWfh(log, ResolveEmployeeStatus(log)));
+            }
+
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var onsiteCsv = BuildOnsiteCsv(exportOnsiteLogs);
+            var wfhCsv = BuildWfhCsv(exportWfhLogs);
+            var zipFileName = $"attendance_logs_{timestamp}.zip";
+            var zipContent = BuildAttendanceLogsZip(onsiteCsv, wfhCsv, timestamp);
+
+            await JS.InvokeVoidAsync("attendanceLogs.downloadFileFromBase64", zipFileName, zipContent, "application/zip");
+
+            showExportLogsModal = false;
+            showExportPeriodMenu = false;
+            showExportPeriod2Menu = false;
+            openExportPeriodMenuUpward = false;
+            openExportPeriod2MenuUpward = false;
+            ShowToast(ToastType.Success, "Export ready", "Attendance logs were exported successfully.");
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Export failed", ex.Message);
+        }
+        finally
+        {
+            isExportingLogs = false;
+        }
     }
 
-    private string BuildOnsiteCsv()
+    private (DateTime Start, DateTime End) GetExportPeriodRange()
+    {
+        if (exportSelectedPeriod == null && exportSecondSelectedPeriod == null)
+        {
+            throw new InvalidOperationException("Select at least one export period.");
+        }
+
+        if (exportSelectedPeriod == null)
+        {
+            exportSelectedPeriod = exportSecondSelectedPeriod;
+        }
+
+        if (exportSecondSelectedPeriod == null)
+        {
+            return (exportSelectedPeriod!.Start, exportSelectedPeriod.End);
+        }
+
+        var start = exportSelectedPeriod!.Start <= exportSecondSelectedPeriod.Start
+            ? exportSelectedPeriod.Start
+            : exportSecondSelectedPeriod.Start;
+        var end = exportSelectedPeriod.End >= exportSecondSelectedPeriod.End
+            ? exportSelectedPeriod.End
+            : exportSecondSelectedPeriod.End;
+
+        return (start, end);
+    }
+
+    private string BuildOnsiteCsv(IEnumerable<AttendanceLog> logs)
     {
         var rows = new List<string>
         {
@@ -4171,12 +5624,12 @@
                 "TimeOutAm",
                 "TimeInPm",
                 "TimeOutPm",
-                "Tardiness",
+                "Late/Undertime",
                 "AttendanceDate"
             })
         };
 
-        rows.AddRange(onsiteLogs.Select(log => string.Join(",", new[]
+        rows.AddRange(logs.Select(log => string.Join(",", new[]
         {
             CsvValue(log.AttendanceLogId),
             CsvValue(log.EmployeeId),
@@ -4189,7 +5642,7 @@
             CsvValue(log.Designation),
             CsvValue(log.TimeInAm),
             CsvValue(log.TimeOutAm),
-            CsvValue(log.TimeInPm),
+            CsvValue(GetCreditedOnsiteTimeInPm(log)),
             CsvValue(log.TimeOutPm),
             CsvValue(DisplayTardiness(log.Tardiness)),
             CsvValue(log.AttendanceDate)
@@ -4198,7 +5651,7 @@
         return string.Join(global::System.Environment.NewLine, rows);
     }
 
-    private string BuildWfhCsv()
+    private string BuildWfhCsv(IEnumerable<AttendanceLogWfh> logs)
     {
         var rows = new List<string>
         {
@@ -4219,12 +5672,12 @@
                 "AttendanceStatus",
                 "TimeIn",
                 "TimeOut",
-                "Tardiness",
+                "Late/Undertime",
                 "AttendanceDate"
             })
         };
 
-        rows.AddRange(wfhLogs.Select(log => string.Join(",", new[]
+        rows.AddRange(logs.Select(log => string.Join(",", new[]
         {
             CsvValue(log.AttendanceLogWfhId),
             CsvValue(log.EmployeeId),
@@ -4246,6 +5699,26 @@
         })));
 
         return string.Join(global::System.Environment.NewLine, rows);
+    }
+
+    private static string BuildAttendanceLogsZip(string onsiteCsv, string wfhCsv, string timestamp)
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            WriteZipEntry(archive, $"attendance_logs_onsite_{timestamp}.csv", "\uFEFF" + onsiteCsv);
+            WriteZipEntry(archive, $"attendance_logs_wfh_{timestamp}.csv", "\uFEFF" + wfhCsv);
+        }
+
+        return Convert.ToBase64String(stream.ToArray());
+    }
+
+    private static void WriteZipEntry(ZipArchive archive, string fileName, string content)
+    {
+        var entry = archive.CreateEntry(fileName, CompressionLevel.Fastest);
+        using var entryStream = entry.Open();
+        using var writer = new StreamWriter(entryStream);
+        writer.Write(content);
     }
 
     private static string CsvValue(object? value)
