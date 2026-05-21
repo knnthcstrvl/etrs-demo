@@ -1716,6 +1716,12 @@
         color: #b42318;
     }
 
+    .attendance-tardiness-pill-incomplete {
+        border-color: #cbd5e1;
+        background: #f8fafc;
+        color: #475569;
+    }
+
     .attendance-tardiness-pill-late {
         border-color: #fde68a;
         background: #fffbeb;
@@ -4583,10 +4589,14 @@
         if (string.IsNullOrWhiteSpace(normalized)
             || string.Equals(normalized, "On Time", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalized, "Pending", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalized, "Tagged", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalized, "Incomplete", StringComparison.OrdinalIgnoreCase))
+            || string.Equals(normalized, "Tagged", StringComparison.OrdinalIgnoreCase))
         {
             return "On Time";
+        }
+
+        if (string.Equals(normalized, "Incomplete", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Incomplete";
         }
 
         if (string.Equals(normalized, "Absent", StringComparison.OrdinalIgnoreCase))
@@ -4865,10 +4875,14 @@
         if (string.IsNullOrWhiteSpace(normalized)
             || string.Equals(normalized, "On Time", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalized, "Pending", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalized, "Tagged", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalized, "Incomplete", StringComparison.OrdinalIgnoreCase))
+            || string.Equals(normalized, "Tagged", StringComparison.OrdinalIgnoreCase))
         {
             return new[] { "On Time" };
+        }
+
+        if (string.Equals(normalized, "Incomplete", StringComparison.OrdinalIgnoreCase))
+        {
+            return new[] { "Incomplete" };
         }
 
         if (string.Equals(normalized, "Absent", StringComparison.OrdinalIgnoreCase))
@@ -4956,6 +4970,7 @@
         {
             "On Time" => "on-time",
             "Absent" => "absent",
+            "Incomplete" => "incomplete",
             "Half-Day (AM)" or "Half-Day (PM)" => "half-day",
             _ when tag.Contains("late", StringComparison.OrdinalIgnoreCase) => "late",
             _ when tag.Contains("undertime", StringComparison.OrdinalIgnoreCase) => "undertime",
@@ -5015,14 +5030,12 @@
         }
 
         var date = log.AttendanceDate.Date;
-        if (log.TimeIn.HasValue && !log.TimeOut.HasValue)
+        if (!log.TimeOut.HasValue)
         {
-            return IsPastAttendanceCutoff(date)
-                ? "Absent"
-                : FormatLateUndertime(CalculateLateDuration(date, log.TimeIn.Value, employeeStatus), TimeSpan.Zero);
+            return "Absent";
         }
 
-        if (!log.TimeIn.HasValue || !log.TimeOut.HasValue)
+        if (!log.TimeIn.HasValue)
         {
             return string.Empty;
         }
@@ -5058,21 +5071,40 @@
         var timeInPm = log.TimeInPm;
         var creditedTimeInPm = GetCreditedOnsiteTimeInPm(log);
 
-        if (!timeInAm.HasValue && !creditedTimeInPm.HasValue)
+        if (!log.TimeOutAm.HasValue && !log.TimeOutPm.HasValue)
         {
             return "Absent";
         }
 
-        if (!timeInAm.HasValue
-            && (!log.TimeOutAm.HasValue || IsLunchBreakOut(log.TimeOutAm))
-            && creditedTimeInPm.HasValue
+        if (!timeInAm.HasValue && !creditedTimeInPm.HasValue)
+        {
+            return HasAnyOnsitePunch(log) ? "Incomplete" : "Absent";
+        }
+
+        if (!HasCompleteOnsiteMorning(timeInAm, log.TimeOutAm)
+            && creditedTimeInPm is DateTime afternoonTimeIn
+            && log.TimeOutPm is DateTime afternoonTimeOut
             && IsAfternoonHalfDay(creditedTimeInPm, log.TimeOutPm))
         {
-            var afternoonLate = CalculateAfternoonHalfDayLate(date, creditedTimeInPm.Value);
+            var afternoonLate = CalculateAfternoonHalfDayLate(date, afternoonTimeIn);
             return FormatHalfDayLateUndertime(
                 "Half-Day (PM)",
                 afternoonLate,
-                CalculateAfternoonHalfDayUndertime(date, log.TimeOutPm!.Value, employeeStatus));
+                CalculateAfternoonHalfDayUndertime(date, afternoonTimeOut, employeeStatus));
+        }
+
+        if (IsOnsiteMorningOnlyHalfDay(timeInAm, log.TimeOutAm)
+            && !HasCompleteOnsiteAfternoon(creditedTimeInPm, log.TimeOutPm))
+        {
+            return FormatHalfDayLateUndertime(
+                "Half-Day (AM)",
+                CalculateLateDuration(date, timeInAm!.Value, employeeStatus),
+                CalculateMorningHalfDayUndertime(date, log.TimeOutAm!.Value));
+        }
+
+        if (HasIncompleteOnsitePunch(log, creditedTimeInPm))
+        {
+            return "Incomplete";
         }
 
         if (IsMissingRequiredOnsiteOut(log) && IsPastAttendanceCutoff(date))
@@ -5081,26 +5113,6 @@
         }
 
         var timeIn = timeInAm ?? creditedTimeInPm!.Value;
-
-        if (IsMorningHalfDay(timeInAm, log.TimeOutAm, date, allowLunchWindowTimeOut: true)
-            && !creditedTimeInPm.HasValue)
-        {
-            return FormatHalfDayLateUndertime(
-                "Half-Day (AM)",
-                CalculateLateDuration(date, timeInAm!.Value, employeeStatus),
-                CalculateMorningHalfDayUndertime(date, log.TimeOutAm!.Value));
-        }
-
-        if (!timeInAm.HasValue
-            && (!log.TimeOutAm.HasValue || IsLunchBreakOut(log.TimeOutAm))
-            && IsAfternoonHalfDay(creditedTimeInPm, log.TimeOutPm))
-        {
-            var afternoonLate = CalculateAfternoonHalfDayLate(date, creditedTimeInPm!.Value);
-            return FormatHalfDayLateUndertime(
-                "Half-Day (PM)",
-                afternoonLate,
-                CalculateAfternoonHalfDayUndertime(date, log.TimeOutPm!.Value, employeeStatus));
-        }
 
         var late = CalculateLateDuration(date, timeIn, employeeStatus);
         if (HasOpenOnsiteInterval(log))
@@ -5115,6 +5127,11 @@
         }, date);
         var latestTimeOut = log.TimeOutPm ?? log.TimeOutAm;
         var undertime = CalculateUndertime(worked, late, date, timeIn, latestTimeOut, employeeStatus);
+        var morningEarlyOutUndertime = CalculateMorningEarlyOutUndertime(date, timeInAm, log.TimeOutAm);
+        if (morningEarlyOutUndertime > undertime)
+        {
+            undertime = morningEarlyOutUndertime;
+        }
 
         return FormatLateUndertime(late, undertime);
     }
@@ -5157,6 +5174,25 @@
             : TimeSpan.Zero;
     }
 
+    private static TimeSpan CalculateMorningEarlyOutUndertime(DateTime date, DateTime? timeIn, DateTime? timeOut)
+    {
+        if (!timeIn.HasValue || !timeOut.HasValue)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var timeInClock = timeIn.Value.TimeOfDay;
+        var timeOutClock = timeOut.Value.TimeOfDay;
+        var noon = TimeSpan.FromHours(12);
+
+        if (timeInClock >= noon || timeOutClock >= noon || timeOutClock <= timeInClock)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return noon - timeOutClock;
+    }
+
     private static TimeSpan CalculateAfternoonHalfDayUndertime(DateTime date, DateTime actualTimeOut, string? employeeStatus)
     {
         actualTimeOut = NormalizeAttendanceTime(date, actualTimeOut);
@@ -5186,14 +5222,30 @@
         }
 
         var date = log.AttendanceDate.Date;
-        if (!IsLunchBreakOut(log.TimeOutAm)
+        if (!IsCreditableOnsiteAfternoonStart(log)
             || !log.TimeOutPm.HasValue
-            || log.TimeOutPm.Value.TimeOfDay < TimeSpan.FromHours(17))
+            || log.TimeOutPm.Value.TimeOfDay <= TimeSpan.FromHours(13))
         {
             return null;
         }
 
         return date.AddHours(13);
+    }
+
+    private static bool IsCreditableOnsiteAfternoonStart(AttendanceLog log)
+    {
+        if (!log.TimeOutAm.HasValue)
+        {
+            return false;
+        }
+
+        var timeOutClock = log.TimeOutAm.Value.TimeOfDay;
+        if (timeOutClock > TimeSpan.FromHours(13))
+        {
+            return false;
+        }
+
+        return !log.TimeInAm.HasValue || timeOutClock > log.TimeInAm.Value.TimeOfDay;
     }
 
     private static bool ApplyCreditedOnsiteTimeInPm(AttendanceLog log)
@@ -5413,13 +5465,48 @@
 
         var timeInClock = timeIn.Value.TimeOfDay;
         var timeOutClock = NormalizeHalfDayTimeOutClock(timeInClock, timeOut.Value.TimeOfDay);
+        var noon = TimeSpan.FromHours(12);
         var isLunchOut = allowLunchWindowTimeOut
-            ? timeOutClock <= TimeSpan.FromHours(13)
+            ? timeOutClock >= noon && timeOutClock <= TimeSpan.FromHours(13)
             : timeOutClock == TimeSpan.FromHours(12);
 
-        return timeInClock < TimeSpan.FromHours(12)
+        return timeInClock < noon
             && isLunchOut
             && timeOutClock > timeInClock;
+    }
+
+    private static bool IsOnsiteMorningOnlyHalfDay(DateTime? timeIn, DateTime? timeOut)
+    {
+        if (!timeIn.HasValue || !timeOut.HasValue)
+        {
+            return false;
+        }
+
+        var timeInClock = timeIn.Value.TimeOfDay;
+        var timeOutClock = NormalizeHalfDayTimeOutClock(timeInClock, timeOut.Value.TimeOfDay);
+
+        return timeInClock < TimeSpan.FromHours(12)
+            && timeOutClock <= TimeSpan.FromHours(13)
+            && timeOutClock > timeInClock;
+    }
+
+    private static bool HasCompleteOnsiteMorning(DateTime? timeIn, DateTime? timeOut)
+        => timeIn.HasValue && timeOut.HasValue;
+
+    private static bool HasCompleteOnsiteAfternoon(DateTime? timeIn, DateTime? timeOut)
+        => timeIn.HasValue && timeOut.HasValue;
+
+    private static bool HasAnyOnsitePunch(AttendanceLog log)
+        => log.TimeInAm.HasValue
+            || log.TimeOutAm.HasValue
+            || log.TimeInPm.HasValue
+            || log.TimeOutPm.HasValue;
+
+    private static bool HasIncompleteOnsitePunch(AttendanceLog log, DateTime? creditedTimeInPm)
+    {
+        var hasIncompleteMorning = log.TimeInAm.HasValue != log.TimeOutAm.HasValue;
+        var hasIncompleteAfternoon = creditedTimeInPm.HasValue != log.TimeOutPm.HasValue;
+        return hasIncompleteMorning || hasIncompleteAfternoon;
     }
 
     private static bool IsAfternoonHalfDay(DateTime? timeIn, DateTime? timeOut)
