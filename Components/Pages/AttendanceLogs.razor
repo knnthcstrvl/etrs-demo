@@ -3350,17 +3350,6 @@
             .ThenBy(l => l.FirstName)
             .ToListAsync();
 
-        // Compute only when no saved edit tag exists.
-        foreach (var log in wfhLogs)
-        {
-            log.Tardiness = ResolveTardiness(log.Tardiness, () => ComputeTardinessForWfh(log, ResolveEmployeeStatus(log)));
-        }
-
-        foreach (var log in onsiteLogs)
-        {
-            log.Tardiness = ResolveTardiness(log.Tardiness, () => ComputeTardinessForOnsite(log, ResolveEmployeeStatus(log)));
-        }
-
         RefreshFilteredLogs(resetPaging: true);
 
         StateHasChanged();
@@ -3990,7 +3979,7 @@
             AttendanceDate = log.AttendanceDate,
             EmployeeName = FormatName(log.LastName, log.FirstName, log.MiddleName),
             EmployeeStatus = ResolveEmployeeStatus(log),
-            Tardiness = NormalizeTardinessForEdit(GetStoredTardinessDisplayValue(log.Tardiness)),
+            Tardiness = GetEditTardinessValue(log.Tardiness),
             OnsiteTimeInAm = FormatTimeInput(log.TimeInAm),
             OnsiteTimeOutAm = FormatTimeInput(log.TimeOutAm),
             OnsiteTimeInPm = FormatTimeInput(log.TimeInPm),
@@ -4012,7 +4001,7 @@
             AttendanceDate = log.AttendanceDate,
             EmployeeName = FormatName(log.LastName, log.FirstName, log.MiddleName),
             EmployeeStatus = ResolveEmployeeStatus(log),
-            Tardiness = NormalizeTardinessForEdit(GetStoredTardinessDisplayValue(log.Tardiness)),
+            Tardiness = GetEditTardinessValue(log.Tardiness),
             WfhTimeIn = FormatTimeInput(log.TimeIn),
             WfhTimeOut = FormatTimeInput(log.TimeOut),
             Target = log.Target,
@@ -4418,6 +4407,11 @@
 
     private static string NormalizeTardinessForEdit(string? value)
         => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
+    private static string GetEditTardinessValue(string? value)
+        => IsManualTardinessOverride(value)
+            ? NormalizeTardinessForEdit(GetStoredTardinessDisplayValue(value))
+            : DefaultTardinessSentinel;
 
     private static string NormalizeStoredTardiness(string? value, string? computedValue)
     {
