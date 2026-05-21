@@ -11,6 +11,12 @@ section > div.border {
   box-shadow: 0 6px 18px rgba(22,22,32,0.05);
 }
 
+/* ensure navbar sits above page controls and dropdowns used elsewhere */
+.etrs-admin-navbar {
+  position: relative; /* create stacking context for z-index */
+  z-index: 1310;
+}
+
 section .d-flex.align-items-center {
   padding: 10px 16px;
 }

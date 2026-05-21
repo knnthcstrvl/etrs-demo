@@ -4,6 +4,9 @@
 @using Financial.Model.Dtr
 @using Microsoft.EntityFrameworkCore
 @inject ProcurementDbContext Db
+@inject IJSRuntime JS
+
+@implements IAsyncDisposable
 
 
 <div class="dashboard-shell">
@@ -12,7 +15,76 @@
             <div class="hero-label">Dashboard</div>
             <h1>Electronic Time Record System</h1>
         </div>
-        <span class="hero-chip">Admin Dashboard</span>
+        <div class="period-dropdown" @ref="periodControlsRef">
+            <div class="attendance-filter-select-wrap period-dropdown">
+                <button type="button" class="attendance-filter-select-trigger period-button @(showPeriodMenu ? "active" : null)" @onclick="TogglePeriodMenu">
+                    <span class="period-button-content">
+                        <span class="period-label">Period:</span>
+                        <span class="period-selected">@SelectedPeriodLabel</span>
+                        @if (selectedPeriod?.IsCurrent == true)
+                        {
+                            <span class="period-current-text">(Current)</span>
+                        }
+                    </span>
+                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                </button>
+
+                <div class="attendance-filter-select-menu period-menu @(showPeriodMenu ? "show" : null)">
+                    @foreach (var p in periods)
+                    {
+                        var itemId = selectedPeriod == p ? "period-1-selected-item" : null;
+                        <button type="button" class="attendance-filter-select-option period-option @(selectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectPeriod(p)">
+                            <span class="period-option-label">@p.Label</span>
+                            @if (p.IsCurrent)
+                            {
+                                <span class="period-current-text">(Current)</span>
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @if (periods.Count > 1 && !showAddPeriod && !isClosingAddPeriod)
+            {
+                <button type="button" class="btn btn-outline-secondary period-add-button" @onclick="ToggleAddPeriod">+</button>
+            }
+
+            @if (showAddPeriod || isClosingAddPeriod)
+            {
+                <div class="period-range-entry @(isClosingAddPeriod ? "closing" : null)">
+                    <div class="period-to-label">TO</div>
+
+                    <div class="attendance-filter-select-wrap period-dropdown">
+                        <button type="button" class="period-close-btn" title="Close period range" @onclick="ToggleAddPeriod">×</button>
+                        <button type="button" class="attendance-filter-select-trigger period-button @(showPeriod2Menu ? "active" : null)" @onclick="TogglePeriod2Menu">
+                            <span class="period-button-content">
+                                <span class="period-label">Period:</span>
+                                <span class="period-selected">@SelectedPeriod2Label</span>
+                                @if (secondSelectedPeriod?.IsCurrent == true)
+                                {
+                                    <span class="period-current-text">(Current)</span>
+                                }
+                            </span>
+                            <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                        </button>
+
+                        <div class="attendance-filter-select-menu period-menu @(showPeriod2Menu ? "show" : null)">
+                            @foreach (var p in periods)
+                            {
+                                var itemId = secondSelectedPeriod == p ? "period-2-selected-item" : null;
+                                <button type="button" class="attendance-filter-select-option period-option @(secondSelectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectSecondPeriod(p)">
+                                    <span class="period-option-label">@p.Label</span>
+                                    @if (p.IsCurrent)
+                                    {
+                                        <span class="period-current-text">(Current)</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
     </div>
 
     <div class="metric-grid dashboard-metrics">
@@ -23,10 +95,12 @@
         <div class="metric-card">
             <span class="metric-label">Onsite Logs Today</span>
             <strong>@onsiteLogsToday</strong>
+            <div class="metric-percent" title="Percentage of employees">@OnsitePercentLabel</div>
         </div>
         <div class="metric-card">
             <span class="metric-label">WFH Logs Today</span>
             <strong>@wfhLogsToday</strong>
+            <div class="metric-percent" title="Percentage of employees">@WfhPercentLabel</div>
         </div>
     </div>
 
@@ -110,6 +184,293 @@
         overflow-wrap: anywhere;
         vertical-align: top;
     }
+
+    /* Period selector styles copied from AttendanceLogs to keep appearance consistent */
+    .period-dropdown {
+        display:inline-block;
+        min-width: 320px; /* controls default field width */
+        width: 320px;
+        overflow: visible;
+        box-sizing: border-box;
+    }
+
+    .period-button {
+        min-height: 2.5rem;
+        padding: 0.5rem 0.8rem;
+        border-radius: 8px;
+        border: 1px solid var(--etrs-gray-200);
+        background: #fff;
+    }
+
+    /* ensure proper spacing between period selector and add button in the hero */
+    .dashboard-hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .dashboard-hero .period-dropdown {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        /* allow the outer wrapper to shrink so it doesn't force layout width */
+        min-width: 0;
+        width: auto;
+    }
+
+    /* ensure the add button matches the period trigger size and is centered */
+    .period-add-button {
+        margin-left: 0.5rem;
+        height: calc(1.6rem + 0.5rem);
+        width: calc(1.6rem + 0.5rem);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    /* give the add button symmetrical horizontal spacing so TO is centered between selectors */
+    .period-add-button {
+        margin: 0 0.5rem;
+    }
+
+    /* make sure the second period trigger aligns exactly with the first */
+    .period-range-entry .attendance-filter-select-wrap {
+        margin: 0;
+        /* enforce same width as the primary selector so both selectors match */
+        min-width: 260px;
+        width: 260px;
+        box-sizing: border-box;
+    }
+
+    /* match spacing for the TO label with AttendanceLogs styles */
+    .period-to-label {
+        display: inline-flex;
+        align-items: center;
+        padding: 0 0.15rem;
+        margin: 0 0.05rem;
+        color: var(--etrs-gray-700);
+        font-size: 0.82rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .period-range-entry {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* ensure both selectors inside a range entry are identical in width and buttons fill their boxes */
+    .period-range-entry .attendance-filter-select-wrap {
+        min-width: 280px;
+        width: 280px;
+        box-sizing: border-box;
+    }
+
+    .period-range-entry .period-button,
+    .period-dropdown .period-button {
+        width: 100%;
+    }
+
+    /* ensure primary and secondary period buttons fill their containers like AttendanceLogs */
+    .period-dropdown .period-button { width: 100%; }
+
+    /* keep spacing when two period selectors are shown with add button in between */
+    .period-dropdown + .period-add-button + .period-dropdown { margin-left: 0.5rem; }
+
+    .period-dropdown + .period-add-button + .period-dropdown .period-button { width: 100%; }
+
+    .period-range-entry .attendance-filter-select-trigger,
+    .period-range-entry .period-button {
+        min-height: 2.5rem;
+        height: 2.5rem;
+        padding: 0.5rem 0.8rem;
+    }
+
+    /* ensure primary selector trigger uses the same padding as the secondary */
+    .attendance-filter-select-wrap.period-dropdown .attendance-filter-select-trigger,
+    .attendance-filter-select-wrap.period-dropdown .period-button {
+        padding: 0.5rem 0.8rem;
+    }
+
+    /* ensure vertical centering of the TO range and controls */
+    .period-range-entry {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .period-button-content {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 0;
+        flex: 1 1 auto;
+        white-space: nowrap;
+    }
+
+    .period-label {
+        font-weight:500;
+        color:var(--finance-text-muted);
+    }
+
+    .period-selected {
+        font-weight:600;
+        max-width: 160px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    .period-menu {
+        min-width:260px;
+        max-height:320px;
+        z-index: 1100;
+    }
+
+    .attendance-filter-select-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.45rem 0.55rem;
+        border: 0;
+        background: transparent;
+    }
+
+    .attendance-filter-select-option.active {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    /* force circular close button style to match AttendanceLogs page */
+    .period-close-btn {
+        position: absolute;
+        right: -8px;
+        top: -10px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 1px solid var(--finance-border);
+        background: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        line-height: 1;
+        cursor: pointer;
+        color: var(--finance-text-muted);
+        padding: 0;
+        z-index: 2;
+    }
+
+    .period-close-btn:hover {
+        background: var(--finance-surface-soft);
+    }
+
+    /* additional selector styles copied from AttendanceLogs for exact match */
+    .attendance-filter-select-wrap {
+        position: relative;
+    }
+
+    .attendance-filter-select-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        width: 100%;
+        min-height: 2.15rem;
+        padding: 0.38rem 0.68rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+
+    .attendance-filter-select-trigger.active {
+        border-color: rgba(16, 77, 173, 0.35);
+        box-shadow: 0 0 0 3px rgba(16, 77, 173, 0.08);
+    }
+
+    .attendance-filter-select-menu {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        max-height: 220px;
+        padding: 0.3rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        overflow-y: auto;
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 8;
+    }
+
+    .attendance-filter-select-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .attendance-filter-select-option {
+        display: block;
+        width: 100%;
+        padding: 0.45rem 0.55rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .attendance-filter-select-option:hover,
+    .attendance-filter-select-option.active {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    /* metric percent badge on the right edge of metric cards */
+    .metric-card {
+        position: relative;
+        padding-right: 5rem; /* room for larger percent badge */
+    }
+
+    .metric-percent {
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+        bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 3.75rem;
+        padding: 0 0.75rem;
+        border-left: 1px solid rgba(0,0,0,0.05);
+        color: var(--etrs-gray-700);
+        font-size: 1.25rem;
+        font-weight: 800;
+        background: transparent;
+    }
 </style>
 
 @code {
@@ -119,18 +480,295 @@
     private List<AttendanceLog> recentOnsiteLogs = new();
     private List<AttendanceLogWfh> recentWfhLogs = new();
 
+    private class Period
+    {
+        public DateTime Start { get; set; }
+        public DateTime End { get; set; }
+        public string Label { get; set; } = string.Empty;
+        public bool IsCurrent { get; set; }
+    }
+
+    private List<Period> periods = new();
+    private Period? selectedPeriod;
+    private bool showPeriodMenu;
+    private string SelectedPeriodLabel => selectedPeriod?.Label ?? "No periods available";
+    private string SelectedPeriod2Label => secondSelectedPeriod?.Label ?? "Select a period";
+    private ElementReference periodControlsRef;
+    private DotNetObjectReference<Dashboard>? periodDropdownDotNetRef;
+    private bool periodDismissRegistered;
+    private bool showAddPeriod;
+    private bool isClosingAddPeriod;
+    private Period? secondSelectedPeriod;
+    private bool showPeriod2Menu;
+    private DateTime filterStart;
+    private DateTime filterEnd;
+
+    private string OnsitePercentLabel => FormatPercent(onsiteLogsToday, employeeCount);
+    private string WfhPercentLabel => FormatPercent(wfhLogsToday, employeeCount);
+
+    private static string FormatPercent(int part, int total)
+        => total <= 0 ? "-" : $"{Math.Round((double)part / total * 100)}%";
+
     protected override async Task OnInitializedAsync()
     {
-        var today = DateTime.Today;
+        await RefreshAvailablePeriodsAsync(preserveSelections: false);
+        await LoadRecentLogsAsync();
+    }
+
+    private async Task TogglePeriodMenu()
+    {
+        showPeriodMenu = !showPeriodMenu;
+        if (showPeriodMenu)
+        {
+            showPeriod2Menu = false;
+        }
+        if (showPeriodMenu)
+        {
+            await ScrollSelectedPeriodIntoViewAsync("period-1-selected-item");
+        }
+    }
+
+    private async Task SelectPeriod(Period p)
+    {
+        selectedPeriod = p;
+        showPeriodMenu = false;
+        await LoadRecentLogsAsync();
+    }
+
+    private static void NormalizeSelectedPeriods(ref Period? firstPeriod, ref Period? secondPeriod)
+    {
+        if (firstPeriod == null || secondPeriod == null)
+        {
+            return;
+        }
+
+        if (secondPeriod.Start < firstPeriod.Start)
+        {
+            (firstPeriod, secondPeriod) = (secondPeriod, firstPeriod);
+        }
+    }
+
+    private void NormalizeSelectedPeriods()
+    {
+        NormalizeSelectedPeriods(ref selectedPeriod, ref secondSelectedPeriod);
+    }
+
+    private void ApplySelectedPeriodRange()
+    {
+        if (selectedPeriod == null && secondSelectedPeriod == null)
+        {
+            return;
+        }
+
+        if (selectedPeriod == null)
+        {
+            selectedPeriod = secondSelectedPeriod;
+        }
+
+        if (secondSelectedPeriod == null)
+        {
+            filterStart = selectedPeriod!.Start;
+            filterEnd = selectedPeriod.End;
+            return;
+        }
+
+        var start = selectedPeriod!.Start <= secondSelectedPeriod.Start
+            ? selectedPeriod.Start
+            : secondSelectedPeriod.Start;
+        var end = selectedPeriod.End >= secondSelectedPeriod.End
+            ? selectedPeriod.End
+            : secondSelectedPeriod.End;
+
+        filterStart = start;
+        filterEnd = end;
+    }
+
+    private async Task ToggleAddPeriod()
+    {
+        if (!showAddPeriod && !isClosingAddPeriod)
+        {
+            isClosingAddPeriod = false;
+            showAddPeriod = true;
+            return;
+        }
+
+        if (isClosingAddPeriod)
+        {
+            return;
+        }
+
+        isClosingAddPeriod = true;
+        showPeriod2Menu = false;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(180);
+
+        showAddPeriod = false;
+        isClosingAddPeriod = false;
+        secondSelectedPeriod = null;
+        showPeriod2Menu = false;
+
+        selectedPeriod = periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
+
+        if (selectedPeriod != null)
+        {
+            ApplySelectedPeriodRange();
+            await RefreshAvailablePeriodsAsync();
+            await LoadRecentLogsAsync();
+        }
+    }
+
+    private async Task TogglePeriod2Menu()
+    {
+        showPeriod2Menu = !showPeriod2Menu;
+        if (showPeriod2Menu)
+        {
+            showPeriodMenu = false;
+        }
+        if (showPeriod2Menu)
+        {
+            await ScrollSelectedPeriodIntoViewAsync("period-2-selected-item");
+        }
+    }
+
+    private async Task SelectSecondPeriod(Period p)
+    {
+        secondSelectedPeriod = p;
+        NormalizeSelectedPeriods();
+        showPeriod2Menu = false;
+        ApplySelectedPeriodRange();
+        await LoadRecentLogsAsync();
+    }
+
+    private async Task ScrollSelectedPeriodIntoViewAsync(string elementId)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("etrWorkFromHome.scrollElementIntoView", elementId);
+        }
+        catch
+        {
+        }
+    }
+
+    [JSInvokable]
+    public void ClosePeriodMenus()
+    {
+        if (!showPeriodMenu && !showPeriod2Menu)
+        {
+            return;
+        }
+
+        showPeriodMenu = false;
+        showPeriod2Menu = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await SyncPeriodDismissRegistrationAsync();
+    }
+
+    private async Task SyncPeriodDismissRegistrationAsync()
+    {
+        var shouldRegister = showPeriodMenu || showPeriod2Menu;
+
+        if (shouldRegister && !periodDismissRegistered)
+        {
+            periodDropdownDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("attendanceLogs.registerPeriodDismiss", periodControlsRef, periodDropdownDotNetRef);
+            periodDismissRegistered = true;
+        }
+        else if (!shouldRegister && periodDismissRegistered)
+        {
+            await JS.InvokeVoidAsync("attendanceLogs.unregisterPeriodDismiss", periodControlsRef);
+            periodDismissRegistered = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (periodDismissRegistered)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("attendanceLogs.unregisterPeriodDismiss", periodControlsRef);
+            }
+            catch
+            {
+            }
+        }
+
+        periodDropdownDotNetRef?.Dispose();
+    }
+
+    private async Task RefreshAvailablePeriodsAsync(bool preserveSelections = true)
+    {
+        var previous = preserveSelections ? selectedPeriod : null;
+        var datesOnsite = await Db.AttendanceLogs
+            .AsNoTracking()
+            .Select(l => l.AttendanceDate)
+            .Distinct()
+            .ToListAsync();
+
+        var datesWfh = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Where(l => l.TimeIn.HasValue || l.TimeOut.HasValue || !string.IsNullOrWhiteSpace(l.Target) || !string.IsNullOrWhiteSpace(l.Accomplishment) || !string.IsNullOrWhiteSpace(l.Mov))
+            .Select(l => l.AttendanceDate)
+            .Distinct()
+            .ToListAsync();
+
+        periods = datesOnsite.Concat(datesWfh)
+            .Select(d => BuildPeriodForDate(d.Date, DateTime.Today))
+            .GroupBy(p => new { p.Start, p.End })
+            .Select(g => g.First())
+            .OrderBy(p => p.Start)
+            .ToList();
+
+        if (!preserveSelections || periods.Count == 0)
+        {
+            selectedPeriod = periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
+            return;
+        }
+
+        if (previous != null)
+        {
+            selectedPeriod = periods.FirstOrDefault(p => p.Start.Date == previous.Start.Date && p.End.Date == previous.End.Date)
+                ?? periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
+        }
+    }
+
+    private static Period BuildPeriodForDate(DateTime date, DateTime now)
+    {
+        var start = date.Day <= 15
+            ? new DateTime(date.Year, date.Month, 1)
+            : new DateTime(date.Year, date.Month, 16);
+        var end = date.Day <= 15
+            ? new DateTime(date.Year, date.Month, 15)
+            : new DateTime(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month));
+
+        return new Period
+        {
+            Start = start,
+            End = end,
+            Label = $"{start:MMM dd} - {end:dd}, {end:yyyy}",
+            IsCurrent = now.Date >= start.Date && now.Date <= end.Date
+        };
+    }
+
+    private async Task LoadRecentLogsAsync()
+    {
+        var start = selectedPeriod?.Start.Date ?? DateTime.Today;
+        var endExclusive = (selectedPeriod?.End.Date ?? DateTime.Today).AddDays(1);
 
         employeeCount = await Db.Employees.CountAsync();
-        onsiteLogsToday = await Db.AttendanceLogs.CountAsync(l => l.AttendanceDate == today);
+        onsiteLogsToday = await Db.AttendanceLogs.CountAsync(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive);
         wfhLogsToday = await Db.AttendanceLogsWfh.CountAsync(l =>
-            l.AttendanceDate == today &&
+            l.AttendanceDate >= start && l.AttendanceDate < endExclusive &&
             (l.TimeIn.HasValue || l.TimeOut.HasValue));
 
         recentOnsiteLogs = await Db.AttendanceLogs
             .AsNoTracking()
+            .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .OrderByDescending(l => l.AttendanceDate)
             .ThenBy(l => l.LastName)
             .Take(5)
@@ -138,7 +776,7 @@
 
         recentWfhLogs = await Db.AttendanceLogsWfh
             .AsNoTracking()
-            .Where(l => l.TimeIn.HasValue || l.TimeOut.HasValue)
+            .Where(l => (l.TimeIn.HasValue || l.TimeOut.HasValue) && l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .OrderByDescending(l => l.AttendanceDate)
             .ThenBy(l => l.LastName)
             .Take(5)
