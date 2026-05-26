@@ -137,6 +137,38 @@ window.attendanceLogs = (function () {
         return spaceAbove > spaceBelow;
     }
 
+    function getRowMenuPosition(rowKey, pointerX, pointerY, menuWidth, menuHeight, viewportPadding) {
+        const row = document.querySelector(`[data-row-menu-key="${CSS.escape(rowKey || "")}"]`);
+        if (!row) {
+            return { left: 0, top: 0 };
+        }
+
+        const rowRect = row.getBoundingClientRect();
+        const tableCard = row.closest(".attendance-table-card");
+        const cardRect = tableCard ? tableCard.getBoundingClientRect() : rowRect;
+        const padding = Number.isFinite(viewportPadding) ? viewportPadding : 12;
+        const width = Number.isFinite(menuWidth) ? menuWidth : 152;
+        const height = Number.isFinite(menuHeight) ? menuHeight : 88;
+        const x = Number.isFinite(pointerX) ? pointerX : rowRect.left;
+        const y = Number.isFinite(pointerY) ? pointerY : rowRect.top;
+        const visibleRight = Math.min(cardRect.right, window.innerWidth - padding);
+        const visibleLeft = Math.max(cardRect.left, padding);
+        const preferredLeft = x + 12;
+        const preferredTop = y + 12;
+        const left = Math.min(Math.max(visibleLeft, preferredLeft), Math.max(visibleLeft, visibleRight - width));
+        const rowBottomLimit = rowRect.bottom - 8;
+        const rowAlignedTop = Math.min(Math.max(rowRect.top + 8, preferredTop), Math.max(rowRect.top + 8, rowBottomLimit));
+        const top = Math.min(
+            Math.max(padding, rowAlignedTop),
+            Math.max(padding, window.innerHeight - height - padding)
+        );
+
+        return {
+            left: Math.round(left),
+            top: Math.round(top)
+        };
+    }
+
     function downloadCsv(fileName, content) {
         const csvWithBom = "\uFEFF" + (content || "");
         const blob = new Blob([csvWithBom], { type: "text/csv;charset=utf-8;" });
@@ -192,6 +224,7 @@ window.attendanceLogs = (function () {
         registerTableMenuDismiss: registerTableMenuDismiss,
         unregisterTableMenuDismiss: unregisterTableMenuDismiss,
         shouldOpenMenuUpward: shouldOpenMenuUpward,
+        getRowMenuPosition: getRowMenuPosition,
         downloadCsv: downloadCsv,
         downloadFileFromBase64: downloadFileFromBase64
     };

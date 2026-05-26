@@ -3,6 +3,7 @@
 @inject Financial.Services.CurrentUserService CurrentUser
 @using Financial.Model.Dtr
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
 @using System.ComponentModel.DataAnnotations
 @using System.IO.Compression
@@ -360,7 +361,10 @@
             </div>
         </div>
 
-        <div class="panel-card attendance-table-card">
+        <div class="panel-card attendance-table-card"
+             @ref="attendanceTableCardRef"
+             @onmouseenter="KeepRowMenuOpen"
+             @onmouseleave="HideRowMenuAsync">
             @if (viewMode == "onsite")
             {
                 <table class="table attendance-table attendance-table-onsite">
@@ -380,7 +384,10 @@
                     <tbody>
                         @foreach (var log in PagedOnsiteLogs)
                         {
-                            <tr class="attendance-log-row" @ondblclick="() => OpenOnsiteDetail(log)">
+                            <tr class="attendance-log-row"
+                                data-row-menu-key="@GetOnsiteRowMenuKey(log)"
+                                @ondblclick="() => OpenOnsiteDetail(log)"
+                                @onmouseenter="e => ShowOnsiteRowMenuAsync(log, e)">
                                 <td class="attendance-actions-cell">
                                     <button type="button"
                                             class="attendance-action-button"
@@ -450,7 +457,10 @@
                     <tbody>
                         @foreach (var log in PagedWfhLogs)
                         {
-                            <tr class="attendance-log-row" @ondblclick="() => OpenWfhDetail(log)">
+                            <tr class="attendance-log-row"
+                                data-row-menu-key="@GetWfhRowMenuKey(log)"
+                                @ondblclick="() => OpenWfhDetail(log)"
+                                @onmouseenter="e => ShowWfhRowMenuAsync(log, e)">
                                 <td class="attendance-actions-cell">
                                     <button type="button"
                                             class="attendance-action-button"
@@ -509,6 +519,34 @@
                         }
                     </tbody>
                 </table>
+            }
+        </div>
+        <div class="attendance-hover-row-menu @(HasHoveredRowMenu ? "show" : null)"
+             style="@RowActionMenuStyle"
+             @onmouseenter="KeepRowMenuOpen"
+             @onmouseleave="HideRowMenuAsync"
+             @onclick:stopPropagation="true">
+            @if (hoveredOnsiteRowMenuLog is not null)
+            {
+                <button type="button" @onclick="OpenHoveredOnsiteDetail">
+                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    <span>View</span>
+                </button>
+                <button type="button" @onclick="OpenHoveredOnsiteEdit" disabled="@(!CurrentUser.HasAccess("Edit"))">
+                    <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                    <span>Edit</span>
+                </button>
+            }
+            else if (hoveredWfhRowMenuLog is not null)
+            {
+                <button type="button" @onclick="OpenHoveredWfhDetail">
+                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    <span>View</span>
+                </button>
+                <button type="button" @onclick="OpenHoveredWfhEdit" disabled="@(!CurrentUser.HasAccess("Edit"))">
+                    <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                    <span>Edit</span>
+                </button>
             }
         </div>
         @if (viewMode == "onsite")
@@ -1783,6 +1821,55 @@
         opacity: 0.5;
     }
 
+    .attendance-hover-row-menu {
+        position: fixed;
+        z-index: 1000;
+        min-width: 9.5rem;
+        padding: 0.35rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        opacity: 0;
+        transform: translateY(-4px) scale(0.98);
+        transform-origin: top right;
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+        visibility: hidden;
+    }
+
+    .attendance-hover-row-menu.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+        visibility: visible;
+    }
+
+    .attendance-hover-row-menu button {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        width: 100%;
+        padding: 0.5rem 0.6rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        font-size: 0.84rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .attendance-hover-row-menu button:hover:not(:disabled) {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .attendance-hover-row-menu button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
     .attendance-logs-controls {
         display:flex;
         align-items:center;
@@ -2660,6 +2747,12 @@
         public bool SortDescending { get; set; }
     }
 
+    private sealed class RowMenuPosition
+    {
+        public double Left { get; set; }
+        public double Top { get; set; }
+    }
+
     private string viewMode = "onsite";
     private int employeeCount;
     private int wfhTaggedCount;
@@ -2671,6 +2764,14 @@
     private DateTime filterEnd;
     private AttendanceLog? selectedOnsiteLog;
     private AttendanceLogWfh? selectedWfhLog;
+    private AttendanceLog? hoveredOnsiteRowMenuLog;
+    private AttendanceLogWfh? hoveredWfhRowMenuLog;
+    private double rowActionMenuLeft;
+    private double rowActionMenuTop;
+    private bool showRowActionMenu;
+    private bool rowActionMenuHovered;
+    private int rowActionMenuShowVersion;
+    private int rowActionMenuHideVersion;
     private bool showInputLogsModal;
     private bool isSavingInputLog;
     private InputLogMode inputLogMode = InputLogMode.Onsite;
@@ -2718,6 +2819,7 @@
     private DotNetObjectReference<AttendanceLogs>? periodDropdownDotNetRef;
     private bool periodDismissRegistered;
     private ElementReference tableMenuControlsRef;
+    private ElementReference attendanceTableCardRef;
     private DotNetObjectReference<AttendanceLogs>? tableMenuDotNetRef;
     private bool tableMenuDismissRegistered;
     private string? activeFilterField;
@@ -2725,6 +2827,8 @@
     private string SelectedPeriod2Label => secondSelectedPeriod?.Label ?? "Select a period";
     private string ExportSelectedPeriodLabel => exportSelectedPeriod?.Label ?? "No periods available";
     private string ExportSelectedPeriod2Label => exportSecondSelectedPeriod?.Label ?? "Select a period";
+    private bool HasHoveredRowMenu => showRowActionMenu && (hoveredOnsiteRowMenuLog is not null || hoveredWfhRowMenuLog is not null);
+    private string RowActionMenuStyle => $"left:{rowActionMenuLeft:0}px;top:{rowActionMenuTop:0}px;";
     private static string GetExportPeriodMenuClass(bool isVisible, bool openUpward)
         => $"attendance-filter-select-menu period-menu{(isVisible ? " show" : string.Empty)}{(openUpward ? " open-upward" : string.Empty)}";
 
@@ -3961,6 +4065,141 @@
             .Select(value => value!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase);
+
+    private async Task ShowOnsiteRowMenuAsync(AttendanceLog log, MouseEventArgs e)
+    {
+        await QueueRowMenuAsync(
+            GetOnsiteRowMenuKey(log),
+            e,
+            () =>
+            {
+                hoveredOnsiteRowMenuLog = log;
+                hoveredWfhRowMenuLog = null;
+            });
+    }
+
+    private async Task ShowWfhRowMenuAsync(AttendanceLogWfh log, MouseEventArgs e)
+    {
+        await QueueRowMenuAsync(
+            GetWfhRowMenuKey(log),
+            e,
+            () =>
+            {
+                hoveredWfhRowMenuLog = log;
+                hoveredOnsiteRowMenuLog = null;
+            });
+    }
+
+    private async Task QueueRowMenuAsync(string rowKey, MouseEventArgs e, Action selectRow)
+    {
+        var showVersion = ++rowActionMenuShowVersion;
+        rowActionMenuHideVersion++;
+        rowActionMenuHovered = true;
+        showRowActionMenu = false;
+
+        await Task.Delay(1000);
+
+        if (!rowActionMenuHovered || showVersion != rowActionMenuShowVersion)
+        {
+            return;
+        }
+
+        selectRow();
+
+        var position = await JS.InvokeAsync<RowMenuPosition>("attendanceLogs.getRowMenuPosition", rowKey, e.ClientX, e.ClientY, 152, 88, 12);
+        rowActionMenuLeft = position.Left;
+        rowActionMenuTop = position.Top;
+        showRowActionMenu = true;
+    }
+
+    private async Task HideRowMenuAsync()
+    {
+        rowActionMenuHovered = false;
+        rowActionMenuShowVersion++;
+        var hideVersion = ++rowActionMenuHideVersion;
+
+        await Task.Delay(120);
+
+        if (rowActionMenuHovered || hideVersion != rowActionMenuHideVersion)
+        {
+            return;
+        }
+
+        showRowActionMenu = false;
+        await InvokeAsync(StateHasChanged);
+
+        await Task.Delay(190);
+
+        if (!showRowActionMenu && hideVersion == rowActionMenuHideVersion)
+        {
+            hoveredOnsiteRowMenuLog = null;
+            hoveredWfhRowMenuLog = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void KeepRowMenuOpen()
+    {
+        rowActionMenuHovered = true;
+        rowActionMenuHideVersion++;
+    }
+
+    private void CloseRowMenu()
+    {
+        showRowActionMenu = false;
+        hoveredOnsiteRowMenuLog = null;
+        hoveredWfhRowMenuLog = null;
+    }
+
+    private static string GetOnsiteRowMenuKey(AttendanceLog log)
+        => $"onsite-{log.AttendanceLogId}";
+
+    private static string GetWfhRowMenuKey(AttendanceLogWfh log)
+        => $"wfh-{log.AttendanceLogWfhId}";
+
+    private void OpenHoveredOnsiteDetail()
+    {
+        if (hoveredOnsiteRowMenuLog is not { } log)
+        {
+            return;
+        }
+
+        CloseRowMenu();
+        OpenOnsiteDetail(log);
+    }
+
+    private void OpenHoveredWfhDetail()
+    {
+        if (hoveredWfhRowMenuLog is not { } log)
+        {
+            return;
+        }
+
+        CloseRowMenu();
+        OpenWfhDetail(log);
+    }
+
+    private void OpenHoveredOnsiteEdit()
+    {
+        if (hoveredOnsiteRowMenuLog is not { } log)
+        {
+            return;
+        }
+
+        CloseRowMenu();
+        OpenOnsiteEdit(log);
+    }
+
+    private void OpenHoveredWfhEdit()
+    {
+        if (hoveredWfhRowMenuLog is not { } log)
+        {
+            return;
+        }
+
+        CloseRowMenu();
+        OpenWfhEdit(log);
+    }
 
     private void OpenOnsiteDetail(AttendanceLog log)
     {
