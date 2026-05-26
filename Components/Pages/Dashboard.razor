@@ -2,52 +2,97 @@
 <PageTitle>ETRS | Dashboard</PageTitle>
 @using Financial.Data
 @using Financial.Model.Dtr
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
+@using System.IO.Compression
+@using System.Globalization
+@using System.Text
 @inject ProcurementDbContext Db
 @inject IJSRuntime JS
 
 @implements IAsyncDisposable
 
 
-<div class="dashboard-shell">
+<div class="dashboard-shell" @onclick="CloseDashboardTransientMenus">
     <div class="dashboard-hero">
         <div class="hero-left">
             <div class="hero-label">Dashboard</div>
             <h1>Electronic Time Record System</h1>
         </div>
-        <div class="period-dropdown" @ref="periodControlsRef">
-            <div class="attendance-filter-select-wrap period-dropdown">
-                <button type="button" class="attendance-filter-select-trigger period-button @(showPeriodMenu ? "active" : null)" @onclick="TogglePeriodMenu">
-                    <span class="period-button-content">
-                        <span class="period-label">Period:</span>
-                        <span class="period-selected">@SelectedPeriodLabel</span>
-                        @if (selectedPeriod?.IsCurrent == true)
-                        {
-                            <span class="period-current-text">(Current)</span>
-                        }
-                    </span>
-                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
-                </button>
-
-                <div class="attendance-filter-select-menu period-menu @(showPeriodMenu ? "show" : null)">
-                    @foreach (var p in periods)
+        <div class="dashboard-live-clock" aria-live="polite">
+            <div class="dashboard-live-time" aria-label="@LiveClockTimeLabel">
+                @foreach (var part in LiveClockParts)
+                {
+                    if (part.Value == ":")
                     {
-                        var itemId = selectedPeriod == p ? "period-1-selected-item" : null;
-                        <button type="button" class="attendance-filter-select-option period-option @(selectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectPeriod(p)">
-                            <span class="period-option-label">@p.Label</span>
-                            @if (p.IsCurrent)
+                        <span class="flip-clock-separator">:</span>
+                    }
+                    else
+                    {
+                        <span @key="GetClockPartKey(part.Index, part.Value, part.PreviousValue)" class="flip-clock-card @(part.HasChanged ? "changing" : null)">
+                            <span class="flip-clock-number">@part.Value</span>
+                            @if (part.HasChanged)
+                            {
+                                <span class="flip-clock-top-previous" aria-hidden="true">
+                                    <span class="flip-clock-top-number">@part.PreviousValue</span>
+                                </span>
+                                <span class="flip-clock-bottom-next" aria-hidden="true">
+                                    <span class="flip-clock-bottom-number">@part.Value</span>
+                                </span>
+                            }
+                            <span class="flip-clock-lower-flap" aria-hidden="true">
+                                <span class="flip-clock-flap-face flip-clock-flap-front">
+                                    <span class="flip-clock-flap-number flip-clock-flap-number-bottom">@part.PreviousValue</span>
+                                </span>
+                                <span class="flip-clock-flap-face flip-clock-flap-back">
+                                    <span class="flip-clock-flap-number flip-clock-flap-number-top">@part.Value</span>
+                                </span>
+                                <span class="flip-clock-back-number-overlay">
+                                    <span class="flip-clock-back-number">@part.Value</span>
+                                </span>
+                            </span>
+                        </span>
+                    }
+                }
+                <span class="flip-clock-meridiem">@liveClockNow.ToString("tt")</span>
+            </div>
+            <div class="dashboard-live-date">@LiveClockDateLabel</div>
+        </div>
+        <div class="period-dropdown @(showAddPeriod || isClosingAddPeriod ? "has-period-range" : null)" @ref="periodControlsRef">
+            <div class="period-primary-row">
+                <div class="attendance-filter-select-wrap period-dropdown">
+                    <button type="button" class="attendance-filter-select-trigger period-button @(showPeriodMenu ? "active" : null)" @onclick="TogglePeriodMenu">
+                        <span class="period-button-content">
+                            <span class="period-label">Period:</span>
+                            <span class="period-selected">@SelectedPeriodLabel</span>
+                            @if (selectedPeriod?.IsCurrent == true)
                             {
                                 <span class="period-current-text">(Current)</span>
                             }
-                        </button>
-                    }
-                </div>
-            </div>
+                        </span>
+                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                    </button>
 
-            @if (periods.Count > 1 && !showAddPeriod && !isClosingAddPeriod)
-            {
-                <button type="button" class="btn btn-outline-secondary period-add-button" @onclick="ToggleAddPeriod">+</button>
-            }
+                    <div class="attendance-filter-select-menu period-menu @(showPeriodMenu ? "show" : null)">
+                        @foreach (var p in periods)
+                        {
+                            var itemId = selectedPeriod == p ? "period-1-selected-item" : null;
+                            <button type="button" class="attendance-filter-select-option period-option @(selectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectPeriod(p)">
+                                <span class="period-option-label">@p.Label</span>
+                                @if (p.IsCurrent)
+                                {
+                                    <span class="period-current-text">(Current)</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (periods.Count > 1 && !showAddPeriod && !isClosingAddPeriod)
+                {
+                    <button type="button" class="btn btn-outline-secondary period-add-button" @onclick="ToggleAddPeriod">+</button>
+                }
+            </div>
 
             @if (showAddPeriod || isClosingAddPeriod)
             {
@@ -104,10 +149,25 @@
         </div>
     </div>
 
-    <div class="dashboard-grid">
-        <section class="panel-card">
+    <div class="dashboard-grid dashboard-log-grid" @ref="tableMenuControlsRef">
+        <section class="panel-card dashboard-log-card">
             <div class="panel-heading">
                 <h2>Recent Onsite Logs</h2>
+                <div class="dashboard-table-actions" @onclick:stopPropagation="true">
+                    <button type="button" class="dashboard-table-action-trigger @(openTableMenu == DashboardTableMenu.Onsite ? "active" : null)" @onclick="() => ToggleTableMenu(DashboardTableMenu.Onsite)" aria-label="Open recent onsite logs actions" aria-expanded="@(openTableMenu == DashboardTableMenu.Onsite)">
+                        <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+                    </button>
+                    <div class="dashboard-table-action-menu @(openTableMenu == DashboardTableMenu.Onsite ? "show" : null)">
+                        <button type="button" @onclick="() => OpenViewMoreLogsAsync(DashboardTableMenu.Onsite)">
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>View More</span>
+                        </button>
+                        <button type="button" @onclick="OpenExportLogsModal">
+                            <i class="fa-solid fa-file-export" aria-hidden="true"></i>
+                            <span>Export</span>
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle dashboard-log-table">
@@ -124,7 +184,10 @@
                         {
                             <tr>
                                 <td>@log.IdNumber</td>
-                                <td>@FormatName(log.LastName, log.FirstName, log.MiddleName)</td>
+                                <td>
+                                    <div>@FormatName(log.LastName, log.FirstName, log.MiddleName)</div>
+                                    <div class="dashboard-employee-meta">@FormatEmployeeMeta(log.DivisionCenterUnit, log.Designation)</div>
+                                </td>
                                 <td style="white-space:pre-line;">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</td>
                                 <td style="white-space:pre-line;">@FormatTimeRange(log.TimeInPm, log.TimeOutPm)</td>
                             </tr>
@@ -134,9 +197,24 @@
             </div>
         </section>
 
-        <section class="panel-card">
+        <section class="panel-card dashboard-log-card">
             <div class="panel-heading">
                 <h2>Recent WFH Logs</h2>
+                <div class="dashboard-table-actions" @onclick:stopPropagation="true">
+                    <button type="button" class="dashboard-table-action-trigger @(openTableMenu == DashboardTableMenu.Wfh ? "active" : null)" @onclick="() => ToggleTableMenu(DashboardTableMenu.Wfh)" aria-label="Open recent WFH logs actions" aria-expanded="@(openTableMenu == DashboardTableMenu.Wfh)">
+                        <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+                    </button>
+                    <div class="dashboard-table-action-menu @(openTableMenu == DashboardTableMenu.Wfh ? "show" : null)">
+                        <button type="button" @onclick="() => OpenViewMoreLogsAsync(DashboardTableMenu.Wfh)">
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>View More</span>
+                        </button>
+                        <button type="button" @onclick="OpenExportLogsModal">
+                            <i class="fa-solid fa-file-export" aria-hidden="true"></i>
+                            <span>Export</span>
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle dashboard-log-table dashboard-log-table-wfh">
@@ -144,6 +222,9 @@
                         <tr>
                             <th>ID Number</th>
                             <th>Employee</th>
+                            <th>Target</th>
+                            <th>Accomplishment</th>
+                            <th>MOV</th>
                             <th>Time In</th>
                             <th>Time Out</th>
                         </tr>
@@ -153,7 +234,22 @@
                         {
                             <tr>
                                 <td>@log.IdNumber</td>
-                                <td>@FormatName(log.LastName, log.FirstName, log.MiddleName)</td>
+                                <td>
+                                    <div>@FormatName(log.LastName, log.FirstName, log.MiddleName)</div>
+                                    <div class="dashboard-employee-meta">@FormatEmployeeMeta(log.DivisionCenterUnit, log.Designation)</div>
+                                </td>
+                                <td><span class="dashboard-text-cell" title="@DisplayValue(log.Target)">@DisplayValue(log.Target)</span></td>
+                                <td><span class="dashboard-text-cell" title="@DisplayValue(log.Accomplishment)">@DisplayValue(log.Accomplishment)</span></td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(log.Mov))
+                                    {
+                                        <span>-</span>
+                                    }
+                                    else
+                                    {
+                                        <a class="dashboard-text-cell" href="@log.Mov" target="_blank" title="@log.Mov">View File</a>
+                                    }
+                                </td>
                                 <td style="white-space:pre-line;">@FormatTime(log.TimeIn)</td>
                                 <td style="white-space:pre-line;">@FormatTime(log.TimeOut)</td>
                             </tr>
@@ -162,27 +258,1304 @@
                 </table>
             </div>
         </section>
-
     </div>
+
+    <div class="dashboard-chart-row">
+        <section class="panel-card dashboard-chart-card">
+            <div class="panel-heading dashboard-chart-heading">
+                <div>
+                    <h2>Late and Undertime Summary</h2>
+                </div>
+                <div class="dashboard-chart-totals" aria-label="Late and undertime totals">
+                    <span><i class="dashboard-chart-dot late" aria-hidden="true"></i>@lateTotal Late</span>
+                    <span><i class="dashboard-chart-dot undertime" aria-hidden="true"></i>@undertimeTotal Undertime</span>
+                </div>
+            </div>
+
+            <div class="dashboard-late-chart" role="img" aria-label="Late and undertime summary chart">
+                <div class="dashboard-apex-chart" @ref="lateUndertimeChartRef"></div>
+            </div>
+        </section>
+
+        <section class="panel-card dashboard-pie-card">
+            <div class="panel-heading dashboard-chart-heading">
+                <div>
+                    <h2>Work Arrangement</h2>
+                </div>
+                <div class="attendance-filter-select-wrap dashboard-division-dropdown" @onclick:stopPropagation="true">
+                    <button type="button" class="attendance-filter-select-trigger dashboard-division-trigger @(showDivisionPieMenu ? "active" : null)" @onclick="ToggleDivisionPieMenu">
+                        <span class="attendance-filter-select-value">@SelectedDivisionPieLabel</span>
+                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                    </button>
+                    <div class="attendance-filter-select-menu dashboard-division-menu @(showDivisionPieMenu ? "show" : null)">
+                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(selectedDivisionPie) ? "active" : null)" @onclick='() => SelectDivisionPie(string.Empty)'>All Divisions / Units</button>
+                        @foreach (var option in divisionPieOptions)
+                        {
+                            <button type="button" class="attendance-filter-select-option @(string.Equals(selectedDivisionPie, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SelectDivisionPie(option)'>@option</button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-pie-content">
+                <div class="dashboard-apex-pie-wrap">
+                    <div class="dashboard-apex-pie" @ref="workArrangementChartRef"></div>
+                </div>
+
+                <div class="dashboard-pie-legend">
+                    <div class="dashboard-pie-legend-row">
+                        <span><i class="dashboard-chart-dot onsite" aria-hidden="true"></i>Onsite</span>
+                        <strong>@DivisionPieOnsitePercentLabel</strong>
+                    </div>
+                    <div class="dashboard-pie-legend-row">
+                        <span><i class="dashboard-chart-dot wfh" aria-hidden="true"></i>WFH</span>
+                        <strong>@DivisionPieWfhPercentLabel</strong>
+                    </div>
+                    <div class="dashboard-pie-counts">
+                        <span>@divisionPieOnsiteCount onsite logs</span>
+                        <span>@divisionPieWfhCount WFH logs</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    @if (showViewMoreModal)
+    {
+        <div class="attendance-detail-overlay dashboard-modal-overlay" @onclick="CloseViewMoreModal">
+            <div class="attendance-detail-modal dashboard-logs-modal" @onclick="CloseViewMoreTransientMenus" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">@ViewMoreTitle</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseViewMoreModal" aria-label="Close dashboard logs">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body dashboard-logs-modal-body">
+                    <div class="attendance-table-toolbar dashboard-modal-toolbar">
+                        <div class="attendance-table-search">
+                            <input id="dashboardLogSearch"
+                                   class="form-control attendance-table-search-input"
+                                   type="search"
+                                   placeholder="Search..."
+                                   value="@viewMoreSearchText"
+                                   @oninput="HandleViewMoreSearchInput" />
+                        </div>
+
+                        <div class="attendance-table-actions">
+                            <div class="attendance-filter-dropdown" @onclick:stopPropagation="true">
+                                <button type="button" class="btn btn-outline-secondary attendance-filter-button" @onclick="ToggleViewMoreFilterMenu">
+                                    <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i>
+                                    <span>Filter</span>
+                                    @if (HasActiveViewMoreFilters)
+                                    {
+                                        <span class="attendance-filter-button-clear"
+                                              title="Clear filters"
+                                              role="button"
+                                              tabindex="0"
+                                              @onclick="ClearViewMoreFiltersFromButton"
+                                              @onclick:stopPropagation="true">×</span>
+                                    }
+                                </button>
+
+                                <div class="attendance-filter-menu @(showViewMoreFilterMenu ? "show" : null)" @onclick:stopPropagation="true">
+                                    <div class="attendance-filter-grid">
+                                        <div class="attendance-filter-field">
+                                            <label class="attendance-table-toolbar-label" for="dashboardFilterId">ID Number</label>
+                                            <div class="attendance-filter-select-wrap">
+                                                <button type="button" id="dashboardFilterId" class="attendance-filter-select-trigger @(activeViewMoreFilterField == "id" ? "active" : null)" @onclick='() => ToggleViewMoreFilterField("id")'>
+                                                    <span class="attendance-filter-select-value">@DisplayValue(viewMoreFilterIdNumber, "All ID Numbers")</span>
+                                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                                </button>
+
+                                                <div class="attendance-filter-select-menu @(activeViewMoreFilterField == "id" ? "show" : null)">
+                                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(viewMoreFilterIdNumber) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("id", string.Empty)'>All ID Numbers</button>
+                                                    @foreach (var option in CurrentViewMoreIdNumberOptions)
+                                                    {
+                                                        <button type="button" class="attendance-filter-select-option @(string.Equals(viewMoreFilterIdNumber, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("id", option)'>@option</button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="attendance-filter-field">
+                                            <label class="attendance-table-toolbar-label" for="dashboardFilterEmployee">Employee</label>
+                                            <div class="attendance-filter-select-wrap">
+                                                <button type="button" id="dashboardFilterEmployee" class="attendance-filter-select-trigger @(activeViewMoreFilterField == "employee" ? "active" : null)" @onclick='() => ToggleViewMoreFilterField("employee")'>
+                                                    <span class="attendance-filter-select-value">@DisplayValue(viewMoreFilterEmployee, "All Employees")</span>
+                                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                                </button>
+
+                                                <div class="attendance-filter-select-menu @(activeViewMoreFilterField == "employee" ? "show" : null)">
+                                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(viewMoreFilterEmployee) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("employee", string.Empty)'>All Employees</button>
+                                                    @foreach (var option in CurrentViewMoreEmployeeOptions)
+                                                    {
+                                                        <button type="button" class="attendance-filter-select-option @(string.Equals(viewMoreFilterEmployee, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("employee", option)'>@option</button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="attendance-filter-field">
+                                            <label class="attendance-table-toolbar-label" for="dashboardFilterDivision">Division / Unit</label>
+                                            <div class="attendance-filter-select-wrap">
+                                                <button type="button" id="dashboardFilterDivision" class="attendance-filter-select-trigger @(activeViewMoreFilterField == "division" ? "active" : null)" @onclick='() => ToggleViewMoreFilterField("division")'>
+                                                    <span class="attendance-filter-select-value">@DisplayValue(viewMoreFilterDivision, "All Divisions / Units")</span>
+                                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                                </button>
+
+                                                <div class="attendance-filter-select-menu @(activeViewMoreFilterField == "division" ? "show" : null)">
+                                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(viewMoreFilterDivision) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                                    @foreach (var option in CurrentViewMoreDivisionOptions)
+                                                    {
+                                                        <button type="button" class="attendance-filter-select-option @(string.Equals(viewMoreFilterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("division", option)'>@option</button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="attendance-filter-field">
+                                            <label class="attendance-table-toolbar-label" for="dashboardFilterDesignation">Designation</label>
+                                            <div class="attendance-filter-select-wrap">
+                                                <button type="button" id="dashboardFilterDesignation" class="attendance-filter-select-trigger @(activeViewMoreFilterField == "designation" ? "active" : null)" @onclick='() => ToggleViewMoreFilterField("designation")'>
+                                                    <span class="attendance-filter-select-value">@DisplayValue(viewMoreFilterDesignation, "All Designations")</span>
+                                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                                </button>
+
+                                                <div class="attendance-filter-select-menu @(activeViewMoreFilterField == "designation" ? "show" : null)">
+                                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(viewMoreFilterDesignation) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("designation", string.Empty)'>All Designations</button>
+                                                    @foreach (var option in CurrentViewMoreDesignationOptions)
+                                                    {
+                                                        <button type="button" class="attendance-filter-select-option @(string.Equals(viewMoreFilterDesignation, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("designation", option)'>@option</button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="attendance-filter-actions">
+                                        <button type="button" class="attendance-filter-clear" @onclick="ClearViewMoreFilters">Clear</button>
+                                        <button type="button" class="btn btn-primary attendance-filter-apply" @onclick="CloseViewMoreFilterMenu">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="attendance-filter-dropdown attendance-entries-counter" @onclick:stopPropagation="true">
+                                <button type="button" class="btn btn-outline-secondary attendance-filter-button attendance-entries-button" @onclick="ToggleViewMoreEntriesMenu">
+                                    <span>@viewMorePageSize</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-entries-menu attendance-filter-menu @(showViewMoreEntriesMenu ? "show" : null)" @onclick:stopPropagation="true">
+                                    @foreach (var option in PageSizeOptions)
+                                    {
+                                        <button type="button"
+                                                class="attendance-entries-option @(viewMorePageSize == option ? "active" : null)"
+                                                @onclick="() => SelectViewMorePageSize(option)">
+                                            @option
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive dashboard-modal-table-wrap">
+                        @if (viewMoreTable == DashboardTableMenu.Onsite)
+                        {
+                            <table class="table table-sm align-middle dashboard-log-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID Number</th>
+                                        <th>Employee</th>
+                                        <th>AM</th>
+                                        <th>PM</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var log in PagedViewMoreOnsiteLogs)
+                                    {
+                                        <tr>
+                                            <td>@log.IdNumber</td>
+                                            <td>
+                                                <div>@FormatName(log.LastName, log.FirstName, log.MiddleName)</div>
+                                                <div class="dashboard-employee-meta">@FormatEmployeeMeta(log.DivisionCenterUnit, log.Designation)</div>
+                                            </td>
+                                            <td style="white-space:pre-line;">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</td>
+                                            <td style="white-space:pre-line;">@FormatTimeRange(log.TimeInPm, log.TimeOutPm)</td>
+                                        </tr>
+                                    }
+                                    @if (!PagedViewMoreOnsiteLogs.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <table class="table table-sm align-middle dashboard-log-table dashboard-log-table-wfh">
+                                <thead>
+                                    <tr>
+                                        <th>ID Number</th>
+                                        <th>Employee</th>
+                                        <th>Target</th>
+                                        <th>Accomplishment</th>
+                                        <th>MOV</th>
+                                        <th>Time In</th>
+                                        <th>Time Out</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var log in PagedViewMoreWfhLogs)
+                                    {
+                                        <tr>
+                                            <td>@log.IdNumber</td>
+                                            <td>
+                                                <div>@FormatName(log.LastName, log.FirstName, log.MiddleName)</div>
+                                                <div class="dashboard-employee-meta">@FormatEmployeeMeta(log.DivisionCenterUnit, log.Designation)</div>
+                                            </td>
+                                            <td><span class="dashboard-text-cell" title="@DisplayValue(log.Target)">@DisplayValue(log.Target)</span></td>
+                                            <td><span class="dashboard-text-cell" title="@DisplayValue(log.Accomplishment)">@DisplayValue(log.Accomplishment)</span></td>
+                                            <td>
+                                                @if (string.IsNullOrWhiteSpace(log.Mov))
+                                                {
+                                                    <span>-</span>
+                                                }
+                                                else
+                                                {
+                                                    <a class="dashboard-text-cell" href="@log.Mov" target="_blank" title="@log.Mov">View File</a>
+                                                }
+                                            </td>
+                                            <td style="white-space:pre-line;">@FormatTime(log.TimeIn)</td>
+                                            <td style="white-space:pre-line;">@FormatTime(log.TimeOut)</td>
+                                        </tr>
+                                    }
+                                    @if (!PagedViewMoreWfhLogs.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="7" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+
+                    <div class="table-footer dashboard-modal-table-footer">
+                        <div class="table-entries">@ViewMoreEntryLabel</div>
+                        <div class="table-pagination">
+                            <button type="button" class="table-page-btn table-page-arrow" @onclick="PreviousViewMorePage" disabled="@(viewMorePage <= 1)">&#8249;</button>
+                            @foreach (var pageItem in BuildPageItems(ViewMoreTotalPages, viewMorePage))
+                            {
+                                if (pageItem.HasValue)
+                                {
+                                    <button type="button" class="table-page-btn @(viewMorePage == pageItem.Value ? "active" : null)" @onclick="() => SelectViewMorePage(pageItem.Value)">@pageItem.Value</button>
+                                }
+                                else
+                                {
+                                    <span class="table-page-ellipsis">...</span>
+                                }
+                            }
+                            <button type="button" class="table-page-btn table-page-arrow" @onclick="NextViewMorePage" disabled="@(viewMorePage >= ViewMoreTotalPages)">&#8250;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseViewMoreModal">Close</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (showExportLogsModal)
+    {
+        <div class="attendance-detail-overlay dashboard-modal-overlay" @onclick="CloseExportLogsModal">
+            <div class="attendance-detail-modal attendance-export-modal" @onclick="CloseExportPeriodMenus" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Export Logs</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseExportLogsModal" aria-label="Close export attendance logs">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body attendance-input-body">
+                    <div class="attendance-detail-section attendance-detail-hero">
+                        <div>
+                            <div class="attendance-detail-eyebrow">CSV Export</div>
+                            <div class="attendance-detail-person">Select the period range to include in the export.</div>
+                            <div class="attendance-detail-meta">This export downloads a ZIP file with separate onsite and WFH CSV files.</div>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-section attendance-detail-section-primary">
+                        <div class="attendance-export-periods" @ref="exportPeriodControlsRef" @onclick:stopPropagation="true">
+                            <div class="attendance-export-period-row @(showExportPeriodMenu ? "menu-open" : null)">
+                                <span class="attendance-detail-label">From</span>
+                                <div class="attendance-filter-select-wrap period-dropdown attendance-export-period-dropdown @(showExportPeriodMenu ? "menu-open" : null)" @onclick:stopPropagation="true">
+                                    <button type="button" class="attendance-filter-select-trigger period-button @(showExportPeriodMenu ? "active" : null)" @ref="exportPeriodButtonRef" @onclick="ToggleExportPeriodMenu">
+                                        <span class="period-button-content">
+                                            <span class="period-label">Period:</span>
+                                            <span class="period-selected">@ExportSelectedPeriodLabel</span>
+                                            @if (exportSelectedPeriod?.IsCurrent == true)
+                                            {
+                                                <span class="period-current-text">(Current)</span>
+                                            }
+                                        </span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="@GetExportPeriodMenuClass(showExportPeriodMenu, openExportPeriodMenuUpward)" @onclick:stopPropagation="true">
+                                        @foreach (var p in periods)
+                                        {
+                                            var itemId = exportSelectedPeriod == p ? "dashboard-export-period-1-selected-item" : null;
+                                            <button type="button" class="attendance-filter-select-option period-option @(exportSelectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectExportPeriod(p)">
+                                                <span class="period-option-label">@p.Label</span>
+                                                @if (p.IsCurrent)
+                                                {
+                                                    <span class="period-current-text">(Current)</span>
+                                                }
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if (periods.Count > 1 && !showExportAddPeriod && !isClosingExportAddPeriod)
+                            {
+                                <button type="button" class="btn btn-outline-secondary period-add-button attendance-export-period-add" @onclick="ToggleExportAddPeriod">
+                                    <span class="attendance-export-period-add-icon" aria-hidden="true">+</span>
+                                    <span>Add a period</span>
+                                </button>
+                            }
+
+                            @if (showExportAddPeriod || isClosingExportAddPeriod)
+                            {
+                                <div class="period-range-entry attendance-export-range-entry @(isClosingExportAddPeriod ? "closing" : null) @(showExportPeriod2Menu ? "menu-open" : null)">
+                                    <div class="period-to-label">TO</div>
+
+                                    <div class="attendance-filter-select-wrap period-dropdown attendance-export-period-dropdown @(showExportPeriod2Menu ? "menu-open" : null)" @onclick:stopPropagation="true">
+                                        <button type="button" class="period-close-btn" title="Close export period range" @onclick="ToggleExportAddPeriod">×</button>
+                                        <button type="button" class="attendance-filter-select-trigger period-button @(showExportPeriod2Menu ? "active" : null)" @ref="exportPeriod2ButtonRef" @onclick="ToggleExportPeriod2Menu">
+                                            <span class="period-button-content">
+                                                <span class="period-label">Period:</span>
+                                                <span class="period-selected">@ExportSelectedPeriod2Label</span>
+                                                @if (exportSecondSelectedPeriod?.IsCurrent == true)
+                                                {
+                                                    <span class="period-current-text">(Current)</span>
+                                                }
+                                            </span>
+                                            <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                        </button>
+
+                                        <div class="@GetExportPeriodMenuClass(showExportPeriod2Menu, openExportPeriod2MenuUpward)" @onclick:stopPropagation="true">
+                                            @foreach (var p in periods)
+                                            {
+                                                var itemId = exportSecondSelectedPeriod == p ? "dashboard-export-period-2-selected-item" : null;
+                                                <button type="button" class="attendance-filter-select-option period-option @(exportSecondSelectedPeriod == p ? "active" : null)" id="@itemId" @onclick="() => SelectExportSecondPeriod(p)">
+                                                    <span class="period-option-label">@p.Label</span>
+                                                    @if (p.IsCurrent)
+                                                    {
+                                                        <span class="period-current-text">(Current)</span>
+                                                    }
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseExportLogsModal" disabled="@isExportingLogs">Cancel</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@isExportingLogs">@(isExportingLogs ? "Exporting..." : "Export")</button>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 <style>
+    .dashboard-grid .panel-heading {
+        align-items: center;
+    }
+
     .dashboard-grid .panel-heading h2 {
+        margin: 0;
         font-size: 1rem;
         font-weight: 600;
     }
 
-    .dashboard-log-table {
-        width: auto;
+    .dashboard-log-grid {
+        grid-template-columns: repeat(2, minmax(320px, 1fr));
+        align-items: stretch;
+    }
+
+    .dashboard-chart-row {
+        display: grid;
+        grid-template-columns: minmax(0, 60%) minmax(320px, 40%);
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .dashboard-log-card,
+    .dashboard-chart-card,
+    .dashboard-pie-card {
+        min-width: 0;
+    }
+
+    .dashboard-log-card {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .dashboard-log-card .table-responsive {
+        flex: 1 1 auto;
+    }
+
+    .dashboard-chart-card,
+    .dashboard-pie-card {
+        display: flex;
+        flex-direction: column;
+        min-height: 460px;
+    }
+
+    .dashboard-chart-heading {
+        align-items: center !important;
+    }
+
+    .dashboard-chart-heading h2 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .dashboard-chart-totals {
+        display: inline-flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 0.55rem 0.85rem;
+        color: var(--finance-text-muted);
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
+
+    .dashboard-chart-totals span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .dashboard-chart-dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+    }
+
+    .dashboard-chart-dot.late {
+        background: #111844;
+    }
+
+    .dashboard-chart-dot.undertime {
+        background: #4B5694;
+    }
+
+    .dashboard-chart-dot.onsite {
+        background: #111844;
+    }
+
+    .dashboard-chart-dot.wfh {
+        background: #EAE0CF;
+        border: 1px solid #d8ccb8;
+    }
+
+    .dashboard-late-chart {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 360px;
+        padding: 0.4rem 0.25rem 0;
+        border-radius: 8px;
+        background: var(--etrs-gray-50);
+        border: 1px solid var(--finance-border-soft);
+        overflow: hidden;
+    }
+
+    .dashboard-apex-chart {
+        min-height: 340px;
+    }
+
+    .dashboard-apex-pie-wrap {
+        min-width: 0;
+    }
+
+    .dashboard-apex-pie {
+        min-height: 300px;
+    }
+
+    .dashboard-apex-chart .apexcharts-canvas,
+    .dashboard-apex-pie .apexcharts-canvas {
+        max-width: 100%;
+    }
+
+    .dashboard-apex-pie .apexcharts-tooltip {
+        border: 1px solid var(--finance-border) !important;
+        background: #ffffff !important;
+        color: var(--finance-text) !important;
+        box-shadow: 0 10px 24px rgba(30, 41, 57, 0.12) !important;
+    }
+
+    .dashboard-apex-pie .apexcharts-tooltip-title {
+        border-bottom: 1px solid var(--finance-border-soft) !important;
+        background: #ffffff !important;
+        color: var(--finance-text) !important;
+    }
+
+    .dashboard-apex-pie .dashboard-apex-tooltip {
+        padding: 0.55rem 0.75rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 6px;
+        background: #ffffff;
+        color: var(--finance-text);
+        box-shadow: 0 10px 24px rgba(30, 41, 57, 0.12);
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .dashboard-apex-pie .apexcharts-pie-area {
+        transform-box: fill-box;
+        transform-origin: center;
+        transition: transform 150ms ease;
+    }
+
+    .dashboard-apex-pie .apexcharts-pie-area:hover {
+        transform: scale(1.035);
+    }
+
+    .dashboard-chart-bars {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        grid-auto-columns: minmax(42px, 1fr);
+        grid-auto-flow: column;
+        gap: 0.8rem;
         min-width: 100%;
+        height: 100%;
+    }
+
+    .dashboard-chart-column {
+        position: relative;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) 1.2rem;
+        min-width: 42px;
+        height: 100%;
+    }
+
+    .dashboard-chart-positive,
+    .dashboard-chart-negative {
+        position: relative;
+        min-height: 0;
+    }
+
+    .dashboard-chart-positive {
+        display: flex;
+        align-items: flex-end;
+    }
+
+    .dashboard-chart-negative {
+        display: flex;
+        align-items: flex-start;
+    }
+
+    .dashboard-chart-bar {
+        display: block;
+        width: 100%;
+        min-height: 3px;
+        border-radius: 7px;
+        transition: height 180ms ease;
+    }
+
+    .dashboard-chart-bar.late {
+        background: #111844;
+        box-shadow: none;
+    }
+
+    .dashboard-chart-bar.undertime {
+        background: #4B5694;
+        box-shadow: none;
+    }
+
+    .dashboard-chart-bar[style*="height: 0"] {
+        min-height: 0;
+    }
+
+    .dashboard-chart-label {
+        align-self: end;
+        padding-top: 0.45rem;
+        color: var(--finance-text-muted);
+        font-size: 0.7rem;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .dashboard-chart-zero-line {
+        position: absolute;
+        left: 2.35rem;
+        right: 1.1rem;
+        top: calc(50% - 0.6rem);
+        z-index: 1;
+        height: 1px;
+        background: var(--finance-border);
+    }
+
+    .dashboard-chart-scale {
+        position: absolute;
+        left: 0.45rem;
+        z-index: 3;
+        color: var(--finance-text-muted);
+        font-size: 0.7rem;
+        line-height: 1;
+    }
+
+    .dashboard-chart-scale-top {
+        top: 1.1rem;
+    }
+
+    .dashboard-chart-scale-zero {
+        top: calc(50% - 1rem);
+    }
+
+    .dashboard-chart-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        color: var(--finance-text-muted);
+        font-size: 0.9rem;
+        text-align: center;
+    }
+
+    .dashboard-division-dropdown {
+        width: min(100%, 14rem);
+    }
+
+    .dashboard-division-trigger {
+        min-height: 2.25rem;
+        height: 2.25rem;
+        padding: 0.45rem 0.65rem;
+        font-size: 0.82rem;
+    }
+
+    .dashboard-division-menu {
+        right: 0;
+        left: auto;
+        width: min(18rem, 84vw);
+        max-height: 16rem;
+        overflow-y: auto;
+    }
+
+    .dashboard-pie-content {
+        flex: 1 1 auto;
+        display: grid;
+        grid-template-columns: minmax(160px, 1fr) minmax(170px, 0.9fr);
+        gap: 1.25rem;
+        align-items: center;
+        min-height: 320px;
+    }
+
+    .dashboard-donut-wrap {
+        display: flex;
+        justify-content: center;
+    }
+
+    .dashboard-donut {
+        --onsite-slice: 50%;
+        position: relative;
+        width: min(100%, 210px);
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background:
+            radial-gradient(circle at center, #ffffff 0 46%, transparent 47%),
+            conic-gradient(#2f6b3d 0 var(--onsite-slice), #d7b252 var(--onsite-slice) 100%);
+        box-shadow: inset 0 0 0 1px var(--finance-border-soft);
+    }
+
+    .dashboard-donut::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: repeating-conic-gradient(from -8deg, rgba(255,255,255,0.18) 0deg 8deg, transparent 8deg 16deg);
+        pointer-events: none;
+        mix-blend-mode: soft-light;
+    }
+
+    .dashboard-donut.empty {
+        background:
+            radial-gradient(circle at center, #ffffff 0 46%, transparent 47%),
+            conic-gradient(var(--etrs-gray-300) 0 100%);
+    }
+
+    .dashboard-donut-center {
+        position: absolute;
+        inset: 29%;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 1px solid var(--finance-border-soft);
+        text-align: center;
+    }
+
+    .dashboard-donut-center strong {
+        color: var(--finance-text);
+        font-size: 1.6rem;
+        line-height: 1;
+        font-weight: 700;
+    }
+
+    .dashboard-donut-center span {
+        margin-top: 0.2rem;
+        color: var(--finance-text-muted);
+        font-size: 0.75rem;
+    }
+
+    .dashboard-pie-legend {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .dashboard-pie-legend-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        color: var(--finance-text);
+        font-size: 0.88rem;
+    }
+
+    .dashboard-pie-legend-row span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-width: 0;
+    }
+
+    .dashboard-pie-legend-row strong {
+        font-size: 0.95rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .dashboard-pie-counts {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-top: 0.25rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--finance-border-soft);
+        color: var(--finance-text-muted);
+        font-size: 0.8rem;
+    }
+
+    @@media (max-width: 1180px) {
+        .dashboard-log-grid,
+        .dashboard-chart-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @@media (max-width: 760px) {
+        .dashboard-chart-card {
+            min-height: 520px;
+        }
+
+        .dashboard-late-chart {
+            min-height: 420px;
+        }
+
+        .dashboard-chart-heading,
+        .dashboard-chart-totals {
+            align-items: flex-start !important;
+            justify-content: flex-start;
+        }
+
+        .dashboard-pie-content {
+            grid-template-columns: 1fr;
+            min-height: 0;
+        }
+
+        .dashboard-division-dropdown {
+            width: 100%;
+        }
+    }
+
+    .dashboard-table-actions {
+        position: relative;
+        flex: 0 0 auto;
+    }
+
+    .dashboard-table-action-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--finance-text-muted);
+        line-height: 1;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .dashboard-table-action-trigger:hover,
+    .dashboard-table-action-trigger.active {
+        background: var(--finance-surface-soft);
+        color: var(--finance-text);
+    }
+
+    .dashboard-table-action-menu {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        right: 0;
+        z-index: 12;
+        min-width: 9.5rem;
+        padding: 0.35rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .dashboard-table-action-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .dashboard-table-action-menu button {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        width: 100%;
+        padding: 0.5rem 0.6rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        font-size: 0.84rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .dashboard-table-action-menu button:hover {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .dashboard-log-table {
+        width: max-content;
+        min-width: 100%;
+        margin: 0;
+        border-collapse: collapse;
+        table-layout: auto;
     }
 
     .dashboard-log-table th,
     .dashboard-log-table td {
-        white-space: normal;
-        word-break: break-word;
-        overflow-wrap: anywhere;
+        white-space: nowrap;
+        word-break: normal;
+        overflow-wrap: normal;
         vertical-align: top;
+    }
+
+    .dashboard-employee-meta {
+        margin-top: 0.2rem;
+        color: var(--finance-text-muted);
+        font-size: 0.82rem;
+        line-height: 1.25;
+        white-space: nowrap;
+    }
+
+    .dashboard-grid .panel-card .table-responsive,
+    .dashboard-logs-modal .dashboard-modal-table-wrap {
+        overflow-x: auto;
+        overflow-y: auto;
+    }
+
+    .app-content .dashboard-logs-modal .dashboard-modal-table-wrap.table-responsive {
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+    }
+
+    .dashboard-grid .panel-card .table-responsive {
+        max-width: 100%;
+    }
+
+    .dashboard-logs-modal .dashboard-modal-table-wrap .dashboard-log-table {
+        min-width: max(100%, 920px);
+    }
+
+    .dashboard-logs-modal .dashboard-modal-table-wrap .dashboard-log-table-wfh {
+        min-width: 1320px;
+    }
+
+    .dashboard-logs-modal .dashboard-modal-table-wrap .dashboard-log-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+        background: var(--etrs-gray-50);
+    }
+
+    .dashboard-log-table .dashboard-text-cell {
+        display: block;
+        max-width: 18rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .attendance-detail-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: rgba(30, 41, 57, 0.28);
+        backdrop-filter: blur(8px);
+    }
+
+    .attendance-detail-modal {
+        width: min(100%, 760px);
+        max-height: min(92vh, 900px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300) 88%, white);
+        border-radius: 10px;
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        animation: attendance-detail-enter 180ms ease-out;
+    }
+
+    .attendance-detail-header,
+    .attendance-detail-hero,
+    .attendance-detail-footer {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .attendance-detail-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 1.15rem 1.5rem 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border-bottom: 1px solid var(--etrs-gray-200);
+    }
+
+    .attendance-detail-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 1rem 1.5rem;
+    }
+
+    .attendance-detail-title {
+        margin: 0;
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--etrs-gray-700);
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .attendance-detail-section {
+        margin-top: 1rem;
+        padding: 1rem 1.05rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.9);
+        overflow: visible;
+    }
+
+    .attendance-detail-hero {
+        align-items: center;
+        background: #ffffff;
+        border-color: var(--etrs-gray-200);
+        border-radius: 8px;
+    }
+
+    .attendance-detail-eyebrow {
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-person {
+        margin-top: 0.35rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-meta {
+        margin-top: 0.2rem;
+        font-weight: 400;
+        color: var(--etrs-gray-700);
+    }
+
+    .attendance-detail-label {
+        color: var(--etrs-gray-700);
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .attendance-detail-section-primary .attendance-detail-label {
+        font-weight: 500;
+    }
+
+    .attendance-detail-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 1rem 1.5rem 1.25rem;
+        background: linear-gradient(180deg, rgba(250, 250, 250, 0.92) 0%, var(--etrs-gray-50) 100%);
+        border-top: 1px solid var(--etrs-gray-200);
+    }
+
+    .attendance-detail-done {
+        min-width: 7rem;
+        border-radius: 12px;
+        padding-inline: 1.25rem;
+    }
+
+    .attendance-detail-text-action {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--etrs-gray-700);
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .attendance-detail-text-action:hover,
+    .attendance-detail-text-action:focus-visible {
+        color: var(--etrs-black);
+        text-decoration: none;
+    }
+
+    .attendance-detail-text-action:disabled {
+        color: var(--etrs-gray-500);
+        text-decoration: none;
+    }
+
+    .attendance-input-body {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .dashboard-modal-overlay {
+        z-index: 1200;
+    }
+
+    .dashboard-logs-modal {
+        width: min(96vw, 1040px);
+        max-height: 90vh;
+    }
+
+    .dashboard-logs-modal-body {
+        overflow: auto;
+    }
+
+    .dashboard-modal-table-wrap {
+        max-height: 52vh;
+        overflow: auto;
+    }
+
+    .dashboard-modal-table-footer {
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .attendance-detail-modal.attendance-export-modal {
+        width: min(100%, 600px);
+        max-height: none;
+        overflow: visible;
+        position: relative;
+        z-index: 1201;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+    }
+
+    .attendance-detail-modal.attendance-export-modal::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300) 88%, white);
+        border-radius: 10px;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    .attendance-export-modal > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .attendance-export-modal .attendance-detail-body {
+        flex: 0 0 auto;
+        overflow: visible;
+        padding-bottom: 0.5rem;
+        position: relative;
+        z-index: 4;
+    }
+
+    .attendance-export-modal .attendance-detail-header {
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+
+    .attendance-export-modal .attendance-detail-footer {
+        padding-top: 1rem;
+        position: relative;
+        z-index: 1;
+        border-bottom-left-radius: 10px;
+        border-bottom-right-radius: 10px;
+    }
+
+    .attendance-export-periods {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+    }
+
+    .attendance-export-period-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        position: relative;
+        z-index: 5;
+    }
+
+    .attendance-export-period-row.menu-open {
+        z-index: 40;
+    }
+
+    .attendance-export-period-dropdown {
+        width: 100%;
+        min-width: 100%;
+        z-index: 25;
+    }
+
+    .attendance-export-period-dropdown.menu-open {
+        z-index: 45;
+    }
+
+    .attendance-export-period-dropdown .period-button {
+        width: 100%;
+    }
+
+    .attendance-export-periods .period-range-entry .period-to-label {
+        flex: 0 0 28px;
+    }
+
+    .attendance-export-periods .period-range-entry .attendance-export-period-dropdown {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto;
+    }
+
+    .attendance-export-period-dropdown .attendance-filter-select-menu {
+        z-index: 1302;
+    }
+
+    .attendance-export-period-dropdown .attendance-filter-select-menu.open-upward {
+        top: auto;
+        bottom: calc(100% + 0.35rem);
+        transform: translateY(6px);
+    }
+
+    .attendance-export-period-dropdown .attendance-filter-select-menu.open-upward.show {
+        transform: translateY(0);
+    }
+
+    .period-add-button.attendance-export-period-add {
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        min-height: 42px;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        margin-left: 0;
+        padding: 0.7rem 0.9rem;
+        white-space: nowrap;
+        flex-wrap: nowrap;
+        box-sizing: border-box;
+    }
+
+    .attendance-export-period-add-icon {
+        font-size: 1rem;
+        line-height: 1;
+        font-weight: 600;
+    }
+
+    .attendance-export-range-entry {
+        align-self: stretch;
+        position: relative;
+        z-index: 5;
+    }
+
+    .attendance-export-range-entry.menu-open {
+        z-index: 40;
     }
 
     /* Period selector styles copied from AttendanceLogs to keep appearance consistent */
@@ -204,20 +1577,332 @@
 
     /* ensure proper spacing between period selector and add button in the hero */
     .dashboard-hero {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(240px, 1fr) auto minmax(320px, 1fr);
         align-items: center;
-        justify-content: space-between;
         gap: 1rem;
-        flex-wrap: wrap;
+        border: 0;
+        box-shadow: none;
     }
 
-    .dashboard-hero .period-dropdown {
+    .dashboard-live-clock {
+        min-width: 390px;
+        text-align: center;
+        color: var(--etrs-black);
+        justify-self: center;
+    }
+
+    .dashboard-live-time {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
+        justify-content: center;
+        gap: 0.32rem;
+        white-space: nowrap;
+    }
+
+    .dashboard-hero > .period-dropdown {
+        justify-self: end;
+    }
+
+    .dashboard-live-date {
+        margin-top: 0.45rem;
+        color: var(--finance-text-muted);
+        font-size: 0.82rem;
+        font-weight: 600;
+        line-height: 1.25;
+        white-space: nowrap;
+    }
+
+    .flip-clock-card {
+        --flip-card-height: 3.35rem;
+        --flip-card-font-size: 2.65rem;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.45rem;
+        height: var(--flip-card-height);
+        border-radius: 8px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #353535 0%, #2b2b2b 49%, #242424 50%, #303030 100%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 16px rgba(15, 23, 42, 0.18);
+        color: #d7d7d7;
+        font-size: var(--flip-card-font-size);
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-shadow: 0 2px 3px rgba(0,0,0,0.55);
+        perspective: 360px;
+        transform-style: preserve-3d;
+    }
+
+    .flip-clock-number {
+        position: relative;
+        z-index: 1;
+        display: inline-block;
+        backface-visibility: hidden;
+    }
+
+    .flip-clock-top-previous {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        z-index: 5;
+        display: block;
+        height: 50%;
+        overflow: hidden;
+        border-radius: 8px 8px 0 0;
+        background: linear-gradient(180deg, #353535 0%, #2b2b2b 100%);
+        animation: flip-clock-top-hold 520ms linear forwards;
+    }
+
+    .flip-clock-top-number {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: var(--flip-card-height);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #d7d7d7;
+        font-size: var(--flip-card-font-size);
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-shadow: 0 2px 3px rgba(0,0,0,0.55);
+    }
+
+    .flip-clock-bottom-next {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2;
+        display: block;
+        height: 50%;
+        overflow: hidden;
+        border-radius: 0 0 8px 8px;
+        background: linear-gradient(180deg, #242424 0%, #303030 100%);
+    }
+
+    .flip-clock-bottom-number {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: var(--flip-card-height);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #d7d7d7;
+        font-size: var(--flip-card-font-size);
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-shadow: 0 2px 3px rgba(0,0,0,0.55);
+    }
+
+    .flip-clock-lower-flap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 6;
+        display: block;
+        height: 50%;
+        overflow: visible;
+        border-radius: 0 0 8px 8px;
+        border: 1px solid transparent;
+        background: linear-gradient(180deg, #242424 0%, #303030 100%);
+        transform-origin: top center;
+        transform-style: preserve-3d;
+        backface-visibility: visible;
+        animation: flip-clock-lower-turn 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+
+    .flip-clock-flap-face {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        height: 100%;
+        overflow: hidden;
+        border-radius: inherit;
+        backface-visibility: hidden;
+    }
+
+    .flip-clock-flap-front {
+        background: linear-gradient(180deg, #242424 0%, #303030 100%);
+        transform: rotateX(0deg);
+        animation: flip-clock-front-face 520ms linear forwards;
+    }
+
+    .flip-clock-flap-back {
+        background: linear-gradient(180deg, #353535 0%, #2b2b2b 100%);
+        transform: rotateX(180deg) translateZ(1px);
+        animation: flip-clock-back-face 520ms linear forwards;
+    }
+
+    .flip-clock-flap-number {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: var(--flip-card-height);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #d7d7d7;
+        font-size: var(--flip-card-font-size);
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-shadow: 0 2px 3px rgba(0,0,0,0.55);
+    }
+
+    .flip-clock-flap-number-bottom {
+        bottom: 0;
+        backface-visibility: hidden;
+    }
+
+    .flip-clock-flap-number-top {
+        top: 0;
+        backface-visibility: hidden;
+    }
+
+    .flip-clock-back-number-overlay {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 100%;
+        overflow: hidden;
+        z-index: 2;
+        opacity: 0;
+        transform: rotateX(180deg) translateZ(3px);
+        backface-visibility: hidden;
+        animation: flip-clock-back-face 520ms linear forwards;
+    }
+
+    .flip-clock-back-number {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: var(--flip-card-height);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #d7d7d7;
+        font-size: var(--flip-card-font-size);
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-shadow: 0 2px 3px rgba(0,0,0,0.55);
+    }
+
+    .flip-clock-card:not(.changing) .flip-clock-lower-flap {
+        display: none;
+    }
+
+    .flip-clock-card::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 1px;
+        background: rgba(0,0,0,0.45);
+        box-shadow: 0 1px 0 rgba(255,255,255,0.04);
+        z-index: 4;
+    }
+
+    .flip-clock-separator {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 3.35rem;
+        color: #5f6368;
+        font-size: 2.35rem;
+        line-height: 1;
+        font-weight: 800;
+    }
+
+    .flip-clock-meridiem {
+        margin-left: 0.4rem;
+        color: #63666a;
+        font-size: 1.85rem;
+        line-height: 1;
+        font-weight: 800;
+        letter-spacing: 0;
+    }
+
+    @@media (max-width: 1200px) {
+        .dashboard-hero {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .dashboard-live-clock {
+            min-width: 320px;
+            text-align: left;
+        }
+
+        .dashboard-live-time {
+            justify-content: flex-start;
+        }
+
+        .flip-clock-card {
+            --flip-card-height: 2.85rem;
+            --flip-card-font-size: 2.2rem;
+            width: 2rem;
+        }
+
+        .flip-clock-separator {
+            height: 2.85rem;
+            font-size: 2rem;
+        }
+
+        .flip-clock-meridiem {
+            font-size: 1.55rem;
+        }
+    }
+
+    .dashboard-hero > .period-dropdown {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.45rem;
         /* allow the outer wrapper to shrink so it doesn't force layout width */
         min-width: 0;
         width: auto;
+    }
+
+    .period-primary-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .dashboard-hero .period-primary-row > .attendance-filter-select-wrap {
+        min-width: 280px;
+        width: 280px;
+        box-sizing: border-box;
+    }
+
+    .dashboard-hero > .period-dropdown.has-period-range .period-primary-row > .attendance-filter-select-wrap {
+        min-width: 316px;
+        width: 316px;
+    }
+
+    .dashboard-hero .period-primary-row > .attendance-filter-select-wrap > .period-button {
+        min-height: 2.5rem;
+        height: 2.5rem;
+        padding: 0.5rem 0.8rem;
     }
 
     /* ensure the add button matches the period trigger size and is centered */
@@ -251,8 +1936,10 @@
     .period-to-label {
         display: inline-flex;
         align-items: center;
+        justify-content: flex-start;
+        width: 28px;
         padding: 0 0.15rem;
-        margin: 0 0.05rem;
+        margin: 0;
         color: var(--etrs-gray-700);
         font-size: 0.82rem;
         font-weight: 500;
@@ -261,9 +1948,17 @@
     }
 
     .period-range-entry {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         gap: 0.5rem;
+        animation: period-range-enter 180ms ease-out;
+        transform-origin: left center;
+        overflow: visible;
+    }
+
+    .period-range-entry.closing {
+        animation: period-range-exit 180ms ease-in forwards;
+        pointer-events: none;
     }
 
     /* ensure both selectors inside a range entry are identical in width and buttons fill their boxes */
@@ -299,9 +1994,9 @@
         padding: 0.5rem 0.8rem;
     }
 
-    /* ensure vertical centering of the TO range and controls */
+    /* keep the comparison row stacked below the primary selector */
     .period-range-entry {
-        display: inline-flex;
+        display: flex;
         align-items: center;
     }
 
@@ -449,6 +2144,260 @@
         color: var(--finance-primary, var(--finance-text));
     }
 
+    .dashboard-logs-modal .attendance-table-toolbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .dashboard-logs-modal .attendance-table-search {
+        flex: 1 1 420px;
+        max-width: 520px;
+    }
+
+    .dashboard-logs-modal .attendance-table-search-input {
+        min-height: 2.85rem;
+    }
+
+    .dashboard-logs-modal .attendance-table-search-input::-webkit-search-cancel-button {
+        cursor: pointer;
+        filter: grayscale(1) brightness(0);
+        opacity: 1;
+    }
+
+    .dashboard-logs-modal .attendance-table-actions {
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .dashboard-logs-modal .attendance-table-toolbar-label {
+        display: inline-block;
+        margin-bottom: 0.25rem;
+        color: var(--finance-text-muted);
+        font-size: 0.74rem;
+        font-weight: 600;
+    }
+
+    .dashboard-logs-modal .attendance-filter-dropdown {
+        position: relative;
+    }
+
+    .dashboard-logs-modal .attendance-filter-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.85rem;
+    }
+
+    .dashboard-logs-modal .attendance-filter-button-clear {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 0.92rem;
+        height: 0.92rem;
+        border: 1px solid #d4d8e1;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted);
+        font-size: 0.62rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .dashboard-logs-modal .attendance-filter-button-clear:hover {
+        border-color: #bcc4d2;
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .dashboard-logs-modal .attendance-filter-menu {
+        position: absolute;
+        top: calc(100% + 0.55rem);
+        right: 0;
+        width: min(92vw, 560px);
+        padding: 0.55rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 20;
+    }
+
+    .dashboard-logs-modal .attendance-filter-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .dashboard-logs-modal .attendance-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .dashboard-logs-modal .attendance-filter-field {
+        min-width: 0;
+        position: relative;
+    }
+
+    .dashboard-logs-modal .attendance-filter-select-wrap {
+        position: relative;
+    }
+
+    .dashboard-logs-modal .attendance-filter-select-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        width: 100%;
+        min-height: 2.15rem;
+        padding: 0.38rem 0.68rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+
+    .dashboard-logs-modal .attendance-filter-select-trigger.active {
+        border-color: rgba(16, 77, 173, 0.35);
+        box-shadow: 0 0 0 3px rgba(16, 77, 173, 0.08);
+    }
+
+    .dashboard-logs-modal .attendance-filter-select-value {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dashboard-logs-modal .attendance-filter-select-menu {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        max-height: 220px;
+        padding: 0.3rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        overflow-y: auto;
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 8;
+    }
+
+    .dashboard-logs-modal .attendance-filter-select-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .dashboard-logs-modal .attendance-filter-select-option {
+        display: block;
+        width: 100%;
+        padding: 0.45rem 0.55rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .dashboard-logs-modal .attendance-filter-select-option:hover,
+    .dashboard-logs-modal .attendance-filter-select-option.active {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .dashboard-logs-modal .attendance-filter-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        margin-top: 0.55rem;
+        font-size: 0.82rem;
+    }
+
+    .dashboard-logs-modal .attendance-filter-clear {
+        border: 0;
+        padding: 0.3rem 0.45rem;
+        background: transparent;
+        color: var(--finance-text-muted);
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+
+    .dashboard-logs-modal .attendance-filter-apply {
+        min-width: 64px;
+        min-height: 2rem;
+        padding: 0.32rem 0.72rem;
+        font-size: 0.82rem;
+    }
+
+    .dashboard-logs-modal .attendance-entries-counter {
+        min-width: 92px;
+    }
+
+    .dashboard-logs-modal .attendance-entries-button {
+        justify-content: space-between;
+        min-width: 92px;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .dashboard-logs-modal .attendance-dropdown-caret {
+        font-size: 0.78rem;
+    }
+
+    .dashboard-logs-modal .attendance-entries-menu {
+        width: 100%;
+        min-width: 92px;
+        padding: 0.35rem;
+    }
+
+    .dashboard-logs-modal .attendance-entries-option {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 0.65rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        text-align: left;
+        font-size: 0.92rem;
+    }
+
+    .dashboard-logs-modal .attendance-entries-option:hover,
+    .dashboard-logs-modal .attendance-entries-option.active {
+        background: var(--finance-surface-soft);
+    }
+
+    .dashboard-logs-modal .attendance-empty-state {
+        padding: 2rem 1rem;
+        text-align: center;
+        color: var(--finance-text-muted);
+    }
+
     /* metric percent badge on the right edge of metric cards */
     .metric-card {
         position: relative;
@@ -471,6 +2420,158 @@
         font-weight: 800;
         background: transparent;
     }
+
+    .attendance-export-modal .attendance-export-periods {
+        width: 100%;
+    }
+
+    .attendance-export-modal .attendance-export-period-row,
+    .attendance-export-modal .attendance-export-range-entry {
+        width: 100%;
+    }
+
+    .attendance-export-modal .attendance-export-period-dropdown.period-dropdown {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .attendance-export-modal .attendance-export-period-row .attendance-export-period-dropdown.period-dropdown {
+        width: 100%;
+    }
+
+    .attendance-export-modal .period-add-button.attendance-export-period-add {
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        margin: 0;
+    }
+
+    .attendance-export-modal .attendance-export-range-entry.period-range-entry {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .attendance-export-modal .attendance-export-range-entry .period-to-label {
+        width: 28px;
+        min-width: 0;
+        padding: 0;
+        margin: 0;
+    }
+
+    .attendance-export-modal .attendance-export-range-entry .attendance-export-period-dropdown.period-dropdown {
+        width: 100%;
+        min-width: 0;
+    }
+
+    @@keyframes period-range-enter {
+        from {
+            opacity: 0;
+            transform: translateX(-8px) scale(0.98);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
+
+    @@keyframes flip-clock-lower-turn {
+        0% {
+            opacity: 1;
+            border-color: transparent;
+            border-top-color: transparent;
+            filter: brightness(0.82);
+            transform: rotateX(0deg);
+        }
+
+        8% {
+            border-color: rgba(210, 214, 220, 0.72);
+            border-top-color: rgba(255, 255, 255, 0.18);
+        }
+
+        50% {
+            opacity: 1;
+            border-color: rgba(210, 214, 220, 0.72);
+            border-top-color: rgba(255, 255, 255, 0.18);
+            filter: brightness(0.72);
+            transform: rotateX(-88deg);
+        }
+
+        51% {
+            opacity: 1;
+            border-color: rgba(210, 214, 220, 0.72);
+            border-top-color: rgba(255, 255, 255, 0.18);
+            filter: brightness(0.78);
+            transform: rotateX(-92deg);
+        }
+
+        82% {
+            opacity: 1;
+            border-color: rgba(210, 214, 220, 0.36);
+            border-top-color: rgba(255, 255, 255, 0.1);
+            filter: brightness(0.9);
+            transform: rotateX(-162deg);
+        }
+
+        100% {
+            opacity: 1;
+            border-color: transparent;
+            border-top-color: transparent;
+            filter: brightness(0.9);
+            transform: rotateX(-180deg);
+        }
+    }
+
+    @@keyframes flip-clock-front-face {
+        0%,
+        50% {
+            opacity: 1;
+        }
+
+        51%,
+        100% {
+            opacity: 0;
+        }
+    }
+
+    @@keyframes flip-clock-back-face {
+        0%,
+        50% {
+            opacity: 0;
+        }
+
+        51%,
+        100% {
+            opacity: 1;
+        }
+    }
+
+    @@keyframes flip-clock-top-hold {
+        0%,
+        88% {
+            opacity: 1;
+        }
+
+        100% {
+            opacity: 0;
+        }
+    }
+
+    @@keyframes period-range-exit {
+        from {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(-8px) scale(0.98);
+        }
+    }
 </style>
 
 @code {
@@ -479,6 +2580,55 @@
     private int wfhLogsToday;
     private List<AttendanceLog> recentOnsiteLogs = new();
     private List<AttendanceLogWfh> recentWfhLogs = new();
+    private List<LateUndertimeChartPoint> lateUndertimeChart = new();
+    private int lateTotal;
+    private int undertimeTotal;
+    private List<string> divisionPieOptions = new();
+    private string selectedDivisionPie = string.Empty;
+    private bool showDivisionPieMenu;
+    private int divisionPieOnsiteCount;
+    private int divisionPieWfhCount;
+    private int divisionPieTotal;
+    private DashboardTableMenu openTableMenu = DashboardTableMenu.None;
+    private bool showViewMoreModal;
+    private DashboardTableMenu viewMoreTable = DashboardTableMenu.Onsite;
+    private string viewMoreSearchText = string.Empty;
+    private string viewMoreFilterIdNumber = string.Empty;
+    private string viewMoreFilterEmployee = string.Empty;
+    private string viewMoreFilterDivision = string.Empty;
+    private string viewMoreFilterDesignation = string.Empty;
+    private bool showViewMoreFilterMenu;
+    private bool showViewMoreEntriesMenu;
+    private string? activeViewMoreFilterField;
+    private int viewMorePageSize = 10;
+    private int viewMorePage = 1;
+    private List<AttendanceLog> viewMoreOnsiteLogs = new();
+    private List<AttendanceLogWfh> viewMoreWfhLogs = new();
+    private bool showExportLogsModal;
+    private bool isExportingLogs;
+    private Period? exportSelectedPeriod;
+    private bool showExportPeriodMenu;
+    private bool openExportPeriodMenuUpward;
+    private bool showExportAddPeriod;
+    private bool isClosingExportAddPeriod;
+    private Period? exportSecondSelectedPeriod;
+    private bool showExportPeriod2Menu;
+    private bool openExportPeriod2MenuUpward;
+    private ElementReference exportPeriodButtonRef;
+    private ElementReference exportPeriod2ButtonRef;
+    private ElementReference exportPeriodControlsRef;
+    private ElementReference lateUndertimeChartRef;
+    private ElementReference workArrangementChartRef;
+    private bool exportPeriodDismissRegistered;
+    private bool dashboardChartsRenderPending;
+    private static readonly int[] PageSizeOptions = new[] { 10, 25, 50, 100 };
+
+    private enum DashboardTableMenu
+    {
+        None,
+        Onsite,
+        Wfh
+    }
 
     private class Period
     {
@@ -488,6 +2638,16 @@
         public bool IsCurrent { get; set; }
     }
 
+    private class LateUndertimeChartPoint
+    {
+        public string Label { get; set; } = string.Empty;
+        public string TooltipLabel { get; set; } = string.Empty;
+        public int LateCount { get; set; }
+        public int UndertimeCount { get; set; }
+    }
+
+    private readonly record struct LateUndertimeChartItem(DateTime Date, bool HasLate, bool HasUndertime);
+
     private List<Period> periods = new();
     private Period? selectedPeriod;
     private bool showPeriodMenu;
@@ -496,23 +2656,654 @@
     private ElementReference periodControlsRef;
     private DotNetObjectReference<Dashboard>? periodDropdownDotNetRef;
     private bool periodDismissRegistered;
+    private ElementReference tableMenuControlsRef;
+    private DotNetObjectReference<Dashboard>? tableMenuDotNetRef;
+    private bool tableMenuDismissRegistered;
     private bool showAddPeriod;
     private bool isClosingAddPeriod;
     private Period? secondSelectedPeriod;
     private bool showPeriod2Menu;
     private DateTime filterStart;
     private DateTime filterEnd;
+    private DateTime liveClockNow = DateTime.Now;
+    private DateTime previousLiveClockNow = DateTime.Now;
+    private PeriodicTimer? liveClockTimer;
+    private CancellationTokenSource? liveClockCancellation;
+    private CancellationTokenSource? flipRenderCancellation;
 
     private string OnsitePercentLabel => FormatPercent(onsiteLogsToday, employeeCount);
     private string WfhPercentLabel => FormatPercent(wfhLogsToday, employeeCount);
+    private string ExportSelectedPeriodLabel => exportSelectedPeriod?.Label ?? "No periods available";
+    private string ExportSelectedPeriod2Label => exportSecondSelectedPeriod?.Label ?? "Select a period";
+    private int LateUndertimeChartMax => lateUndertimeChart.Count == 0
+        ? 1
+        : Math.Max(1, lateUndertimeChart.Max(p => Math.Max(p.LateCount, p.UndertimeCount)));
+    private string LateUndertimeChartMaxLabel => LateUndertimeChartMax.ToString("N0");
+    private string LateUndertimeChartPeriodLabel => FormatDateRange(filterStart, filterEnd);
+    private string DashboardChartColumnStyle => $"--dashboard-chart-columns: {Math.Max(lateUndertimeChart.Count, 1)};";
+    private string DivisionPiePeriodLabel => FormatDateRange(filterStart, filterEnd);
+    private string SelectedDivisionPieLabel => string.IsNullOrWhiteSpace(selectedDivisionPie)
+        ? "All Divisions / Units"
+        : selectedDivisionPie;
+    private double DivisionPieOnsitePercent => divisionPieTotal <= 0
+        ? 0
+        : divisionPieOnsiteCount / (double)divisionPieTotal * 100;
+    private double DivisionPieWfhPercent => divisionPieTotal <= 0
+        ? 0
+        : divisionPieWfhCount / (double)divisionPieTotal * 100;
+    private string DivisionPieOnsitePercentLabel => FormatPercentLabel(DivisionPieOnsitePercent);
+    private string DivisionPieWfhPercentLabel => FormatPercentLabel(DivisionPieWfhPercent);
+    private string DivisionPieStyle => $"--onsite-slice: {DivisionPieOnsitePercent.ToString("0.##", CultureInfo.InvariantCulture)}%;";
+    private string LiveClockTimeLabel => liveClockNow.ToString("hh:mm:ss tt");
+    private string LiveClockDateLabel => secondSelectedPeriod is not null
+        ? FormatDateRange(filterStart, filterEnd)
+        : liveClockNow.ToString("dddd, MMMM d, yyyy");
+    private IEnumerable<ClockPartView> LiveClockParts
+    {
+        get
+        {
+            var value = liveClockNow.ToString("hhmmss");
+            var previousValue = previousLiveClockNow.ToString("hhmmss");
+            yield return ClockPartView.Digit(0, value[0], previousValue[0]);
+            yield return ClockPartView.Digit(1, value[1], previousValue[1]);
+            yield return ClockPartView.Separator(2);
+            yield return ClockPartView.Digit(3, value[2], previousValue[2]);
+            yield return ClockPartView.Digit(4, value[3], previousValue[3]);
+            yield return ClockPartView.Separator(5);
+            yield return ClockPartView.Digit(6, value[4], previousValue[4]);
+            yield return ClockPartView.Digit(7, value[5], previousValue[5]);
+        }
+    }
 
     private static string FormatPercent(int part, int total)
         => total <= 0 ? "-" : $"{Math.Round((double)part / total * 100)}%";
 
+    private static string FormatPercentLabel(double value)
+        => $"{Math.Round(value)}%";
+
+    private static string FormatDateRange(DateTime start, DateTime end)
+        => start.Date == end.Date
+            ? start.ToString("MMMM d, yyyy")
+            : $"{start:MMMM d, yyyy} - {end:MMMM d, yyyy}";
+
+    private string GetLateBarHeight(LateUndertimeChartPoint point)
+        => FormatChartHeight(point.LateCount);
+
+    private string GetUndertimeBarHeight(LateUndertimeChartPoint point)
+        => FormatChartHeight(point.UndertimeCount);
+
+    private string FormatChartHeight(int value)
+    {
+        var height = LateUndertimeChartMax <= 0 ? 0 : value / (double)LateUndertimeChartMax * 100;
+        return height.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatChartTooltip(LateUndertimeChartPoint point)
+        => $"{point.TooltipLabel}: {point.LateCount:N0} late, {point.UndertimeCount:N0} undertime";
+
+    private static string GetClockPartKey(int index, string value, string previousValue) => $"{index}-{previousValue}-{value}";
+    private static string GetExportPeriodMenuClass(bool isVisible, bool openUpward)
+        => $"attendance-filter-select-menu period-menu{(isVisible ? " show" : string.Empty)}{(openUpward ? " open-upward" : string.Empty)}";
+
+    private string ViewMoreTitle => viewMoreTable == DashboardTableMenu.Onsite
+        ? "Recent Onsite Logs"
+        : "Recent WFH Logs";
+
+    private IEnumerable<AttendanceLog> FilteredViewMoreOnsiteLogs
+        => viewMoreOnsiteLogs.Where(MatchesViewMoreOnsiteLog);
+
+    private IEnumerable<AttendanceLogWfh> FilteredViewMoreWfhLogs
+        => viewMoreWfhLogs.Where(MatchesViewMoreWfhLog);
+
+    private int ViewMoreFilteredCount => viewMoreTable == DashboardTableMenu.Onsite
+        ? FilteredViewMoreOnsiteLogs.Count()
+        : FilteredViewMoreWfhLogs.Count();
+
+    private int ViewMoreTotalPages => Math.Max(1, (int)Math.Ceiling(ViewMoreFilteredCount / (double)viewMorePageSize));
+
+    private IEnumerable<AttendanceLog> PagedViewMoreOnsiteLogs
+        => FilteredViewMoreOnsiteLogs
+            .Skip((viewMorePage - 1) * viewMorePageSize)
+            .Take(viewMorePageSize);
+
+    private IEnumerable<AttendanceLogWfh> PagedViewMoreWfhLogs
+        => FilteredViewMoreWfhLogs
+            .Skip((viewMorePage - 1) * viewMorePageSize)
+            .Take(viewMorePageSize);
+
+    private IEnumerable<string> CurrentViewMoreIdNumberOptions => viewMoreTable == DashboardTableMenu.Onsite
+        ? GetDistinctOptions(viewMoreOnsiteLogs.Select(log => log.IdNumber))
+        : GetDistinctOptions(viewMoreWfhLogs.Select(log => log.IdNumber));
+
+    private IEnumerable<string> CurrentViewMoreEmployeeOptions => viewMoreTable == DashboardTableMenu.Onsite
+        ? GetDistinctOptions(viewMoreOnsiteLogs.Select(log => FormatName(log.LastName, log.FirstName, log.MiddleName)))
+        : GetDistinctOptions(viewMoreWfhLogs.Select(log => FormatName(log.LastName, log.FirstName, log.MiddleName)));
+
+    private IEnumerable<string> CurrentViewMoreDivisionOptions => viewMoreTable == DashboardTableMenu.Onsite
+        ? GetDistinctOptions(viewMoreOnsiteLogs.Select(log => log.DivisionCenterUnit))
+        : GetDistinctOptions(viewMoreWfhLogs.Select(log => log.DivisionCenterUnit));
+
+    private IEnumerable<string> CurrentViewMoreDesignationOptions => viewMoreTable == DashboardTableMenu.Onsite
+        ? GetDistinctOptions(viewMoreOnsiteLogs.Select(log => log.Designation))
+        : GetDistinctOptions(viewMoreWfhLogs.Select(log => log.Designation));
+
+    private bool HasActiveViewMoreFilters
+        => !string.IsNullOrWhiteSpace(viewMoreFilterIdNumber)
+            || !string.IsNullOrWhiteSpace(viewMoreFilterEmployee)
+            || !string.IsNullOrWhiteSpace(viewMoreFilterDivision)
+            || !string.IsNullOrWhiteSpace(viewMoreFilterDesignation);
+
+    private string ViewMoreEntryLabel
+    {
+        get
+        {
+            var count = ViewMoreFilteredCount;
+            if (count == 0)
+            {
+                return "Showing 0 to 0 of 0 entries";
+            }
+
+            var start = ((viewMorePage - 1) * viewMorePageSize) + 1;
+            var end = Math.Min(viewMorePage * viewMorePageSize, count);
+            return $"Showing {start} to {end} of {count} entries";
+        }
+    }
+
+    private void ToggleTableMenu(DashboardTableMenu menu)
+    {
+        openTableMenu = openTableMenu == menu ? DashboardTableMenu.None : menu;
+        showPeriodMenu = false;
+        showPeriod2Menu = false;
+        showDivisionPieMenu = false;
+    }
+
+    private void ToggleDivisionPieMenu()
+    {
+        showDivisionPieMenu = !showDivisionPieMenu;
+        openTableMenu = DashboardTableMenu.None;
+        showPeriodMenu = false;
+        showPeriod2Menu = false;
+    }
+
+    private void SelectDivisionPie(string division)
+    {
+        selectedDivisionPie = division;
+        showDivisionPieMenu = false;
+        ApplyDivisionPieSelection();
+    }
+
+    private async Task OpenViewMoreLogsAsync(DashboardTableMenu table)
+    {
+        openTableMenu = DashboardTableMenu.None;
+        viewMoreTable = table;
+        viewMoreSearchText = string.Empty;
+        ClearViewMoreFilterValues();
+        showViewMoreFilterMenu = false;
+        showViewMoreEntriesMenu = false;
+        activeViewMoreFilterField = null;
+        viewMorePage = 1;
+        await LoadViewMoreLogsAsync(table);
+        showViewMoreModal = true;
+    }
+
+    private void CloseViewMoreModal()
+    {
+        showViewMoreModal = false;
+        showViewMoreFilterMenu = false;
+        showViewMoreEntriesMenu = false;
+        activeViewMoreFilterField = null;
+    }
+
+    private void CloseViewMoreTransientMenus()
+    {
+        showViewMoreFilterMenu = false;
+        showViewMoreEntriesMenu = false;
+        activeViewMoreFilterField = null;
+    }
+
+    private async Task LoadViewMoreLogsAsync(DashboardTableMenu table)
+    {
+        var (start, endExclusive) = GetSelectedRange();
+
+        if (table == DashboardTableMenu.Onsite)
+        {
+            viewMoreOnsiteLogs = await Db.AttendanceLogs
+                .AsNoTracking()
+                .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
+                .OrderByDescending(l => l.AttendanceDate)
+                .ThenBy(l => l.LastName)
+                .ThenBy(l => l.FirstName)
+                .ToListAsync();
+            viewMoreWfhLogs.Clear();
+            return;
+        }
+
+        viewMoreWfhLogs = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Where(l => (l.TimeIn.HasValue || l.TimeOut.HasValue) && l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
+            .OrderByDescending(l => l.AttendanceDate)
+            .ThenBy(l => l.LastName)
+            .ThenBy(l => l.FirstName)
+            .ToListAsync();
+        viewMoreOnsiteLogs.Clear();
+    }
+
+    private Task HandleViewMoreSearchInput(ChangeEventArgs e)
+    {
+        viewMoreSearchText = e.Value?.ToString() ?? string.Empty;
+        viewMorePage = 1;
+        return Task.CompletedTask;
+    }
+
+    private void SelectViewMorePage(int page)
+    {
+        viewMorePage = Math.Clamp(page, 1, ViewMoreTotalPages);
+    }
+
+    private void PreviousViewMorePage()
+    {
+        SelectViewMorePage(viewMorePage - 1);
+    }
+
+    private void NextViewMorePage()
+    {
+        SelectViewMorePage(viewMorePage + 1);
+    }
+
+    private bool MatchesViewMoreOnsiteLog(AttendanceLog log)
+    {
+        if (!MatchesLogSearch(log.IdNumber, log.LastName, log.FirstName, log.MiddleName))
+        {
+            return false;
+        }
+
+        return MatchesSelectedValue(log.IdNumber, viewMoreFilterIdNumber)
+            && MatchesSelectedValue(FormatName(log.LastName, log.FirstName, log.MiddleName), viewMoreFilterEmployee)
+            && MatchesSelectedValue(log.DivisionCenterUnit, viewMoreFilterDivision)
+            && MatchesSelectedValue(log.Designation, viewMoreFilterDesignation);
+    }
+
+    private bool MatchesViewMoreWfhLog(AttendanceLogWfh log)
+    {
+        if (!MatchesLogSearch(log.IdNumber, log.LastName, log.FirstName, log.MiddleName))
+        {
+            return false;
+        }
+
+        return MatchesSelectedValue(log.IdNumber, viewMoreFilterIdNumber)
+            && MatchesSelectedValue(FormatName(log.LastName, log.FirstName, log.MiddleName), viewMoreFilterEmployee)
+            && MatchesSelectedValue(log.DivisionCenterUnit, viewMoreFilterDivision)
+            && MatchesSelectedValue(log.Designation, viewMoreFilterDesignation);
+    }
+
+    private bool MatchesLogSearch(string? idNumber, string? lastName, string? firstName, string? middleName)
+    {
+        var query = viewMoreSearchText.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return ContainsText(idNumber, query)
+            || ContainsText(firstName, query)
+            || ContainsText(middleName, query)
+            || ContainsText(lastName, query)
+            || ContainsText(FormatName(lastName ?? string.Empty, firstName ?? string.Empty, middleName ?? string.Empty), query);
+    }
+
+    private static bool ContainsText(string? source, string query)
+        => !string.IsNullOrWhiteSpace(source)
+            && source.Contains(query, StringComparison.OrdinalIgnoreCase);
+
+    private void ToggleViewMoreFilterMenu()
+    {
+        showViewMoreFilterMenu = !showViewMoreFilterMenu;
+        if (showViewMoreFilterMenu)
+        {
+            showViewMoreEntriesMenu = false;
+        }
+        else
+        {
+            activeViewMoreFilterField = null;
+        }
+    }
+
+    private void CloseViewMoreFilterMenu()
+    {
+        showViewMoreFilterMenu = false;
+        activeViewMoreFilterField = null;
+    }
+
+    private void ToggleViewMoreEntriesMenu()
+    {
+        showViewMoreEntriesMenu = !showViewMoreEntriesMenu;
+        if (showViewMoreEntriesMenu)
+        {
+            showViewMoreFilterMenu = false;
+            activeViewMoreFilterField = null;
+        }
+    }
+
+    private void SelectViewMorePageSize(int selectedPageSize)
+    {
+        viewMorePageSize = Math.Clamp(selectedPageSize, 1, 100);
+        viewMorePage = 1;
+        showViewMoreEntriesMenu = false;
+    }
+
+    private void ToggleViewMoreFilterField(string fieldKey)
+    {
+        activeViewMoreFilterField = string.Equals(activeViewMoreFilterField, fieldKey, StringComparison.Ordinal)
+            ? null
+            : fieldKey;
+    }
+
+    private void SetViewMoreFilterValue(string fieldKey, string value)
+    {
+        switch (fieldKey)
+        {
+            case "id":
+                viewMoreFilterIdNumber = value;
+                break;
+            case "employee":
+                viewMoreFilterEmployee = value;
+                break;
+            case "division":
+                viewMoreFilterDivision = value;
+                break;
+            case "designation":
+                viewMoreFilterDesignation = value;
+                break;
+        }
+
+        activeViewMoreFilterField = null;
+        viewMorePage = 1;
+    }
+
+    private void ClearViewMoreFilters()
+    {
+        viewMoreSearchText = string.Empty;
+        ClearViewMoreFilterValues();
+        showViewMoreFilterMenu = false;
+        showViewMoreEntriesMenu = false;
+        activeViewMoreFilterField = null;
+        viewMorePage = 1;
+    }
+
+    private void ClearViewMoreFiltersFromButton(MouseEventArgs _)
+        => ClearViewMoreFilters();
+
+    private void ClearViewMoreFilterValues()
+    {
+        viewMoreFilterIdNumber = string.Empty;
+        viewMoreFilterEmployee = string.Empty;
+        viewMoreFilterDivision = string.Empty;
+        viewMoreFilterDesignation = string.Empty;
+    }
+
+    private static IEnumerable<string> GetDistinctOptions(IEnumerable<string?> values)
+        => values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value);
+
+    private static bool MatchesSelectedValue(string? source, string? selectedValue)
+    {
+        if (string.IsNullOrWhiteSpace(selectedValue))
+        {
+            return true;
+        }
+
+        return string.Equals(source?.Trim(), selectedValue.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<int?> BuildPageItems(int totalPages, int currentPage)
+    {
+        if (totalPages <= 7)
+        {
+            for (var page = 1; page <= totalPages; page++)
+            {
+                yield return page;
+            }
+
+            yield break;
+        }
+
+        yield return 1;
+
+        var start = Math.Max(2, currentPage - 1);
+        var end = Math.Min(totalPages - 1, currentPage + 1);
+
+        if (start > 2)
+        {
+            yield return null;
+        }
+
+        for (var page = start; page <= end; page++)
+        {
+            yield return page;
+        }
+
+        if (end < totalPages - 1)
+        {
+            yield return null;
+        }
+
+        yield return totalPages;
+    }
+
+    private static string DisplayValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string DisplayValue(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value) ? fallback : value;
+
+    private void OpenExportLogsModal()
+    {
+        openTableMenu = DashboardTableMenu.None;
+        exportSelectedPeriod = selectedPeriod;
+        exportSecondSelectedPeriod = secondSelectedPeriod;
+        showExportAddPeriod = exportSecondSelectedPeriod is not null;
+        isClosingExportAddPeriod = false;
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
+        openExportPeriodMenuUpward = false;
+        openExportPeriod2MenuUpward = false;
+        showExportLogsModal = true;
+    }
+
+    private void CloseExportLogsModal()
+    {
+        if (isExportingLogs)
+        {
+            return;
+        }
+
+        showExportLogsModal = false;
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
+        openExportPeriodMenuUpward = false;
+        openExportPeriod2MenuUpward = false;
+    }
+
+    private void CloseExportPeriodMenus()
+    {
+        if (!showExportPeriodMenu && !showExportPeriod2Menu)
+        {
+            return;
+        }
+
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
+        openExportPeriodMenuUpward = false;
+        openExportPeriod2MenuUpward = false;
+    }
+
+    private void CloseDashboardTransientMenus()
+    {
+        openTableMenu = DashboardTableMenu.None;
+        showDivisionPieMenu = false;
+        CloseExportPeriodMenus();
+    }
+
+    private static string BuildCsv(IEnumerable<string> headers, IEnumerable<IEnumerable<string>> rows)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(string.Join(",", headers.Select(CsvValue)));
+
+        foreach (var row in rows)
+        {
+            builder.AppendLine(string.Join(",", row.Select(CsvValue)));
+        }
+
+        return builder.ToString();
+    }
+
+    private static string CsvValue(object? value)
+    {
+        var text = value?.ToString() ?? string.Empty;
+        return $"\"{text.Replace("\"", "\"\"")}\"";
+    }
+
+    private string BuildOnsiteCsv(IEnumerable<AttendanceLog> logs)
+        => BuildCsv(
+            new[]
+            {
+                "AttendanceLogId",
+                "ID Number",
+                "Employee",
+                "AM Time In",
+                "AM Time Out",
+                "PM Time In",
+                "PM Time Out",
+                "Attendance Date"
+            },
+            logs.Select(log => new[]
+            {
+                log.AttendanceLogId.ToString(),
+                log.IdNumber,
+                FormatName(log.LastName, log.FirstName, log.MiddleName),
+                log.TimeInAm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
+                log.TimeOutAm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
+                log.TimeInPm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
+                log.TimeOutPm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
+                log.AttendanceDate.ToString("yyyy-MM-dd")
+            }));
+
+    private string BuildWfhCsv(IEnumerable<AttendanceLogWfh> logs)
+        => BuildCsv(
+            new[]
+            {
+                "AttendanceLogWfhId",
+                "ID Number",
+                "Employee",
+                "Time In",
+                "Time Out",
+                "Target",
+                "Accomplishment",
+                "MOV",
+                "Attendance Date"
+            },
+            logs.Select(log => new[]
+            {
+                log.AttendanceLogWfhId.ToString(),
+                log.IdNumber,
+                FormatName(log.LastName, log.FirstName, log.MiddleName),
+                log.TimeIn?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
+                log.TimeOut?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
+                log.Target,
+                log.Accomplishment,
+                log.Mov,
+                log.AttendanceDate.ToString("yyyy-MM-dd")
+            }));
+
+    private static string BuildAttendanceLogsZip(string onsiteCsv, string wfhCsv, string timestamp)
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            AddZipEntry(archive, $"onsite_logs_{timestamp}.csv", onsiteCsv);
+            AddZipEntry(archive, $"wfh_logs_{timestamp}.csv", wfhCsv);
+        }
+
+        return Convert.ToBase64String(stream.ToArray());
+    }
+
+    private static void AddZipEntry(ZipArchive archive, string fileName, string content)
+    {
+        var entry = archive.CreateEntry(fileName, CompressionLevel.Fastest);
+        using var entryStream = entry.Open();
+        using var writer = new StreamWriter(entryStream, Encoding.UTF8);
+        writer.Write(content);
+    }
+
+    private sealed record FilterOption(string Value, string Label);
+
+    private sealed class ClockPartView
+    {
+        public int Index { get; init; }
+        public string Value { get; init; } = string.Empty;
+        public string PreviousValue { get; init; } = string.Empty;
+        public bool HasChanged => Value != PreviousValue;
+
+        public static ClockPartView Digit(int index, char value, char previousValue)
+            => new() { Index = index, Value = value.ToString(), PreviousValue = previousValue.ToString() };
+
+        public static ClockPartView Separator(int index)
+            => new() { Index = index, Value = ":", PreviousValue = ":" };
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        StartLiveClock();
         await RefreshAvailablePeriodsAsync(preserveSelections: false);
         await LoadRecentLogsAsync();
+    }
+
+    private void StartLiveClock()
+    {
+        liveClockCancellation = new CancellationTokenSource();
+        liveClockTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        _ = RunLiveClockAsync(liveClockCancellation.Token);
+    }
+
+    private async Task RunLiveClockAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (liveClockTimer is not null && await liveClockTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                previousLiveClockNow = liveClockNow;
+                liveClockNow = DateTime.Now;
+                RestartFlipRenderReset();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void RestartFlipRenderReset()
+    {
+        flipRenderCancellation?.Cancel();
+        flipRenderCancellation?.Dispose();
+        flipRenderCancellation = new CancellationTokenSource();
+        _ = ResetFlipRenderStateAsync(flipRenderCancellation.Token);
+    }
+
+    private async Task ResetFlipRenderStateAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(560, cancellationToken);
+            previousLiveClockNow = liveClockNow;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private async Task TogglePeriodMenu()
@@ -531,7 +3322,9 @@
     private async Task SelectPeriod(Period p)
     {
         selectedPeriod = p;
+        NormalizeSelectedPeriods();
         showPeriodMenu = false;
+        ApplySelectedPeriodRange();
         await LoadRecentLogsAsync();
     }
 
@@ -611,7 +3404,8 @@
 
         if (selectedPeriod != null)
         {
-            ApplySelectedPeriodRange();
+            filterStart = selectedPeriod.Start;
+            filterEnd = selectedPeriod.End;
             await RefreshAvailablePeriodsAsync();
             await LoadRecentLogsAsync();
         }
@@ -639,6 +3433,185 @@
         await LoadRecentLogsAsync();
     }
 
+    private async Task ToggleExportPeriodMenu()
+    {
+        if (showExportPeriodMenu)
+        {
+            showExportPeriodMenu = false;
+            return;
+        }
+
+        openExportPeriodMenuUpward = await ShouldOpenExportMenuUpwardAsync(exportPeriodButtonRef);
+        showExportPeriodMenu = true;
+        showExportPeriod2Menu = false;
+        await ScrollSelectedPeriodIntoViewAsync("dashboard-export-period-1-selected-item");
+    }
+
+    private Task SelectExportPeriod(Period p)
+    {
+        exportSelectedPeriod = p;
+        NormalizeSelectedPeriods(ref exportSelectedPeriod, ref exportSecondSelectedPeriod);
+        showExportPeriodMenu = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task ToggleExportAddPeriod()
+    {
+        if (!showExportAddPeriod && !isClosingExportAddPeriod)
+        {
+            isClosingExportAddPeriod = false;
+            showExportAddPeriod = true;
+            return;
+        }
+
+        if (isClosingExportAddPeriod)
+        {
+            return;
+        }
+
+        isClosingExportAddPeriod = true;
+        showExportPeriod2Menu = false;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(180);
+
+        showExportAddPeriod = false;
+        isClosingExportAddPeriod = false;
+        exportSecondSelectedPeriod = null;
+        showExportPeriod2Menu = false;
+    }
+
+    private async Task ToggleExportPeriod2Menu()
+    {
+        if (showExportPeriod2Menu)
+        {
+            showExportPeriod2Menu = false;
+            return;
+        }
+
+        openExportPeriod2MenuUpward = await ShouldOpenExportMenuUpwardAsync(exportPeriod2ButtonRef);
+        showExportPeriod2Menu = true;
+        showExportPeriodMenu = false;
+        await ScrollSelectedPeriodIntoViewAsync("dashboard-export-period-2-selected-item");
+    }
+
+    private Task SelectExportSecondPeriod(Period p)
+    {
+        exportSecondSelectedPeriod = p;
+        NormalizeSelectedPeriods(ref exportSelectedPeriod, ref exportSecondSelectedPeriod);
+        showExportPeriod2Menu = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task<bool> ShouldOpenExportMenuUpwardAsync(ElementReference triggerRef)
+    {
+        try
+        {
+            return await JS.InvokeAsync<bool>("attendanceLogs.shouldOpenMenuUpward", triggerRef, 220, 16);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task ExportAttendanceLogsAsync()
+    {
+        if (isExportingLogs)
+        {
+            return;
+        }
+
+        var (start, end) = GetExportPeriodRange();
+        var endExclusive = end.Date.AddDays(1);
+        isExportingLogs = true;
+
+        try
+        {
+            var exportOnsiteLogs = await Db.AttendanceLogs
+                .AsNoTracking()
+                .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
+                .OrderByDescending(l => l.AttendanceDate)
+                .ThenBy(l => l.LastName)
+                .ThenBy(l => l.FirstName)
+                .ToListAsync();
+
+            var exportWfhLogs = await Db.AttendanceLogsWfh
+                .AsNoTracking()
+                .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
+                .Where(l => l.TimeIn.HasValue
+                    || l.TimeOut.HasValue
+                    || !string.IsNullOrWhiteSpace(l.Target)
+                    || !string.IsNullOrWhiteSpace(l.Accomplishment)
+                    || !string.IsNullOrWhiteSpace(l.Mov))
+                .OrderByDescending(l => l.AttendanceDate)
+                .ThenBy(l => l.LastName)
+                .ThenBy(l => l.FirstName)
+                .ToListAsync();
+
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var zipContent = BuildAttendanceLogsZip(
+                BuildOnsiteCsv(exportOnsiteLogs),
+                BuildWfhCsv(exportWfhLogs),
+                timestamp);
+
+            await JS.InvokeVoidAsync("attendanceLogs.downloadFileFromBase64", $"attendance_logs_{timestamp}.zip", zipContent, "application/zip");
+
+            showExportLogsModal = false;
+            showExportPeriodMenu = false;
+            showExportPeriod2Menu = false;
+            openExportPeriodMenuUpward = false;
+            openExportPeriod2MenuUpward = false;
+        }
+        finally
+        {
+            isExportingLogs = false;
+        }
+    }
+
+    private (DateTime Start, DateTime End) GetExportPeriodRange()
+    {
+        if (exportSelectedPeriod == null && exportSecondSelectedPeriod == null)
+        {
+            throw new InvalidOperationException("Select at least one export period.");
+        }
+
+        if (exportSelectedPeriod == null)
+        {
+            exportSelectedPeriod = exportSecondSelectedPeriod;
+        }
+
+        if (exportSecondSelectedPeriod == null)
+        {
+            return (exportSelectedPeriod!.Start, exportSelectedPeriod.End);
+        }
+
+        var start = exportSelectedPeriod!.Start <= exportSecondSelectedPeriod.Start
+            ? exportSelectedPeriod.Start
+            : exportSecondSelectedPeriod.Start;
+        var end = exportSelectedPeriod.End >= exportSecondSelectedPeriod.End
+            ? exportSelectedPeriod.End
+            : exportSecondSelectedPeriod.End;
+
+        return (start, end);
+    }
+
+    private (DateTime Start, DateTime EndExclusive) GetSelectedRange()
+    {
+        if (filterStart == default || filterEnd == default)
+        {
+            ApplySelectedPeriodRange();
+        }
+
+        if (filterStart > filterEnd)
+        {
+            (filterStart, filterEnd) = (filterEnd, filterStart);
+        }
+
+        var start = filterStart == default ? DateTime.Today : filterStart.Date;
+        var endExclusive = (filterEnd == default ? DateTime.Today : filterEnd.Date).AddDays(1);
+        return (start, endExclusive);
+    }
+
     private async Task ScrollSelectedPeriodIntoViewAsync(string elementId)
     {
         try
@@ -653,19 +3626,77 @@
     [JSInvokable]
     public void ClosePeriodMenus()
     {
-        if (!showPeriodMenu && !showPeriod2Menu)
+        if (!showPeriodMenu && !showPeriod2Menu && !showExportPeriodMenu && !showExportPeriod2Menu)
         {
             return;
         }
 
         showPeriodMenu = false;
         showPeriod2Menu = false;
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
+        openExportPeriodMenuUpward = false;
+        openExportPeriod2MenuUpward = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void CloseTableMenus()
+    {
+        if (openTableMenu == DashboardTableMenu.None)
+        {
+            return;
+        }
+
+        openTableMenu = DashboardTableMenu.None;
         _ = InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await SyncPeriodDismissRegistrationAsync();
+        await SyncExportPeriodDismissRegistrationAsync();
+        await SyncTableMenuDismissRegistrationAsync();
+        await RenderDashboardChartsAsync();
+    }
+
+    private async Task RenderDashboardChartsAsync()
+    {
+        if (!dashboardChartsRenderPending)
+        {
+            return;
+        }
+
+        dashboardChartsRenderPending = false;
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "dashboardApexCharts.renderLateUndertime",
+                lateUndertimeChartRef,
+                new
+                {
+                    categories = lateUndertimeChart.Select(point => point.Label).ToArray(),
+                    tooltipLabels = lateUndertimeChart.Select(point => point.TooltipLabel).ToArray(),
+                    lateData = lateUndertimeChart.Select(point => point.LateCount).ToArray(),
+                    undertimeData = lateUndertimeChart.Select(point => point.UndertimeCount).ToArray(),
+                    maxValue = LateUndertimeChartMax
+                });
+
+            await JS.InvokeVoidAsync(
+                "dashboardApexCharts.renderWorkArrangement",
+                workArrangementChartRef,
+                new
+                {
+                    labels = new[] { "Onsite", "WFH" },
+                    series = new[] { divisionPieOnsiteCount, divisionPieWfhCount },
+                    total = divisionPieTotal
+                });
+        }
+        catch (JSException)
+        {
+            dashboardChartsRenderPending = true;
+        }
     }
 
     private async Task SyncPeriodDismissRegistrationAsync()
@@ -685,8 +3716,48 @@
         }
     }
 
+    private async Task SyncExportPeriodDismissRegistrationAsync()
+    {
+        var shouldRegister = showExportPeriodMenu || showExportPeriod2Menu;
+
+        if (shouldRegister && !exportPeriodDismissRegistered)
+        {
+            periodDropdownDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("attendanceLogs.registerPeriodDismiss", exportPeriodControlsRef, periodDropdownDotNetRef);
+            exportPeriodDismissRegistered = true;
+        }
+        else if (!shouldRegister && exportPeriodDismissRegistered)
+        {
+            await JS.InvokeVoidAsync("attendanceLogs.unregisterPeriodDismiss", exportPeriodControlsRef);
+            exportPeriodDismissRegistered = false;
+        }
+    }
+
+    private async Task SyncTableMenuDismissRegistrationAsync()
+    {
+        var shouldRegister = openTableMenu != DashboardTableMenu.None;
+
+        if (shouldRegister && !tableMenuDismissRegistered)
+        {
+            tableMenuDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("attendanceLogs.registerTableMenuDismiss", tableMenuControlsRef, tableMenuDotNetRef);
+            tableMenuDismissRegistered = true;
+        }
+        else if (!shouldRegister && tableMenuDismissRegistered)
+        {
+            await JS.InvokeVoidAsync("attendanceLogs.unregisterTableMenuDismiss", tableMenuControlsRef);
+            tableMenuDismissRegistered = false;
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
+        liveClockCancellation?.Cancel();
+        flipRenderCancellation?.Cancel();
+        liveClockTimer?.Dispose();
+        liveClockCancellation?.Dispose();
+        flipRenderCancellation?.Dispose();
+
         if (periodDismissRegistered)
         {
             try
@@ -698,12 +3769,47 @@
             }
         }
 
+        if (exportPeriodDismissRegistered)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("attendanceLogs.unregisterPeriodDismiss", exportPeriodControlsRef);
+            }
+            catch
+            {
+            }
+        }
+
+        if (tableMenuDismissRegistered)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("attendanceLogs.unregisterTableMenuDismiss", tableMenuControlsRef);
+            }
+            catch
+            {
+            }
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("dashboardApexCharts.destroy", lateUndertimeChartRef);
+            await JS.InvokeVoidAsync("dashboardApexCharts.destroy", workArrangementChartRef);
+        }
+        catch
+        {
+        }
+
         periodDropdownDotNetRef?.Dispose();
+        tableMenuDotNetRef?.Dispose();
     }
 
     private async Task RefreshAvailablePeriodsAsync(bool preserveSelections = true)
     {
         var previous = preserveSelections ? selectedPeriod : null;
+        var previousSecond = preserveSelections ? secondSelectedPeriod : null;
+        var previousExport = preserveSelections ? exportSelectedPeriod : null;
+        var previousExportSecond = preserveSelections ? exportSecondSelectedPeriod : null;
         var datesOnsite = await Db.AttendanceLogs
             .AsNoTracking()
             .Select(l => l.AttendanceDate)
@@ -727,6 +3833,15 @@
         if (!preserveSelections || periods.Count == 0)
         {
             selectedPeriod = periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
+            secondSelectedPeriod = null;
+            exportSelectedPeriod = null;
+            exportSecondSelectedPeriod = null;
+            showAddPeriod = false;
+            showExportAddPeriod = false;
+            if (selectedPeriod != null)
+            {
+                ApplySelectedPeriodRange();
+            }
             return;
         }
 
@@ -735,7 +3850,27 @@
             selectedPeriod = periods.FirstOrDefault(p => p.Start.Date == previous.Start.Date && p.End.Date == previous.End.Date)
                 ?? periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
         }
+
+        secondSelectedPeriod = FindMatchingPeriod(previousSecond);
+        exportSelectedPeriod = FindMatchingPeriod(previousExport);
+        exportSecondSelectedPeriod = FindMatchingPeriod(previousExportSecond);
+
+        if (selectedPeriod is null)
+        {
+            selectedPeriod = periods.FirstOrDefault(p => p.IsCurrent) ?? periods.LastOrDefault();
+        }
+
+        NormalizeSelectedPeriods();
+        NormalizeSelectedPeriods(ref exportSelectedPeriod, ref exportSecondSelectedPeriod);
+        showAddPeriod = secondSelectedPeriod is not null;
+        showExportAddPeriod = exportSecondSelectedPeriod is not null;
+        ApplySelectedPeriodRange();
     }
+
+    private Period? FindMatchingPeriod(Period? period)
+        => period is null
+            ? null
+            : periods.FirstOrDefault(p => p.Start.Date == period.Start.Date && p.End.Date == period.End.Date);
 
     private static Period BuildPeriodForDate(DateTime date, DateTime now)
     {
@@ -757,8 +3892,18 @@
 
     private async Task LoadRecentLogsAsync()
     {
-        var start = selectedPeriod?.Start.Date ?? DateTime.Today;
-        var endExclusive = (selectedPeriod?.End.Date ?? DateTime.Today).AddDays(1);
+        if (filterStart == default || filterEnd == default)
+        {
+            ApplySelectedPeriodRange();
+        }
+
+        if (filterStart > filterEnd)
+        {
+            (filterStart, filterEnd) = (filterEnd, filterStart);
+        }
+
+        var start = filterStart == default ? DateTime.Today : filterStart.Date;
+        var endExclusive = (filterEnd == default ? DateTime.Today : filterEnd.Date).AddDays(1);
 
         employeeCount = await Db.Employees.CountAsync();
         onsiteLogsToday = await Db.AttendanceLogs.CountAsync(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive);
@@ -781,12 +3926,640 @@
             .ThenBy(l => l.LastName)
             .Take(5)
             .ToListAsync();
+
+        await LoadLateUndertimeChartAsync(start, endExclusive);
+        await LoadDivisionPieAsync(start, endExclusive);
+        dashboardChartsRenderPending = true;
+    }
+
+    private async Task LoadLateUndertimeChartAsync(DateTime start, DateTime endExclusive)
+    {
+        var onsiteLogs = await Db.AttendanceLogs
+            .AsNoTracking()
+            .Include(l => l.Employee)
+            .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
+            .ToListAsync();
+
+        var wfhLogs = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Include(l => l.Employee)
+            .Include(l => l.ExceptionCondition)
+            .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
+            .Where(l => l.TimeIn.HasValue || l.TimeOut.HasValue)
+            .ToListAsync();
+
+        var onsiteItems = onsiteLogs.Select(log =>
+        {
+            var resolvedTardiness = ResolveTardiness(log.Tardiness, () => ComputeTardinessForOnsite(log, ResolveEmployeeStatus(log)));
+            return new LateUndertimeChartItem(
+                log.AttendanceDate.Date,
+                HasTardinessTag(resolvedTardiness, "late"),
+                HasTardinessTag(resolvedTardiness, "undertime"));
+        });
+
+        var wfhItems = wfhLogs.Select(log =>
+        {
+            var resolvedTardiness = ResolveTardiness(log.Tardiness, () => ComputeTardinessForWfh(log, ResolveEmployeeStatus(log)));
+            return new LateUndertimeChartItem(
+                log.AttendanceDate.Date,
+                HasTardinessTag(resolvedTardiness, "late"),
+                HasTardinessTag(resolvedTardiness, "undertime"));
+        });
+
+        lateUndertimeChart = BuildLateUndertimeChart(onsiteItems.Concat(wfhItems), start, endExclusive);
+        lateTotal = lateUndertimeChart.Sum(p => p.LateCount);
+        undertimeTotal = lateUndertimeChart.Sum(p => p.UndertimeCount);
+    }
+
+    private static List<LateUndertimeChartPoint> BuildLateUndertimeChart(
+        IEnumerable<LateUndertimeChartItem> items,
+        DateTime start,
+        DateTime endExclusive)
+    {
+        return items
+            .Where(item => item.HasLate || item.HasUndertime)
+            .Select(item => new
+            {
+                Item = item,
+                Period = BuildPeriodForDate(item.Date, DateTime.Today)
+            })
+            .GroupBy(entry => new { entry.Period.Start, entry.Period.End, entry.Period.Label })
+            .OrderBy(group => group.Key.Start)
+            .Select(group => new LateUndertimeChartPoint
+            {
+                Label = FormatCompactPeriodLabel(group.Key.Start, group.Key.End),
+                TooltipLabel = group.Key.Label,
+                LateCount = group.Count(entry => entry.Item.HasLate),
+                UndertimeCount = group.Count(entry => entry.Item.HasUndertime)
+            })
+            .ToList();
+    }
+
+    private static string FormatCompactPeriodLabel(DateTime start, DateTime end)
+        => start.Month == end.Month && start.Year == end.Year
+            ? $"{start:MMM d} - {end:d}"
+            : $"{start:MMM d} - {end:MMM d}";
+
+    private static bool HasTardinessTag(string? value, string tag)
+        => !string.IsNullOrWhiteSpace(value)
+            && value.Contains(tag, StringComparison.OrdinalIgnoreCase);
+
+    private const string ManualTardinessPrefix = "[Manual] ";
+
+    private static string ResolveEmployeeStatus(AttendanceLog log)
+        => log.Employee?.Status ?? "Active";
+
+    private static string ResolveEmployeeStatus(AttendanceLogWfh log)
+        => log.Employee?.Status ?? "Active";
+
+    private static string ResolveTardiness(string? savedValue, Func<string> computeValue)
+        => IsManualTardinessOverride(savedValue)
+            ? GetStoredTardinessDisplayValue(savedValue)
+            : computeValue();
+
+    private static bool IsManualTardinessOverride(string? value)
+        => NormalizeTardiness(value).StartsWith(ManualTardinessPrefix, StringComparison.OrdinalIgnoreCase);
+
+    private static string GetStoredTardinessDisplayValue(string? value)
+    {
+        var normalized = NormalizeTardiness(value);
+        return normalized.StartsWith(ManualTardinessPrefix, StringComparison.OrdinalIgnoreCase)
+            ? normalized[ManualTardinessPrefix.Length..].Trim()
+            : normalized;
+    }
+
+    private static string NormalizeTardiness(string? value)
+        => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
+    private static string ComputeTardinessForWfh(AttendanceLogWfh log, string? employeeStatus)
+    {
+        if (!string.Equals(GetWorkArrangement(log), "WFH", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        var date = log.AttendanceDate.Date;
+        if (!log.TimeOut.HasValue)
+        {
+            return "Absent";
+        }
+
+        if (!log.TimeIn.HasValue)
+        {
+            return string.Empty;
+        }
+
+        if (IsMorningHalfDay(log.TimeIn, log.TimeOut, date, allowLunchWindowTimeOut: true))
+        {
+            return FormatHalfDayLateUndertime(
+                "Half-Day (AM)",
+                CalculateLateDuration(date, log.TimeIn.Value, employeeStatus),
+                CalculateMorningHalfDayUndertime(date, log.TimeOut.Value));
+        }
+
+        if (IsAfternoonHalfDay(log.TimeIn, log.TimeOut))
+        {
+            return FormatHalfDayLateUndertime(
+                "Half-Day (PM)",
+                CalculateAfternoonHalfDayLate(date, log.TimeIn.Value),
+                CalculateAfternoonHalfDayUndertime(date, log.TimeOut.Value, employeeStatus));
+        }
+
+        var late = CalculateLateDuration(date, log.TimeIn.Value, employeeStatus);
+        var worked = CalculateWorkedDuration(new[] { (log.TimeIn, log.TimeOut) }, date);
+        var undertime = CalculateUndertime(worked, late, date, log.TimeIn.Value, log.TimeOut, employeeStatus);
+
+        return FormatLateUndertime(late, undertime);
+    }
+
+    private static string ComputeTardinessForOnsite(AttendanceLog log, string? employeeStatus)
+    {
+        var date = log.AttendanceDate.Date;
+        var timeInAm = log.TimeInAm;
+        var creditedTimeInPm = GetCreditedOnsiteTimeInPm(log);
+
+        if (!log.TimeOutAm.HasValue && !log.TimeOutPm.HasValue)
+        {
+            return "Absent";
+        }
+
+        if (!timeInAm.HasValue && !creditedTimeInPm.HasValue)
+        {
+            return HasAnyOnsitePunch(log) ? "Incomplete" : "Absent";
+        }
+
+        if (!HasCompleteOnsiteMorning(timeInAm, log.TimeOutAm)
+            && creditedTimeInPm is DateTime afternoonTimeIn
+            && log.TimeOutPm is DateTime afternoonTimeOut
+            && IsAfternoonHalfDay(creditedTimeInPm, log.TimeOutPm))
+        {
+            return FormatHalfDayLateUndertime(
+                "Half-Day (PM)",
+                CalculateAfternoonHalfDayLate(date, afternoonTimeIn),
+                CalculateAfternoonHalfDayUndertime(date, afternoonTimeOut, employeeStatus));
+        }
+
+        if (IsOnsiteMorningOnlyHalfDay(timeInAm, log.TimeOutAm)
+            && !HasCompleteOnsiteAfternoon(creditedTimeInPm, log.TimeOutPm))
+        {
+            return FormatHalfDayLateUndertime(
+                "Half-Day (AM)",
+                CalculateLateDuration(date, timeInAm!.Value, employeeStatus),
+                CalculateMorningHalfDayUndertime(date, log.TimeOutAm!.Value));
+        }
+
+        if (HasIncompleteOnsitePunch(log, creditedTimeInPm))
+        {
+            return "Incomplete";
+        }
+
+        if (HasOpenOnsiteInterval(log) && DateTime.Now >= date.Date.AddDays(1).AddMinutes(-1))
+        {
+            return "Absent";
+        }
+
+        var timeIn = timeInAm ?? creditedTimeInPm!.Value;
+        var late = CalculateLateDuration(date, timeIn, employeeStatus);
+        if (HasOpenOnsiteInterval(log))
+        {
+            return FormatLateUndertime(late, TimeSpan.Zero);
+        }
+
+        var worked = CalculateWorkedDuration(new[]
+        {
+            (timeInAm, log.TimeOutAm),
+            (creditedTimeInPm, log.TimeOutPm)
+        }, date);
+        var latestTimeOut = log.TimeOutPm ?? log.TimeOutAm;
+        var undertime = CalculateUndertime(worked, late, date, timeIn, latestTimeOut, employeeStatus);
+        var morningEarlyOutUndertime = CalculateMorningEarlyOutUndertime(date, timeInAm, log.TimeOutAm);
+        if (morningEarlyOutUndertime > undertime)
+        {
+            undertime = morningEarlyOutUndertime;
+        }
+
+        return FormatLateUndertime(late, undertime);
+    }
+
+    private static readonly TimeSpan RequiredWorkDuration = TimeSpan.FromHours(8);
+
+    private static string GetWorkArrangement(AttendanceLogWfh log)
+        => !string.IsNullOrWhiteSpace(log.ExceptionCondition?.ConditionName)
+            ? log.ExceptionCondition.ConditionName
+            : string.IsNullOrWhiteSpace(log.WorkArrangement) ? "WFH" : log.WorkArrangement;
+
+    private static TimeSpan CalculateLateDuration(DateTime date, DateTime actualTimeIn, string? employeeStatus)
+    {
+        var officialTimeIn = GetOfficialTimeIn(date, actualTimeIn);
+        var lateThreshold = IsFixedEightAmEmployee(employeeStatus)
+            ? date.AddHours(8)
+            : date.AddHours(9);
+
+        return officialTimeIn > lateThreshold
+            ? CalculateDurationExcludingLunch(date, lateThreshold, officialTimeIn)
+            : TimeSpan.Zero;
+    }
+
+    private static TimeSpan CalculateAfternoonHalfDayLate(DateTime date, DateTime actualTimeIn)
+    {
+        actualTimeIn = NormalizeAttendanceTime(date, actualTimeIn);
+        var lateThreshold = date.AddHours(13);
+        return actualTimeIn > lateThreshold
+            ? actualTimeIn - lateThreshold
+            : TimeSpan.Zero;
+    }
+
+    private static TimeSpan CalculateMorningHalfDayUndertime(DateTime date, DateTime actualTimeOut)
+    {
+        actualTimeOut = NormalizeAttendanceTime(date, actualTimeOut);
+        if (actualTimeOut.TimeOfDay >= TimeSpan.FromHours(23)
+            && actualTimeOut.TimeOfDay < TimeSpan.FromHours(24))
+        {
+            actualTimeOut = actualTimeOut.AddHours(-12);
+        }
+
+        var requiredOut = date.AddHours(12);
+        return actualTimeOut < requiredOut
+            ? requiredOut - actualTimeOut
+            : TimeSpan.Zero;
+    }
+
+    private static TimeSpan CalculateMorningEarlyOutUndertime(DateTime date, DateTime? timeIn, DateTime? timeOut)
+    {
+        if (!timeIn.HasValue || !timeOut.HasValue)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var timeInClock = timeIn.Value.TimeOfDay;
+        var timeOutClock = timeOut.Value.TimeOfDay;
+        var noon = TimeSpan.FromHours(12);
+
+        if (timeInClock >= noon || timeOutClock >= noon || timeOutClock <= timeInClock)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return noon - timeOutClock;
+    }
+
+    private static TimeSpan CalculateAfternoonHalfDayUndertime(DateTime date, DateTime actualTimeOut, string? employeeStatus)
+    {
+        actualTimeOut = NormalizeAttendanceTime(date, actualTimeOut);
+        var requiredOut = IsFixedEightAmEmployee(employeeStatus)
+            ? date.AddHours(17)
+            : date.AddHours(18);
+        return actualTimeOut < requiredOut
+            ? requiredOut - actualTimeOut
+            : TimeSpan.Zero;
+    }
+
+    private static DateTime GetOfficialTimeIn(DateTime date, DateTime actualTimeIn)
+    {
+        actualTimeIn = NormalizeAttendanceTime(date, actualTimeIn);
+        var sevenAm = date.AddHours(7);
+        return actualTimeIn < sevenAm ? sevenAm : actualTimeIn;
+    }
+
+    private static DateTime NormalizeAttendanceTime(DateTime date, DateTime value)
+        => date.Date.Add(value.TimeOfDay);
+
+    private static DateTime? GetCreditedOnsiteTimeInPm(AttendanceLog log)
+    {
+        if (log.TimeInPm.HasValue)
+        {
+            return log.TimeInPm;
+        }
+
+        var date = log.AttendanceDate.Date;
+        if (!IsCreditableOnsiteAfternoonStart(log)
+            || !log.TimeOutPm.HasValue
+            || log.TimeOutPm.Value.TimeOfDay <= TimeSpan.FromHours(13))
+        {
+            return null;
+        }
+
+        return date.AddHours(13);
+    }
+
+    private static bool IsCreditableOnsiteAfternoonStart(AttendanceLog log)
+    {
+        if (!log.TimeOutAm.HasValue)
+        {
+            return false;
+        }
+
+        var timeOutClock = log.TimeOutAm.Value.TimeOfDay;
+        if (timeOutClock > TimeSpan.FromHours(13))
+        {
+            return false;
+        }
+
+        return !log.TimeInAm.HasValue || timeOutClock > log.TimeInAm.Value.TimeOfDay;
+    }
+
+    private static bool IsFixedEightAmEmployee(string? employeeStatus)
+    {
+        if (string.IsNullOrWhiteSpace(employeeStatus))
+        {
+            return false;
+        }
+
+        var status = employeeStatus.Trim();
+        return ContainsStatusToken(status, "COS")
+            || ContainsStatusToken(status, "JO")
+            || ContainsStatusToken(status, "Casual")
+            || ContainsStatusToken(status, "Intern");
+    }
+
+    private static bool ContainsStatusToken(string value, string token)
+        => value
+            .Split(new[] { ' ', ',', '/', '-', ';', ':' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(part => string.Equals(part, token, StringComparison.OrdinalIgnoreCase));
+
+    private static TimeSpan CalculateWorkedDuration(IEnumerable<(DateTime? Start, DateTime? End)> intervals, DateTime date)
+    {
+        var total = TimeSpan.Zero;
+
+        foreach (var (startValue, endValue) in intervals)
+        {
+            if (!startValue.HasValue || !endValue.HasValue || endValue.Value <= startValue.Value)
+            {
+                continue;
+            }
+
+            var start = GetOfficialTimeIn(date, startValue.Value);
+            var end = NormalizeAttendanceTime(date, endValue.Value);
+            if (end <= start)
+            {
+                continue;
+            }
+
+            total += CalculateDurationExcludingLunch(date, start, end);
+        }
+
+        return total > RequiredWorkDuration ? RequiredWorkDuration : total;
+    }
+
+    private static TimeSpan CalculateDurationExcludingLunch(DateTime date, DateTime start, DateTime end)
+    {
+        start = NormalizeAttendanceTime(date, start);
+        end = NormalizeAttendanceTime(date, end);
+
+        if (end <= start)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var duration = end - start;
+        var lunchStart = date.AddHours(12);
+        var lunchEnd = date.AddHours(13);
+        var overlapStart = start > lunchStart ? start : lunchStart;
+        var overlapEnd = end < lunchEnd ? end : lunchEnd;
+
+        if (overlapEnd > overlapStart)
+        {
+            duration -= overlapEnd - overlapStart;
+        }
+
+        return duration > TimeSpan.Zero ? duration : TimeSpan.Zero;
+    }
+
+    private static TimeSpan CalculateUndertime(
+        TimeSpan worked,
+        TimeSpan late,
+        DateTime date,
+        DateTime actualTimeIn,
+        DateTime? actualTimeOut,
+        string? employeeStatus)
+    {
+        var shortage = RequiredWorkDuration - worked;
+        if (shortage <= TimeSpan.Zero)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var undertime = shortage - late;
+        if (!IsFixedEightAmEmployee(employeeStatus) && actualTimeOut.HasValue)
+        {
+            var requiredEndTime = CalculateRequiredEndTime(date, actualTimeIn);
+            var endTimeShortage = requiredEndTime - NormalizeAttendanceTime(date, actualTimeOut.Value);
+            if (endTimeShortage > undertime)
+            {
+                undertime = endTimeShortage;
+            }
+        }
+
+        return undertime > TimeSpan.Zero ? undertime : TimeSpan.Zero;
+    }
+
+    private static DateTime CalculateRequiredEndTime(DateTime date, DateTime actualTimeIn)
+    {
+        var current = GetOfficialTimeIn(date, actualTimeIn);
+        var remaining = RequiredWorkDuration;
+        var lunchStart = date.AddHours(12);
+        var lunchEnd = date.AddHours(13);
+
+        if (current < lunchStart)
+        {
+            var beforeLunch = lunchStart - current;
+            if (beforeLunch >= remaining)
+            {
+                return current + remaining;
+            }
+
+            remaining -= beforeLunch;
+            current = lunchEnd;
+        }
+        else if (current < lunchEnd)
+        {
+            current = lunchEnd;
+        }
+
+        return current + remaining;
+    }
+
+    private static bool HasOpenOnsiteInterval(AttendanceLog log)
+        => (log.TimeInAm.HasValue && !log.TimeOutAm.HasValue)
+            || (log.TimeInPm.HasValue && !log.TimeOutPm.HasValue);
+
+    private static bool IsAfternoonStart(DateTime value)
+        => value.TimeOfDay >= TimeSpan.FromHours(12);
+
+    private static bool IsMorningHalfDay(DateTime? timeIn, DateTime? timeOut, DateTime date, bool allowLunchWindowTimeOut)
+    {
+        if (!timeIn.HasValue || !timeOut.HasValue)
+        {
+            return false;
+        }
+
+        var timeInClock = timeIn.Value.TimeOfDay;
+        var timeOutClock = NormalizeHalfDayTimeOutClock(timeInClock, timeOut.Value.TimeOfDay);
+        var noon = TimeSpan.FromHours(12);
+        var isLunchOut = allowLunchWindowTimeOut
+            ? timeOutClock >= noon && timeOutClock <= TimeSpan.FromHours(13)
+            : timeOutClock == TimeSpan.FromHours(12);
+
+        return timeInClock < noon
+            && isLunchOut
+            && timeOutClock > timeInClock;
+    }
+
+    private static bool IsOnsiteMorningOnlyHalfDay(DateTime? timeIn, DateTime? timeOut)
+    {
+        if (!timeIn.HasValue || !timeOut.HasValue)
+        {
+            return false;
+        }
+
+        var timeInClock = timeIn.Value.TimeOfDay;
+        var timeOutClock = NormalizeHalfDayTimeOutClock(timeInClock, timeOut.Value.TimeOfDay);
+
+        return timeInClock < TimeSpan.FromHours(12)
+            && timeOutClock <= TimeSpan.FromHours(13)
+            && timeOutClock > timeInClock;
+    }
+
+    private static bool HasCompleteOnsiteMorning(DateTime? timeIn, DateTime? timeOut)
+        => timeIn.HasValue && timeOut.HasValue;
+
+    private static bool HasCompleteOnsiteAfternoon(DateTime? timeIn, DateTime? timeOut)
+        => timeIn.HasValue && timeOut.HasValue;
+
+    private static bool HasAnyOnsitePunch(AttendanceLog log)
+        => log.TimeInAm.HasValue
+            || log.TimeOutAm.HasValue
+            || log.TimeInPm.HasValue
+            || log.TimeOutPm.HasValue;
+
+    private static bool HasIncompleteOnsitePunch(AttendanceLog log, DateTime? creditedTimeInPm)
+    {
+        var hasIncompleteMorning = log.TimeInAm.HasValue != log.TimeOutAm.HasValue;
+        var hasIncompleteAfternoon = creditedTimeInPm.HasValue != log.TimeOutPm.HasValue;
+        return hasIncompleteMorning || hasIncompleteAfternoon;
+    }
+
+    private static bool IsAfternoonHalfDay(DateTime? timeIn, DateTime? timeOut)
+    {
+        if (!timeIn.HasValue || !timeOut.HasValue)
+        {
+            return false;
+        }
+
+        return IsAfternoonStart(timeIn.Value)
+            && timeOut.Value.TimeOfDay > timeIn.Value.TimeOfDay;
+    }
+
+    private static TimeSpan NormalizeHalfDayTimeOutClock(TimeSpan timeInClock, TimeSpan timeOutClock)
+    {
+        if (timeInClock < TimeSpan.FromHours(12)
+            && timeOutClock >= TimeSpan.FromHours(23)
+            && timeOutClock < TimeSpan.FromHours(24))
+        {
+            return timeOutClock - TimeSpan.FromHours(12);
+        }
+
+        return timeOutClock;
+    }
+
+    private static string FormatLateUndertime(TimeSpan late, TimeSpan undertime)
+    {
+        var parts = new List<string>();
+        if (late > TimeSpan.Zero)
+        {
+            parts.Add($"{FormatDurationCompact(late)} late");
+        }
+
+        if (undertime > TimeSpan.Zero)
+        {
+            parts.Add($"{FormatDurationCompact(undertime)} undertime");
+        }
+
+        return string.Join("; ", parts);
+    }
+
+    private static string FormatHalfDayLateUndertime(string halfDayTag, TimeSpan late, TimeSpan undertime)
+    {
+        var lateUndertime = FormatLateUndertime(late, undertime);
+        return string.IsNullOrWhiteSpace(lateUndertime)
+            ? halfDayTag
+            : $"{halfDayTag}; {lateUndertime}";
+    }
+
+    private static string FormatDurationCompact(TimeSpan diff)
+    {
+        var totalMinutes = (int)Math.Ceiling(diff.TotalSeconds / 60.0);
+        if (totalMinutes <= 0)
+        {
+            totalMinutes = 1;
+        }
+
+        if (totalMinutes < 60)
+        {
+            return $"{totalMinutes}m";
+        }
+
+        var hours = totalMinutes / 60;
+        var minutes = totalMinutes % 60;
+        return minutes == 0 ? $"{hours}h" : $"{hours}h {minutes}m";
+    }
+
+    private async Task LoadDivisionPieAsync(DateTime start, DateTime endExclusive)
+    {
+        var onsiteDivisions = await Db.AttendanceLogs
+            .AsNoTracking()
+            .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
+            .Select(l => l.DivisionCenterUnit)
+            .ToListAsync();
+
+        var wfhDivisions = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
+            .Where(l => l.TimeIn.HasValue || l.TimeOut.HasValue)
+            .Select(l => l.DivisionCenterUnit)
+            .ToListAsync();
+
+        divisionPieOptions = GetDistinctOptions(onsiteDivisions.Concat(wfhDivisions)).ToList();
+        if (!string.IsNullOrWhiteSpace(selectedDivisionPie)
+            && !divisionPieOptions.Any(option => string.Equals(option, selectedDivisionPie, StringComparison.OrdinalIgnoreCase)))
+        {
+            selectedDivisionPie = string.Empty;
+        }
+
+        ApplyDivisionPieSelection(onsiteDivisions, wfhDivisions);
+    }
+
+    private void ApplyDivisionPieSelection()
+    {
+        _ = RefreshDivisionPieSelectionAsync();
+    }
+
+    private async Task RefreshDivisionPieSelectionAsync()
+    {
+        var (start, endExclusive) = GetSelectedRange();
+        await LoadDivisionPieAsync(start, endExclusive);
+        dashboardChartsRenderPending = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ApplyDivisionPieSelection(IEnumerable<string?> onsiteDivisions, IEnumerable<string?> wfhDivisions)
+    {
+        divisionPieOnsiteCount = onsiteDivisions.Count(division => MatchesSelectedValue(division, selectedDivisionPie));
+        divisionPieWfhCount = wfhDivisions.Count(division => MatchesSelectedValue(division, selectedDivisionPie));
+        divisionPieTotal = divisionPieOnsiteCount + divisionPieWfhCount;
     }
 
     private static string FormatName(string lastName, string firstName, string middleName)
     {
         var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
         return $"{lastName}, {firstName}{middleInitial}";
+    }
+
+    private static string FormatEmployeeMeta(string? divisionCenterUnit, string? designation)
+    {
+        var division = string.IsNullOrWhiteSpace(divisionCenterUnit) ? "-" : divisionCenterUnit.Trim();
+        var role = string.IsNullOrWhiteSpace(designation) ? "-" : designation.Trim();
+        return $"{division} - {role}";
     }
 
     private static string FormatTime(DateTime? value) => value?.ToString("MMM dd, yyyy\nhh:mm tt") ?? "-";
