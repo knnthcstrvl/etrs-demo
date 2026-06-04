@@ -1,9 +1,11 @@
 @page "/users"
 @using Financial.Data
 @using Financial.Model
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
 @inject ProcurementDbContext Db
 @inject Financial.Services.CurrentUserService CurrentUser
+@inject IJSRuntime JS
 
 <PageTitle>ETRS | Users</PageTitle>
 
@@ -36,177 +38,1234 @@
         </div>
     </div>
 
-    <div class="panel-card attendance-table-card">
-        @if (showUserModal)
-        {
-            <div class="modal-overlay">
-                <div class="modal-card modal-card-large">
-                    <div class="modal-card-header">
-                        <div>
-                            <h3 class="modal-card-title">@(isEditingUser ? "Edit User" : "Add User")</h3>
-                            <div class="modal-card-subtitle">Enter user information and access rights</div>
-                        </div>
-                        <button class="modal-card-close btn-link" @onclick="CloseUserModal">✕</button>
-                    </div>
+    <div style="margin-top:1rem;">
+        <div class="attendance-table-toolbar">
+            <div class="attendance-table-search">
+                <input id="userSearch"
+                       class="form-control attendance-table-search-input"
+                       type="search"
+                       placeholder="Search..."
+                       value="@tableSearchText"
+                       @oninput="HandleTableSearchInput" />
+            </div>
 
-                    <div class="modal-card-body">
-                        <div class="user-form">
-                            <div class="name-row">
-                                <div class="form-row">
-                                    <label>Last Name</label>
-                                    <input class="form-control" @bind="userForm.LastName" />
-                                </div>
-                                <div class="form-row">
-                                    <label>First Name</label>
-                                    <input class="form-control" @bind="userForm.FirstName" />
-                                </div>
-                                <div class="form-row">
-                                    <label>Middle Name</label>
-                                    <input class="form-control" @bind="userForm.MiddleName" />
-                                </div>
-                            </div>
-                            <div class="name-row">
-                                <div class="form-row">
-                                    <label>Username</label>
-                                    <input class="form-control" @bind="userForm.Username" />
-                                </div>
-                                <div class="form-row">
-                                    <label>Email</label>
-                                    <input class="form-control" @bind="userForm.Email" />
-                                </div>
-                            </div>
-                            <div class="name-row">
-                                <div class="form-row">
-                                    <label>Role</label>
-                                    <input class="form-control" @bind="userForm.Role" />
-                                </div>
-                                <div class="form-row">
-                                    <label>Access</label>
-                                    <div class="access-select" @onclick:stopPropagation="true">
-                                        <div class="access-pills" @onclick="ToggleAccessDropdown">
-                                            @if (selectedAccess.Count == 0)
-                                            {
-                                                <span class="access-placeholder">Select access</span>
-                                            }
-                                            else
-                                            {
-                                                @foreach (var a in selectedAccess)
-                                                {
-                                                    <span class="access-pill">@a <button type="button" class="access-remove" @onclick="(() => RemoveAccess(a))">✕</button></span>
-                                                }
-                                            }
-                                            <span class="access-caret">▾</span>
-                                        </div>
-                                        @if (showAccessDropdown)
+            <div class="attendance-table-actions">
+                <div class="attendance-filter-dropdown">
+                    <button type="button" class="btn btn-outline-secondary attendance-filter-button" @onclick="ToggleFilterMenu">
+                        <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i>
+                        <span>Filter</span>
+                        @if (HasActiveTableFilters)
+                        {
+                            <span class="attendance-filter-button-clear"
+                                  title="Clear filters"
+                                  role="button"
+                                  tabindex="0"
+                                  @onclick="ClearFiltersFromButton"
+                                  @onclick:stopPropagation="true">&times;</span>
+                        }
+                    </button>
+
+                    <div class="attendance-filter-menu @(showFilterMenu ? "show" : null)" @onclick:stopPropagation="true">
+                        <div class="attendance-filter-grid">
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="userFilterName">Name</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="userFilterName"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "name" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("name")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterName, "All Names")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "name" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterName) ? "active" : null)" @onclick='() => SetFilterValue("name", string.Empty)'>All Names</button>
+                                        @foreach (var option in CurrentNameOptions)
                                         {
-                                            <div class="access-dropdown">
-                                                @foreach (var option in accessOptions)
-                                                {
-                                                    <label class="access-option"><input type="checkbox" checked="@selectedAccess.Contains(option)" @onchange="(() => ToggleAccess(option))" /> @option</label>
-                                                }
-                                            </div>
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterName, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("name", option)'>@option</button>
                                         }
                                     </div>
                                 </div>
                             </div>
-                            <div class="form-row">
-                                <label>Division / Unit</label>
-                                <input class="form-control" @bind="userForm.DivisionCenterUnit" />
-                            </div>
-                            <div class="form-row">
-                                <label>Designation</label>
-                                <input class="form-control" @bind="userForm.Designation" />
+
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="userFilterUsername">Username</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="userFilterUsername"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "username" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("username")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterUsername, "All Usernames")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "username" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterUsername) ? "active" : null)" @onclick='() => SetFilterValue("username", string.Empty)'>All Usernames</button>
+                                        @foreach (var option in CurrentUsernameOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterUsername, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("username", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="form-row form-row-inline">
-                                <label>Active</label>
-                                <input type="checkbox" class="form-check-input" @bind="userForm.IsActive" />
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="userFilterRole">Role</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="userFilterRole"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "role" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("role")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterRole, "All Roles")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "role" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterRole) ? "active" : null)" @onclick='() => SetFilterValue("role", string.Empty)'>All Roles</button>
+                                        @foreach (var option in CurrentRoleOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterRole, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("role", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="form-row access-row" style="display:none;"> <!-- kept for compatibility but hidden -->
-                                <label>Access Level (legacy)</label>
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="userFilterDivision">Division / Unit</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="userFilterDivision"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "division" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("division")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions / Units")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "division" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                        @foreach (var option in CurrentDivisionOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("division", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="userFilterDesignation">Designation</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="userFilterDesignation"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "designation" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("designation")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterDesignation, "All Designations")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "designation" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDesignation) ? "active" : null)" @onclick='() => SetFilterValue("designation", string.Empty)'>All Designations</button>
+                                        @foreach (var option in CurrentDesignationOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterDesignation, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("designation", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="attendance-filter-field">
+                                <label class="attendance-table-toolbar-label" for="userFilterStatus">Status</label>
+                                <div class="attendance-filter-select-wrap">
+                                    <button type="button"
+                                            id="userFilterStatus"
+                                            class="attendance-filter-select-trigger @(activeFilterField == "status" ? "active" : null)"
+                                            @onclick='() => ToggleFilterField("status")'>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterStatus, "All Statuses")</span>
+                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                    </button>
+
+                                    <div class="attendance-filter-select-menu @(activeFilterField == "status" ? "show" : null)">
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterStatus) ? "active" : null)" @onclick='() => SetFilterValue("status", string.Empty)'>All Statuses</button>
+                                        @foreach (var option in StatusOptions)
+                                        {
+                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterStatus, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("status", option)'>@option</button>
+                                        }
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="modal-card-footer">
-                        <button class="btn btn-outline-secondary" @onclick="CloseUserModal">Cancel</button>
-                        <button class="btn btn-primary" @onclick="SaveUserAsync">Save</button>
+                        <div class="attendance-filter-actions">
+                            <button type="button" class="attendance-filter-clear" @onclick="ClearFilters">Clear</button>
+                            <button type="button" class="btn btn-primary attendance-filter-apply" @onclick="CloseFilterMenu">Apply</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-filter-dropdown attendance-entries-counter">
+                    <button type="button" class="btn btn-outline-secondary attendance-filter-button attendance-entries-button" @onclick="ToggleEntriesMenu">
+                        <span>@pageSize</span>
+                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                    </button>
+
+                    <div class="attendance-entries-menu attendance-filter-menu @(showEntriesMenu ? "show" : null)" @onclick:stopPropagation="true">
+                        @foreach (var option in PageSizeOptions)
+                        {
+                            <button type="button"
+                                    class="attendance-entries-option @(pageSize == option ? "active" : null)"
+                                    @onclick="() => SelectPageSize(option)">
+                                @option
+                            </button>
+                        }
                     </div>
                 </div>
             </div>
-        }
-        <table class="table attendance-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Division / Unit</th>
-                    <th>Designation</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var user in PagedUsers)
-                {
-                    <tr>
-                        <td><span class="cell-ellipsis" title="@FormatName(user.LastName, user.FirstName, user.MiddleName)">@FormatName(user.LastName, user.FirstName, user.MiddleName)</span></td>
-                        <td><span class="cell-ellipsis" title="@DisplayValue(user.Username)">@DisplayValue(user.Username)</span></td>
-                        <td><span class="cell-ellipsis" title="@DisplayValue(user.Email)">@DisplayValue(user.Email)</span></td>
-                        <td><span class="cell-ellipsis" title="@DisplayValue(user.Role)">@DisplayValue(user.Role)</span></td>
-                        <td><span class="cell-ellipsis" title="@DisplayValue(user.DivisionCenterUnit)">@DisplayValue(user.DivisionCenterUnit)</span></td>
-                        <td><span class="cell-ellipsis" title="@DisplayValue(user.Designation)">@DisplayValue(user.Designation)</span></td>
-                        <td><span class="status-badge @(user.IsActive ? "status-ok" : "status-danger")">@(user.IsActive ? "Active" : "Inactive")</span></td>
-                        <td><span class="cell-ellipsis" title="@FormatDate(user.DateCreated)">@FormatDate(user.DateCreated)</span></td>
-                        <td>
-                            <button class="btn btn-link" @onclick="() => OpenEditUserModal(user)" disabled="@(!CurrentUser.HasAccess("Edit"))">Edit</button>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-    <div class="table-footer">
-        <div class="table-entries">@GetEntriesText(users.Count, userPage)</div>
-        <div class="table-pagination">
-            <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeUserPage(userPage - 1)" disabled="@(userPage <= 1)">&#8249;</button>
-            @foreach (var pageItem in BuildPageItems(UserTotalPages, userPage))
+        </div>
+
+        <div class="panel-card attendance-table-card"
+             @onmouseenter="KeepRowMenuOpen"
+             @onmouseleave="HideRowMenuAsync">
+            @if (selectedUser is not null)
             {
-                if (pageItem.HasValue)
-                {
-                    <button type="button" class="table-page-btn @(pageItem.Value == userPage ? "active" : null)" @onclick="() => ChangeUserPage(pageItem.Value)">@pageItem.Value</button>
-                }
-                else
-                {
-                    <span class="table-page-ellipsis">...</span>
-                }
+                <div class="attendance-detail-overlay" @onclick="CloseUserDetail">
+                    <div class="attendance-detail-modal user-detail-modal" @onclick:stopPropagation="true">
+                        <div class="attendance-detail-header">
+                            <div>
+                                <h2 class="attendance-detail-title">User Details</h2>
+                            </div>
+                            <div class="attendance-detail-header-actions">
+                                <button type="button"
+                                        class="attendance-detail-header-button"
+                                        @onclick="() => OpenEditUserModal(selectedUser)"
+                                        disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                    Edit User
+                                </button>
+                                <button type="button" class="attendance-detail-close" @onclick="CloseUserDetail" aria-label="Close user details">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-body">
+                            <div class="attendance-detail-section attendance-detail-hero">
+                                <div>
+                                    <div class="attendance-detail-eyebrow">User</div>
+                                    <div class="attendance-detail-person">@FormatName(selectedUser.LastName, selectedUser.FirstName, selectedUser.MiddleName)</div>
+                                    <div class="attendance-detail-meta">@DisplayValue(selectedUser.Username)</div>
+                                </div>
+                                <span class="status-badge @(selectedUser.IsActive ? "status-ok" : "status-danger")">@(selectedUser.IsActive ? "Active" : "Inactive")</span>
+                            </div>
+
+                            <div class="attendance-detail-section attendance-detail-section-primary">
+                                <div class="attendance-detail-grid">
+                                    <div class="attendance-detail-field">
+                                        <span class="attendance-detail-label">Name</span>
+                                        <strong>@FormatName(selectedUser.LastName, selectedUser.FirstName, selectedUser.MiddleName)</strong>
+                                    </div>
+                                    <div class="attendance-detail-field">
+                                        <span class="attendance-detail-label">Username</span>
+                                        <strong>@DisplayValue(selectedUser.Username)</strong>
+                                    </div>
+                                    <div class="attendance-detail-field">
+                                        <span class="attendance-detail-label">Email</span>
+                                        <strong>@DisplayValue(selectedUser.Email)</strong>
+                                    </div>
+                                    <div class="attendance-detail-field">
+                                        <span class="attendance-detail-label">Role</span>
+                                        <strong>@DisplayValue(selectedUser.Role)</strong>
+                                    </div>
+                                    <div class="attendance-detail-field">
+                                        <span class="attendance-detail-label">Division / Unit</span>
+                                        <strong>@DisplayValue(selectedUser.DivisionCenterUnit)</strong>
+                                    </div>
+                                    <div class="attendance-detail-field">
+                                        <span class="attendance-detail-label">Designation</span>
+                                        <strong>@DisplayValue(selectedUser.Designation)</strong>
+                                    </div>
+                                    <div class="attendance-detail-field">
+                                        <span class="attendance-detail-label">Access</span>
+                                        <strong>@DisplayAccess(selectedUser.AccessLevel)</strong>
+                                    </div>
+                                    <div class="attendance-detail-field">
+                                        <span class="attendance-detail-label">Created</span>
+                                        <strong>@FormatDate(selectedUser.DateCreated)</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-footer">
+                            <button type="button" class="attendance-detail-text-action" @onclick="CloseUserDetail">Close</button>
+                        </div>
+                    </div>
+                </div>
             }
-            <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeUserPage(userPage + 1)" disabled="@(userPage >= UserTotalPages)">&#8250;</button>
+
+            @if (showUserModal)
+            {
+                <div class="attendance-detail-overlay" @onclick="CloseUserModal">
+                    <div class="attendance-detail-modal attendance-input-modal user-input-modal" @onclick:stopPropagation="true">
+                        <div class="attendance-detail-header">
+                            <div>
+                                <h2 class="attendance-detail-title">@(isEditingUser ? "Edit User" : "Add User")</h2>
+                            </div>
+                            <button type="button" class="attendance-detail-close" @onclick="CloseUserModal" aria-label="Close user form">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        <div class="attendance-detail-body attendance-input-body">
+                            <div class="attendance-detail-section">
+                                <div class="attendance-input-grid">
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="userLastName">Last Name</label>
+                                        <input id="userLastName" class="form-control attendance-input-control" @bind="userForm.LastName" />
+                                    </div>
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="userFirstName">First Name</label>
+                                        <input id="userFirstName" class="form-control attendance-input-control" @bind="userForm.FirstName" />
+                                    </div>
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="userMiddleName">Middle Name</label>
+                                        <input id="userMiddleName" class="form-control attendance-input-control" @bind="userForm.MiddleName" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="attendance-detail-section">
+                                <div class="attendance-input-grid two-columns">
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="userUsername">Username</label>
+                                        <input id="userUsername" class="form-control attendance-input-control" @bind="userForm.Username" />
+                                    </div>
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="userEmail">Email</label>
+                                        <input id="userEmail" class="form-control attendance-input-control" @bind="userForm.Email" />
+                                    </div>
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="userRole">Role</label>
+                                        <input id="userRole" class="form-control attendance-input-control" @bind="userForm.Role" />
+                                    </div>
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="userAccess">Access</label>
+                                        <div class="access-select" id="userAccess" @onclick:stopPropagation="true">
+                                            <div class="access-pills attendance-input-control" @onclick="ToggleAccessDropdown">
+                                                @if (selectedAccess.Count == 0)
+                                                {
+                                                    <span class="access-placeholder">Select access</span>
+                                                }
+                                                else
+                                                {
+                                                    @foreach (var access in selectedAccess.OrderBy(value => value))
+                                                    {
+                                                        <span class="access-pill">@access <button type="button" class="access-remove" @onclick="(() => RemoveAccess(access))" @onclick:stopPropagation="true">&times;</button></span>
+                                                    }
+                                                }
+                                                <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                            </div>
+                                            @if (showAccessDropdown)
+                                            {
+                                                <div class="access-dropdown attendance-filter-select-menu show">
+                                                    @foreach (var option in accessOptions)
+                                                    {
+                                                        <label class="access-option"><input type="checkbox" checked="@selectedAccess.Contains(option)" @onchange="(() => ToggleAccess(option))" /> @option</label>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="userDivision">Division / Unit</label>
+                                        <input id="userDivision" class="form-control attendance-input-control" @bind="userForm.DivisionCenterUnit" />
+                                    </div>
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="userDesignation">Designation</label>
+                                        <input id="userDesignation" class="form-control attendance-input-control" @bind="userForm.Designation" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="attendance-detail-section user-active-section">
+                                <label class="user-active-toggle">
+                                    <input type="checkbox" class="form-check-input" @bind="userForm.IsActive" />
+                                    <span>Active</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-footer">
+                            <button type="button" class="attendance-detail-text-action" @onclick="CloseUserModal">Cancel</button>
+                            <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveUserAsync">Save</button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <table class="table attendance-table">
+                <thead>
+                    <tr>
+                        <th class="attendance-actions-column">Actions</th>
+                        <th>@SortHeader("Name", "name")</th>
+                        <th>@SortHeader("Username", "username")</th>
+                        <th>Email</th>
+                        <th>@SortHeader("Role", "role")</th>
+                        <th>@SortHeader("Division / Unit", "division")</th>
+                        <th>@SortHeader("Designation", "designation")</th>
+                        <th>@SortHeader("Status", "status")</th>
+                        <th>@SortHeader("Created", "created")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in PagedUsers)
+                    {
+                        <tr class="attendance-log-row"
+                            data-row-menu-key="@GetUserRowMenuKey(user)"
+                            @ondblclick="() => OpenUserDetail(user)"
+                            @onmouseenter="e => ShowUserRowMenuAsync(user, e)">
+                            <td class="attendance-actions-cell">
+                                <button type="button"
+                                        class="attendance-action-button"
+                                        title="View"
+                                        aria-label="View user details"
+                                        @onclick="() => OpenUserDetail(user)"
+                                        @onclick:stopPropagation="true">
+                                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                </button>
+                                <button type="button"
+                                        class="attendance-action-button"
+                                        title="Edit"
+                                        aria-label="Edit user"
+                                        @onclick="() => OpenEditUserModal(user)"
+                                        @onclick:stopPropagation="true"
+                                        disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                    <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                                </button>
+                            </td>
+                            <td><span class="cell-ellipsis" title="@FormatName(user.LastName, user.FirstName, user.MiddleName)">@FormatName(user.LastName, user.FirstName, user.MiddleName)</span></td>
+                            <td><span class="cell-ellipsis" title="@DisplayValue(user.Username)">@DisplayValue(user.Username)</span></td>
+                            <td><span class="cell-ellipsis" title="@DisplayValue(user.Email)">@DisplayValue(user.Email)</span></td>
+                            <td><span class="cell-ellipsis" title="@DisplayValue(user.Role)">@DisplayValue(user.Role)</span></td>
+                            <td><span class="cell-ellipsis" title="@DisplayValue(user.DivisionCenterUnit)">@DisplayValue(user.DivisionCenterUnit)</span></td>
+                            <td><span class="cell-ellipsis" title="@DisplayValue(user.Designation)">@DisplayValue(user.Designation)</span></td>
+                            <td><span class="status-badge @(user.IsActive ? "status-ok" : "status-danger")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                            <td><span class="cell-ellipsis" title="@FormatDate(user.DateCreated)">@FormatDate(user.DateCreated)</span></td>
+                        </tr>
+                    }
+                    @if (!PagedUsers.Any())
+                    {
+                        <tr>
+                            <td colspan="9" class="attendance-empty-state">No users match the current search and filters.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="attendance-hover-row-menu @(HasHoveredRowMenu ? "show" : null)"
+             style="@RowActionMenuStyle"
+             @onmouseenter="KeepRowMenuOpen"
+             @onmouseleave="HideRowMenuAsync"
+             @onclick:stopPropagation="true">
+            @if (hoveredUserRowMenuUser is not null)
+            {
+                <div class="attendance-hover-row-menu-title" title="@FormatName(hoveredUserRowMenuUser.LastName, hoveredUserRowMenuUser.FirstName, hoveredUserRowMenuUser.MiddleName)">
+                    @FormatName(hoveredUserRowMenuUser.LastName, hoveredUserRowMenuUser.FirstName, hoveredUserRowMenuUser.MiddleName)
+                </div>
+                <button type="button" @onclick="OpenHoveredUserDetail">
+                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    <span>View</span>
+                </button>
+                <button type="button" @onclick="OpenHoveredUserEdit" disabled="@(!CurrentUser.HasAccess("Edit"))">
+                    <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                    <span>Edit</span>
+                </button>
+            }
+        </div>
+
+        <div class="table-footer">
+            <div class="table-entries">@GetEntriesText(filteredUsers.Count, userPage, pageSize)</div>
+            <div class="table-pagination">
+                <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeUserPage(userPage - 1)" disabled="@(userPage <= 1)">&#8249;</button>
+                @foreach (var pageItem in BuildPageItems(UserTotalPages, userPage))
+                {
+                    if (pageItem.HasValue)
+                    {
+                        <button type="button" class="table-page-btn @(pageItem.Value == userPage ? "active" : null)" @onclick="() => ChangeUserPage(pageItem.Value)">@pageItem.Value</button>
+                    }
+                    else
+                    {
+                        <span class="table-page-ellipsis">...</span>
+                    }
+                }
+                <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeUserPage(userPage + 1)" disabled="@(userPage >= UserTotalPages)">&#8250;</button>
+            </div>
         </div>
     </div>
 </div>
 
+<style>
+    .attendance-table-toolbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .attendance-table-search {
+        flex: 1 1 420px;
+        max-width: 520px;
+    }
+
+    .attendance-table-search-input,
+    .attendance-input-control {
+        min-height: 2.85rem;
+    }
+
+    .attendance-table-search-input::-webkit-search-cancel-button {
+        cursor: pointer;
+        filter: grayscale(1) brightness(0);
+        opacity: 1;
+    }
+
+    .attendance-table-actions {
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .attendance-table-toolbar-label {
+        display: inline-block;
+        margin-bottom: 0.25rem;
+        color: var(--finance-text-muted);
+        font-size: 0.74rem;
+        font-weight: 600;
+    }
+
+    .attendance-filter-dropdown,
+    .attendance-filter-field,
+    .access-select {
+        position: relative;
+    }
+
+    .attendance-filter-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.85rem;
+    }
+
+    .attendance-filter-button-clear,
+    .attendance-sort-clear {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 0.92rem;
+        height: 0.92rem;
+        border: 1px solid #d4d8e1;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted);
+        font-size: 0.62rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .attendance-filter-button-clear:hover,
+    .attendance-sort-clear:hover {
+        border-color: #bcc4d2;
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .attendance-filter-menu {
+        position: absolute;
+        top: calc(100% + 0.55rem);
+        right: 0;
+        width: min(92vw, 560px);
+        padding: 0.55rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 20;
+    }
+
+    .attendance-filter-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .attendance-filter-grid,
+    .attendance-input-grid.two-columns {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .attendance-input-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.65rem;
+    }
+
+    .attendance-filter-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        margin-top: 0.55rem;
+        font-size: 0.82rem;
+    }
+
+    .attendance-filter-clear {
+        border: 0;
+        padding: 0.3rem 0.45rem;
+        background: transparent;
+        color: var(--finance-text-muted);
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+
+    .attendance-filter-apply {
+        min-width: 64px;
+        min-height: 2rem;
+        padding: 0.32rem 0.72rem;
+        font-size: 0.82rem;
+    }
+
+    .attendance-filter-select-wrap {
+        position: relative;
+    }
+
+    .attendance-filter-select-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        width: 100%;
+        min-height: 2.35rem;
+        padding: 0.5rem 0.65rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--finance-text);
+        font-size: 0.9rem;
+        text-align: left;
+    }
+
+    .attendance-filter-select-trigger.active {
+        border-color: var(--finance-primary, #2563eb);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .attendance-filter-select-value {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .attendance-filter-select-menu {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        max-height: 16rem;
+        overflow: auto;
+        padding: 0.35rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        opacity: 0;
+        transform: translateY(-4px);
+        pointer-events: none;
+        visibility: hidden;
+        z-index: 30;
+    }
+
+    .attendance-filter-select-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+        visibility: visible;
+    }
+
+    .attendance-filter-select-option,
+    .attendance-entries-option {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 0.65rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        text-align: left;
+        font-size: 0.9rem;
+    }
+
+    .attendance-filter-select-option:hover,
+    .attendance-filter-select-option.active,
+    .attendance-entries-option:hover,
+    .attendance-entries-option.active {
+        background: var(--finance-surface-soft);
+    }
+
+    .attendance-entries-counter,
+    .attendance-entries-menu {
+        min-width: 92px;
+    }
+
+    .attendance-entries-button {
+        justify-content: space-between;
+        min-width: 92px;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .attendance-entries-menu {
+        width: 100%;
+        padding: 0.35rem;
+    }
+
+    .attendance-empty-state {
+        padding: 2rem 1rem;
+        text-align: center;
+        color: var(--finance-text-muted);
+    }
+
+    .attendance-sort-header,
+    .attendance-sort-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .attendance-sort-trigger {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        letter-spacing: inherit;
+        text-transform: inherit;
+    }
+
+    .attendance-sort-trigger.active {
+        color: var(--finance-text, #25324b);
+    }
+
+    .attendance-sort-label {
+        white-space: nowrap;
+    }
+
+    .attendance-sort-icon {
+        color: var(--finance-text-muted);
+        line-height: 1;
+    }
+
+    .attendance-sort-icon.active {
+        color: var(--finance-primary, #1f3a8a);
+    }
+
+    .attendance-sort-clear {
+        padding: 0;
+        font-weight: 500;
+    }
+
+    .attendance-table tbody .attendance-log-row {
+        cursor: pointer;
+        transition: background-color 0.18s ease;
+    }
+
+    .attendance-table tbody .attendance-log-row:hover {
+        background: #fbfcff;
+    }
+
+    .attendance-actions-column,
+    .attendance-actions-cell {
+        min-width: 6.5rem;
+    }
+
+    .attendance-table .attendance-actions-cell {
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .attendance-action-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        margin-right: 0.45rem;
+        border: 1px solid var(--finance-border, #d9dee7);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted, #6b7280);
+        transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+    }
+
+    .attendance-action-button:last-child {
+        margin-right: 0;
+    }
+
+    .attendance-action-button:hover,
+    .attendance-action-button:focus-visible {
+        border-color: var(--finance-border, #d9dee7);
+        color: var(--finance-text, #25324b);
+        background: #f5f7fb;
+    }
+
+    .attendance-action-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .attendance-hover-row-menu {
+        position: fixed;
+        z-index: 1000;
+        min-width: 9.5rem;
+        padding: 0.35rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        opacity: 0;
+        transform: translateY(-4px) scale(0.98);
+        transform-origin: top right;
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+        visibility: hidden;
+    }
+
+    .attendance-hover-row-menu.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+        visibility: visible;
+    }
+
+    .attendance-hover-row-menu-title {
+        max-width: 13rem;
+        margin: 0.1rem 0.2rem 0.25rem;
+        padding: 0.35rem 0.4rem 0.45rem;
+        border-bottom: 1px solid var(--finance-border-soft);
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        font-weight: 600;
+        line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .attendance-hover-row-menu button {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        width: 100%;
+        padding: 0.5rem 0.6rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        font-size: 0.84rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .attendance-hover-row-menu button:hover:not(:disabled) {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .attendance-hover-row-menu button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .attendance-detail-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: rgba(30, 41, 57, 0.28);
+        backdrop-filter: blur(8px);
+    }
+
+    .attendance-detail-modal {
+        width: min(100%, 760px);
+        max-height: min(92vh, 900px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300) 88%, white);
+        border-radius: 10px;
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        animation: attendance-detail-enter 180ms ease-out;
+    }
+
+    .attendance-input-modal,
+    .user-input-modal {
+        width: min(100%, 900px);
+        overflow: visible;
+    }
+
+    .attendance-detail-header,
+    .attendance-detail-hero,
+    .attendance-detail-footer {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .attendance-detail-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 1.15rem 1.5rem 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border-bottom: 1px solid var(--etrs-gray-200);
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+
+    .attendance-detail-title {
+        margin: 0;
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--etrs-gray-700);
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .attendance-detail-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .attendance-detail-header-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.5rem;
+        padding: 0.55rem 1rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 0.75rem;
+        background: #fff;
+        color: var(--etrs-black);
+        font-weight: 500;
+    }
+
+    .attendance-detail-header-button:hover,
+    .attendance-detail-header-button:focus-visible {
+        background: var(--etrs-gray-100);
+    }
+
+    .attendance-detail-header-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .attendance-detail-body {
+        overflow: auto;
+        padding: 1rem 1.5rem;
+    }
+
+    .attendance-input-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .attendance-detail-section {
+        padding: 1rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .attendance-detail-hero {
+        align-items: center;
+    }
+
+    .attendance-detail-eyebrow,
+    .attendance-detail-label {
+        color: var(--finance-text-muted);
+        font-size: 0.74rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .attendance-detail-person {
+        margin-top: 0.2rem;
+        color: var(--etrs-black);
+        font-size: 1.35rem;
+        font-weight: 700;
+    }
+
+    .attendance-detail-meta {
+        margin-top: 0.2rem;
+        color: var(--finance-text-muted);
+    }
+
+    .attendance-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.85rem;
+    }
+
+    .attendance-detail-field {
+        min-width: 0;
+    }
+
+    .attendance-detail-field strong {
+        display: block;
+        margin-top: 0.2rem;
+        color: var(--finance-text);
+        font-size: 0.96rem;
+        overflow-wrap: anywhere;
+    }
+
+    .attendance-detail-footer {
+        align-items: center;
+        padding: 0.85rem 1.5rem 1rem;
+        border-top: 1px solid var(--etrs-gray-200);
+        background: #fff;
+    }
+
+    .attendance-detail-text-action {
+        border: 0;
+        padding: 0.45rem 0;
+        background: transparent;
+        color: var(--finance-text-muted);
+        font-weight: 600;
+    }
+
+    .attendance-detail-text-action:hover {
+        color: var(--finance-text);
+    }
+
+    .attendance-detail-done {
+        min-width: 84px;
+    }
+
+    .user-active-section {
+        padding: 0.8rem 1rem;
+    }
+
+    .user-active-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin: 0;
+        color: var(--finance-text);
+        font-weight: 600;
+    }
+
+    .access-pills {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        height: auto;
+        min-height: 2.85rem;
+        padding: 0.45rem 0.65rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #fff;
+        cursor: pointer;
+    }
+
+    .access-placeholder {
+        color: var(--finance-text-muted);
+    }
+
+    .access-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.45rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 999px;
+        background: var(--finance-surface-soft);
+        color: var(--finance-text);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .access-remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1rem;
+        height: 1rem;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--finance-text-muted);
+        line-height: 1;
+    }
+
+    .access-dropdown {
+        right: auto;
+    }
+
+    .access-option {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin: 0;
+        padding: 0.45rem 0.55rem;
+        border-radius: 6px;
+        color: var(--finance-text);
+        font-size: 0.88rem;
+    }
+
+    .access-option:hover {
+        background: var(--finance-surface-soft);
+    }
+
+    @@keyframes attendance-detail-enter {
+        from {
+            opacity: 0;
+            transform: translateY(8px) scale(0.98);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @@media (max-width: 900px) {
+        .attendance-table-toolbar,
+        .attendance-table-actions {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .attendance-table-search {
+            max-width: none;
+            width: 100%;
+        }
+
+        .attendance-filter-menu {
+            left: 0;
+            right: auto;
+            width: min(92vw, 560px);
+        }
+
+        .attendance-input-grid,
+        .attendance-input-grid.two-columns,
+        .attendance-detail-grid,
+        .attendance-filter-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .attendance-detail-overlay {
+            padding: 0.75rem;
+        }
+    }
+</style>
+
 @code {
-    private const int PageSize = 10;
+    private const int DefaultPageSize = 10;
+    private const int MaxPageSize = 50;
+    private static readonly int[] PageSizeOptions = { 10, 25, 50 };
+    private static readonly string[] StatusOptions = { "Active", "Inactive" };
+
     private List<UserAccount> users = new();
+    private List<UserAccount> filteredUsers = new();
     private int activeUsers;
     private int inactiveUsers;
     private int adminUsers;
     private int userPage = 1;
+    private int pageSize = DefaultPageSize;
+    private string tableSearchText = string.Empty;
+    private string filterName = string.Empty;
+    private string filterUsername = string.Empty;
+    private string filterRole = string.Empty;
+    private string filterDivision = string.Empty;
+    private string filterDesignation = string.Empty;
+    private string filterStatus = string.Empty;
+    private string? activeFilterField;
+    private string? sortColumn;
+    private bool sortDescending = true;
+    private bool showFilterMenu;
+    private bool showEntriesMenu;
+    private UserAccount? selectedUser;
+    private UserAccount? hoveredUserRowMenuUser;
+    private double rowActionMenuLeft;
+    private double rowActionMenuTop;
+    private bool showRowActionMenu;
+    private bool rowActionMenuHovered;
+    private int rowActionMenuShowVersion;
+    private int rowActionMenuHideVersion;
 
-    private IEnumerable<UserAccount> PagedUsers => users
-        .Skip((userPage - 1) * PageSize)
-        .Take(PageSize);
+    private bool showUserModal;
+    private bool isEditingUser;
+    private UserAccount userForm = new();
+    private readonly List<string> accessOptions = new() { "Add", "Edit", "Delete", "Import", "Export", "View" };
+    private HashSet<string> selectedAccess = new(StringComparer.OrdinalIgnoreCase);
+    private bool showAccessDropdown;
 
-    private int UserTotalPages => Math.Max(1, (int)Math.Ceiling(users.Count / (double)PageSize));
+    private bool HasHoveredRowMenu => showRowActionMenu && hoveredUserRowMenuUser is not null;
+    private string RowActionMenuStyle => $"left:{rowActionMenuLeft:0}px;top:{rowActionMenuTop:0}px;";
+
+    private IEnumerable<UserAccount> PagedUsers => filteredUsers
+        .Skip((userPage - 1) * pageSize)
+        .Take(pageSize);
+
+    private int UserTotalPages => Math.Max(1, (int)Math.Ceiling(filteredUsers.Count / (double)pageSize));
+
+    private bool HasActiveTableFilters
+        => !string.IsNullOrWhiteSpace(filterName)
+            || !string.IsNullOrWhiteSpace(filterUsername)
+            || !string.IsNullOrWhiteSpace(filterRole)
+            || !string.IsNullOrWhiteSpace(filterDivision)
+            || !string.IsNullOrWhiteSpace(filterDesignation)
+            || !string.IsNullOrWhiteSpace(filterStatus);
+
+    private IEnumerable<string> CurrentNameOptions => GetDistinctOptions(users.Select(user => FormatName(user.LastName, user.FirstName, user.MiddleName)));
+    private IEnumerable<string> CurrentUsernameOptions => GetDistinctOptions(users.Select(user => user.Username));
+    private IEnumerable<string> CurrentRoleOptions => GetDistinctOptions(users.Select(user => user.Role));
+    private IEnumerable<string> CurrentDivisionOptions => GetDistinctOptions(users.Select(user => user.DivisionCenterUnit));
+    private IEnumerable<string> CurrentDesignationOptions => GetDistinctOptions(users.Select(user => user.Designation));
 
     protected override async Task OnInitializedAsync()
     {
         await CurrentUser.InitializeAsync();
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
         users = await Db.UserAccounts
             .AsNoTracking()
             .OrderBy(u => u.LastName)
@@ -216,28 +1275,366 @@
         activeUsers = users.Count(u => u.IsActive);
         inactiveUsers = users.Count - activeUsers;
         adminUsers = users.Count(u => string.Equals(u.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+
+        RefreshFilteredUsers();
     }
 
-    private static string FormatName(string lastName, string firstName, string middleName)
+    private void RefreshFilteredUsers(bool resetPaging = false)
     {
-        var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
-        return $"{lastName}, {firstName}{middleInitial}";
+        filteredUsers = ApplyUserSort(users.Where(MatchesUserFilters)).ToList();
+
+        if (resetPaging)
+        {
+            userPage = 1;
+            return;
+        }
+
+        userPage = Math.Clamp(userPage, 1, UserTotalPages);
     }
+
+    private bool MatchesUserFilters(UserAccount user)
+    {
+        if (!MatchesSharedSearch(user))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(FormatName(user.LastName, user.FirstName, user.MiddleName), filterName))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(user.Username, filterUsername))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(user.Role, filterRole))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(user.DivisionCenterUnit, filterDivision))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(user.Designation, filterDesignation))
+        {
+            return false;
+        }
+
+        return MatchesSelectedValue(GetStatusText(user), filterStatus);
+    }
+
+    private bool MatchesSharedSearch(UserAccount user)
+    {
+        var query = tableSearchText.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return MatchesUserName(user.LastName, user.FirstName, user.MiddleName, query)
+            || ContainsText(user.Username, query)
+            || ContainsText(user.Email, query)
+            || ContainsText(user.Role, query)
+            || ContainsText(user.DivisionCenterUnit, query)
+            || ContainsText(user.Designation, query)
+            || ContainsText(GetStatusText(user), query)
+            || ContainsText(FormatDate(user.DateCreated), query);
+    }
+
+    private static bool ContainsText(string? source, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(source)
+            && source.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesSelectedValue(string? source, string? selectedValue)
+    {
+        if (string.IsNullOrWhiteSpace(selectedValue))
+        {
+            return true;
+        }
+
+        return string.Equals(source?.Trim(), selectedValue.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesUserName(string? lastName, string? firstName, string? middleName, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        var trimmedQuery = query.Trim();
+        var fullName = string.Join(" ", new[] { firstName, middleName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        var reversedName = string.Join(" ", new[] { lastName, firstName, middleName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        var formattedName = FormatName(lastName ?? string.Empty, firstName ?? string.Empty, middleName ?? string.Empty);
+
+        return ContainsText(firstName, trimmedQuery)
+            || ContainsText(middleName, trimmedQuery)
+            || ContainsText(lastName, trimmedQuery)
+            || ContainsText(fullName, trimmedQuery)
+            || ContainsText(reversedName, trimmedQuery)
+            || ContainsText(formattedName, trimmedQuery);
+    }
+
+    private static IEnumerable<string> GetDistinctOptions(IEnumerable<string?> values)
+        => values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase);
+
+    private Task HandleTableSearchInput(ChangeEventArgs e)
+    {
+        tableSearchText = e.Value?.ToString() ?? string.Empty;
+        RefreshFilteredUsers(resetPaging: true);
+        return Task.CompletedTask;
+    }
+
+    private void ToggleFilterField(string fieldKey)
+    {
+        activeFilterField = string.Equals(activeFilterField, fieldKey, StringComparison.Ordinal) ? null : fieldKey;
+    }
+
+    private void SetFilterValue(string fieldKey, string value)
+    {
+        switch (fieldKey)
+        {
+            case "name":
+                filterName = value;
+                break;
+            case "username":
+                filterUsername = value;
+                break;
+            case "role":
+                filterRole = value;
+                break;
+            case "division":
+                filterDivision = value;
+                break;
+            case "designation":
+                filterDesignation = value;
+                break;
+            case "status":
+                filterStatus = value;
+                break;
+        }
+
+        activeFilterField = null;
+        RefreshFilteredUsers(resetPaging: true);
+    }
+
+    private void ToggleEntriesMenu()
+    {
+        showEntriesMenu = !showEntriesMenu;
+        if (showEntriesMenu)
+        {
+            showFilterMenu = false;
+            activeFilterField = null;
+        }
+    }
+
+    private void SelectPageSize(int selectedPageSize)
+    {
+        pageSize = Math.Clamp(selectedPageSize, 1, MaxPageSize);
+        userPage = 1;
+        showEntriesMenu = false;
+    }
+
+    private void ToggleFilterMenu()
+    {
+        showFilterMenu = !showFilterMenu;
+        if (showFilterMenu)
+        {
+            showEntriesMenu = false;
+        }
+        else
+        {
+            activeFilterField = null;
+        }
+    }
+
+    private void CloseFilterMenu()
+    {
+        showFilterMenu = false;
+        activeFilterField = null;
+    }
+
+    private void ClearFilters()
+    {
+        tableSearchText = string.Empty;
+        filterName = string.Empty;
+        filterUsername = string.Empty;
+        filterRole = string.Empty;
+        filterDivision = string.Empty;
+        filterDesignation = string.Empty;
+        filterStatus = string.Empty;
+        showFilterMenu = false;
+        showEntriesMenu = false;
+        activeFilterField = null;
+        RefreshFilteredUsers(resetPaging: true);
+    }
+
+    private void ClearFiltersFromButton(MouseEventArgs _)
+        => ClearFilters();
+
+    private RenderFragment SortHeader(string label, string column) => builder =>
+    {
+        var sequence = 0;
+        var isSorted = IsSortedColumn(column);
+        var isDescending = GetIsSortedDescending(column);
+        var showClear = HasCustomSort(column);
+
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "attendance-sort-header");
+
+        builder.OpenElement(sequence++, "button");
+        builder.AddAttribute(sequence++, "type", "button");
+        builder.AddAttribute(sequence++, "class", $"attendance-sort-trigger{(isSorted ? " active" : string.Empty)}");
+        builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => ToggleSort(column)));
+        builder.AddAttribute(sequence++, "title", $"Sort by {label}");
+
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", "attendance-sort-label");
+        builder.AddContent(sequence++, label);
+        builder.CloseElement();
+
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", $"attendance-sort-icon{(isSorted ? " active" : string.Empty)}");
+        builder.OpenElement(sequence++, "i");
+        builder.AddAttribute(sequence++, "class", isDescending ? "fa-solid fa-caret-down" : "fa-solid fa-caret-up");
+        builder.AddAttribute(sequence++, "aria-hidden", "true");
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+
+        if (showClear)
+        {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", "attendance-sort-clear");
+            builder.AddAttribute(sequence++, "title", "Clear sorting");
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, ClearSorting));
+            builder.AddAttribute(sequence++, "aria-label", "Clear sorting");
+            builder.AddContent(sequence++, "x");
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private bool HasCustomSort(string column)
+        => !string.IsNullOrWhiteSpace(sortColumn)
+            && string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsSortedColumn(string column)
+    {
+        if (!string.IsNullOrWhiteSpace(sortColumn))
+        {
+            return string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(column, "created", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool GetIsSortedDescending(string column)
+    {
+        if (string.IsNullOrWhiteSpace(sortColumn))
+        {
+            return string.Equals(column, "created", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase) && sortDescending;
+    }
+
+    private void ToggleSort(string column)
+    {
+        if (string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase))
+        {
+            sortDescending = !sortDescending;
+        }
+        else
+        {
+            sortColumn = column;
+            sortDescending = false;
+        }
+
+        userPage = 1;
+        RefreshFilteredUsers();
+    }
+
+    private void ClearSorting()
+    {
+        sortColumn = null;
+        sortDescending = true;
+        userPage = 1;
+        RefreshFilteredUsers();
+    }
+
+    private IEnumerable<UserAccount> ApplyUserSort(IEnumerable<UserAccount> source)
+    {
+        var column = sortColumn?.Trim().ToLowerInvariant();
+        var descending = sortDescending;
+
+        return column switch
+        {
+            "name" => OrderByDirection(source, descending, user => NormalizeSortValue(user.LastName))
+                .ThenBy(user => NormalizeSortValue(user.FirstName))
+                .ThenBy(user => NormalizeSortValue(user.MiddleName)),
+            "username" => OrderByDirection(source, descending, user => NormalizeSortValue(user.Username))
+                .ThenBy(user => NormalizeSortValue(user.LastName))
+                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+            "role" => OrderByDirection(source, descending, user => NormalizeSortValue(user.Role))
+                .ThenBy(user => NormalizeSortValue(user.LastName))
+                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+            "division" => OrderByDirection(source, descending, user => NormalizeSortValue(user.DivisionCenterUnit))
+                .ThenBy(user => NormalizeSortValue(user.LastName))
+                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+            "designation" => OrderByDirection(source, descending, user => NormalizeSortValue(user.Designation))
+                .ThenBy(user => NormalizeSortValue(user.LastName))
+                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+            "status" => OrderByDirection(source, descending, GetStatusText)
+                .ThenBy(user => NormalizeSortValue(user.LastName))
+                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+            "created" => OrderByDirection(source, descending, user => user.DateCreated)
+                .ThenBy(user => NormalizeSortValue(user.LastName))
+                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+            _ => source
+                .OrderByDescending(user => user.DateCreated)
+                .ThenBy(user => NormalizeSortValue(user.LastName))
+                .ThenBy(user => NormalizeSortValue(user.FirstName))
+        };
+    }
+
+    private static IOrderedEnumerable<T> OrderByDirection<T, TKey>(IEnumerable<T> source, bool descending, Func<T, TKey> keySelector)
+        => descending ? source.OrderByDescending(keySelector) : source.OrderBy(keySelector);
+
+    private static string NormalizeSortValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 
     private void ChangeUserPage(int page)
     {
         userPage = Math.Clamp(page, 1, UserTotalPages);
     }
 
-    private static string GetEntriesText(int totalCount, int currentPage)
+    private static string GetEntriesText(int totalCount, int currentPage, int currentPageSize)
     {
         if (totalCount == 0)
         {
             return "Showing 0 to 0 of 0 entries";
         }
 
-        var start = ((currentPage - 1) * PageSize) + 1;
-        var end = Math.Min(currentPage * PageSize, totalCount);
+        var start = ((currentPage - 1) * currentPageSize) + 1;
+        var end = Math.Min(currentPage * currentPageSize, totalCount);
         return $"Showing {start} to {end} of {totalCount} entries";
     }
 
@@ -273,34 +1670,126 @@
         yield return totalPages;
     }
 
-    private static string FormatDate(DateTime value) => value.ToString("MMM dd, yyyy");
+    private async Task ShowUserRowMenuAsync(UserAccount user, MouseEventArgs e)
+    {
+        await QueueRowMenuAsync(
+            GetUserRowMenuKey(user),
+            e,
+            () => hoveredUserRowMenuUser = user);
+    }
 
-    private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+    private async Task QueueRowMenuAsync(string rowKey, MouseEventArgs e, Action selectRow)
+    {
+        var showVersion = ++rowActionMenuShowVersion;
+        rowActionMenuHideVersion++;
+        rowActionMenuHovered = true;
+        showRowActionMenu = false;
 
-    // modal state
-    private bool showUserModal;
-    private bool isEditingUser;
-    private UserAccount userForm = new();
+        await Task.Delay(1000);
 
-    private bool accessAdd;
-    private bool accessEdit;
-    private bool accessDelete;
-    private bool accessImport;
-    private bool accessExport;
-    private List<string> accessOptions = new() { "Add", "Edit", "Delete", "Import", "Export", "View" };
-    private HashSet<string> selectedAccess = new(StringComparer.OrdinalIgnoreCase);
-    private bool showAccessDropdown;
+        if (!rowActionMenuHovered || showVersion != rowActionMenuShowVersion)
+        {
+            return;
+        }
+
+        selectRow();
+
+        var position = await JS.InvokeAsync<RowMenuPosition>("attendanceLogs.getRowMenuPosition", rowKey, e.ClientX, e.ClientY, 152, 88, 12);
+        rowActionMenuLeft = position.Left;
+        rowActionMenuTop = position.Top;
+        showRowActionMenu = true;
+    }
+
+    private async Task HideRowMenuAsync()
+    {
+        rowActionMenuHovered = false;
+        rowActionMenuShowVersion++;
+        var hideVersion = ++rowActionMenuHideVersion;
+
+        await Task.Delay(120);
+
+        if (rowActionMenuHovered || hideVersion != rowActionMenuHideVersion)
+        {
+            return;
+        }
+
+        showRowActionMenu = false;
+        await InvokeAsync(StateHasChanged);
+
+        await Task.Delay(190);
+
+        if (!showRowActionMenu && hideVersion == rowActionMenuHideVersion)
+        {
+            hoveredUserRowMenuUser = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void KeepRowMenuOpen()
+    {
+        rowActionMenuHovered = true;
+        rowActionMenuHideVersion++;
+    }
+
+    private void CloseRowMenu()
+    {
+        showRowActionMenu = false;
+        hoveredUserRowMenuUser = null;
+    }
+
+    private static string GetUserRowMenuKey(UserAccount user)
+        => $"user-{user.UserAccountId}";
+
+    private void OpenUserDetail(UserAccount user)
+    {
+        CloseRowMenu();
+        selectedUser = user;
+    }
+
+    private void CloseUserDetail()
+    {
+        selectedUser = null;
+    }
+
+    private void OpenHoveredUserDetail()
+    {
+        if (hoveredUserRowMenuUser is not { } user)
+        {
+            return;
+        }
+
+        OpenUserDetail(user);
+    }
+
+    private void OpenHoveredUserEdit()
+    {
+        if (hoveredUserRowMenuUser is not { } user)
+        {
+            return;
+        }
+
+        CloseRowMenu();
+        OpenEditUserModal(user);
+    }
 
     private void OpenAddUserModal()
     {
+        CloseUserDetail();
+        CloseRowMenu();
         isEditingUser = false;
-        userForm = new UserAccount();
-        accessAdd = accessEdit = accessDelete = accessImport = accessExport = false;
+        userForm = new UserAccount
+        {
+            IsActive = true
+        };
+        selectedAccess = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        showAccessDropdown = false;
         showUserModal = true;
     }
 
     private void OpenEditUserModal(UserAccount user)
     {
+        CloseUserDetail();
+        CloseRowMenu();
         isEditingUser = true;
         userForm = new UserAccount
         {
@@ -319,12 +1808,7 @@
 
         var tokens = (user.AccessLevel ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         selectedAccess = new HashSet<string>(tokens, StringComparer.OrdinalIgnoreCase);
-        accessAdd = selectedAccess.Contains("Add");
-        accessEdit = selectedAccess.Contains("Edit");
-        accessDelete = selectedAccess.Contains("Delete");
-        accessImport = selectedAccess.Contains("Import");
-        accessExport = selectedAccess.Contains("Export");
-
+        showAccessDropdown = false;
         showUserModal = true;
     }
 
@@ -336,8 +1820,7 @@
 
     private async Task SaveUserAsync()
     {
-        // persist selectedAccess
-        userForm.AccessLevel = string.Join(",", selectedAccess);
+        userForm.AccessLevel = string.Join(",", selectedAccess.OrderBy(value => value));
 
         if (isEditingUser)
         {
@@ -360,17 +1843,17 @@
         }
         else
         {
-            // basic password for new users
             if (string.IsNullOrWhiteSpace(userForm.Password))
             {
                 userForm.Password = BCrypt.Net.BCrypt.HashPassword("Password@123");
             }
+
             userForm.DateCreated = DateTime.UtcNow;
             await Db.UserAccounts.AddAsync(userForm);
             await Db.SaveChangesAsync();
         }
 
-        await OnInitializedAsync();
+        await LoadUsersAsync();
         showUserModal = false;
     }
 
@@ -381,19 +1864,41 @@
 
     private void ToggleAccess(string option)
     {
-        if (selectedAccess.Contains(option)) selectedAccess.Remove(option);
-        else selectedAccess.Add(option);
-        // keep legacy booleans for compatibility
-        accessAdd = selectedAccess.Contains("Add");
-        accessEdit = selectedAccess.Contains("Edit");
-        accessDelete = selectedAccess.Contains("Delete");
-        accessImport = selectedAccess.Contains("Import");
-        accessExport = selectedAccess.Contains("Export");
+        if (!selectedAccess.Add(option))
+        {
+            selectedAccess.Remove(option);
+        }
     }
 
     private void RemoveAccess(string option)
     {
-        if (selectedAccess.Contains(option)) selectedAccess.Remove(option);
-        ToggleAccessDropdown();
+        selectedAccess.Remove(option);
+    }
+
+    private static string FormatName(string? lastName, string? firstName, string? middleName)
+    {
+        var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
+        var formatted = $"{lastName}, {firstName}{middleInitial}".Trim(' ', ',');
+        return string.IsNullOrWhiteSpace(formatted) ? "-" : formatted;
+    }
+
+    private static string FormatDate(DateTime value) => value.ToString("MMM dd, yyyy");
+
+    private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string DisplayValue(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value) ? fallback : value;
+
+    private static string GetStatusText(UserAccount user) => user.IsActive ? "Active" : "Inactive";
+
+    private static string DisplayAccess(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? "-"
+            : string.Join(", ", value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+    private sealed class RowMenuPosition
+    {
+        public double Left { get; set; }
+        public double Top { get; set; }
     }
 }

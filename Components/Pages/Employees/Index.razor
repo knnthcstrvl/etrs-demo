@@ -2,6 +2,7 @@
 @using Financial.Data
 @using Financial.Model.Dtr
 @using System.Text
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
 @inject ProcurementDbContext Db
 @inject IJSRuntime JS
@@ -16,9 +17,10 @@
             <h1 class="attendance-logs-title">Employees</h1>
         </div>
         <div class="attendance-logs-header-actions">
-            <InputFile id="employees-import-input" OnChange="ImportEmployeesAsync" accept=".csv" style="display:none;" />
-            <label for="employees-import-input" class="btn btn-outline-secondary mb-0 @(CurrentUser.HasAccess("Import") ? "" : "disabled")">Import</label>
-            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="ExportEmployeesAsync" disabled="@(!CurrentUser.HasAccess("Export"))">Export</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenAddEmployeeModal" disabled="@(!CurrentUser.HasAccess("Edit"))">Add Employee</button>
+            <span class="employees-header-sep" aria-hidden="true"></span>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenImportEmployeesModal" disabled="@(!CurrentUser.HasAccess("Import"))">Import</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenExportEmployeesModal" disabled="@(!CurrentUser.HasAccess("Export"))">Export</button>
         </div>
     </div>
 
@@ -42,58 +44,533 @@
         </div>
     </div>
 
-    <div class="panel-card attendance-table-card">
-        @if (showEmployeeModal)
-        {
-            <div class="modal-overlay">
-                <div class="modal-card">
-                    <h3>@(isEditingEmployee ? "Edit Employee" : "Add Employee")</h3>
-                    <div class="form-grid">
-                        <div>
-                            <label>ID Number</label>
-                            <input class="form-control" @bind="employeeForm.IdNumber" />
+    <div style="margin-top:1rem;">
+    <div class="attendance-table-toolbar">
+        <div class="attendance-table-search">
+            <input id="employeeSearch"
+                   class="form-control attendance-table-search-input"
+                   type="search"
+                   placeholder="Search..."
+                   value="@tableSearchText"
+                   @oninput="HandleTableSearchInput" />
+        </div>
+
+        <div class="attendance-table-actions">
+            <div class="attendance-filter-dropdown">
+                <button type="button" class="btn btn-outline-secondary attendance-filter-button" @onclick="ToggleFilterMenu">
+                    <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i>
+                    <span>Filter</span>
+                    @if (HasActiveTableFilters)
+                    {
+                        <span class="attendance-filter-button-clear"
+                              title="Clear filters"
+                              role="button"
+                              tabindex="0"
+                              @onclick="ClearFiltersFromButton"
+                              @onclick:stopPropagation="true">&times;</span>
+                    }
+                </button>
+
+                <div class="attendance-filter-menu @(showFilterMenu ? "show" : null)" @onclick:stopPropagation="true">
+                    <div class="attendance-filter-grid">
+                        <div class="attendance-filter-field">
+                            <label class="attendance-table-toolbar-label" for="employeeFilterId">ID Number</label>
+                            <div class="attendance-filter-select-wrap">
+                                <button type="button"
+                                        id="employeeFilterId"
+                                        class="attendance-filter-select-trigger @(activeFilterField == "id" ? "active" : null)"
+                                        @onclick='() => ToggleFilterField("id")'>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterIdNumber, "All ID Numbers")</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(activeFilterField == "id" ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterIdNumber) ? "active" : null)" @onclick='() => SetFilterValue("id", string.Empty)'>All ID Numbers</button>
+                                    @foreach (var option in CurrentIdNumberOptions)
+                                    {
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(filterIdNumber, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("id", option)'>@option</button>
+                                    }
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label>Last Name</label>
-                            <input class="form-control" @bind="employeeForm.LastName" />
+
+                        <div class="attendance-filter-field">
+                            <label class="attendance-table-toolbar-label" for="employeeFilterEmployee">Employee</label>
+                            <div class="attendance-filter-select-wrap">
+                                <button type="button"
+                                        id="employeeFilterEmployee"
+                                        class="attendance-filter-select-trigger @(activeFilterField == "employee" ? "active" : null)"
+                                        @onclick='() => ToggleFilterField("employee")'>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterEmployee, "All Employees")</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(activeFilterField == "employee" ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterEmployee) ? "active" : null)" @onclick='() => SetFilterValue("employee", string.Empty)'>All Employees</button>
+                                    @foreach (var option in CurrentEmployeeOptions)
+                                    {
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(filterEmployee, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("employee", option)'>@option</button>
+                                    }
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label>First Name</label>
-                            <input class="form-control" @bind="employeeForm.FirstName" />
+
+                        <div class="attendance-filter-field">
+                            <label class="attendance-table-toolbar-label" for="employeeFilterDivision">Division / Unit</label>
+                            <div class="attendance-filter-select-wrap">
+                                <button type="button"
+                                        id="employeeFilterDivision"
+                                        class="attendance-filter-select-trigger @(activeFilterField == "division" ? "active" : null)"
+                                        @onclick='() => ToggleFilterField("division")'>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions / Units")</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(activeFilterField == "division" ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                    @foreach (var option in CurrentDivisionOptions)
+                                    {
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(filterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("division", option)'>@option</button>
+                                    }
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label>Middle Name</label>
-                            <input class="form-control" @bind="employeeForm.MiddleName" />
+
+                        <div class="attendance-filter-field">
+                            <label class="attendance-table-toolbar-label" for="employeeFilterDesignation">Designation</label>
+                            <div class="attendance-filter-select-wrap">
+                                <button type="button"
+                                        id="employeeFilterDesignation"
+                                        class="attendance-filter-select-trigger @(activeFilterField == "designation" ? "active" : null)"
+                                        @onclick='() => ToggleFilterField("designation")'>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterDesignation, "All Designations")</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(activeFilterField == "designation" ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDesignation) ? "active" : null)" @onclick='() => SetFilterValue("designation", string.Empty)'>All Designations</button>
+                                    @foreach (var option in CurrentDesignationOptions)
+                                    {
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(filterDesignation, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("designation", option)'>@option</button>
+                                    }
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label>Division / Unit</label>
-                            <input class="form-control" @bind="employeeForm.DivisionCenterUnit" />
-                        </div>
-                        <div>
-                            <label>Designation</label>
-                            <input class="form-control" @bind="employeeForm.Designation" />
-                        </div>
-                        <div>
-                            <label>Status</label>
-                            <input class="form-control" @bind="employeeForm.Status" />
+
+                        <div class="attendance-filter-field">
+                            <label class="attendance-table-toolbar-label" for="employeeFilterStatus">Status</label>
+                            <div class="attendance-filter-select-wrap">
+                                <button type="button"
+                                        id="employeeFilterStatus"
+                                        class="attendance-filter-select-trigger @(activeFilterField == "status" ? "active" : null)"
+                                        @onclick='() => ToggleFilterField("status")'>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterStatus, "All Statuses")</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(activeFilterField == "status" ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterStatus) ? "active" : null)" @onclick='() => SetFilterValue("status", string.Empty)'>All Statuses</button>
+                                    @foreach (var option in CurrentStatusOptions)
+                                    {
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(filterStatus, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("status", option)'>@option</button>
+                                    }
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="modal-actions">
-                        <button class="btn btn-secondary" @onclick="CloseEmployeeModal">Cancel</button>
-                        <button class="btn btn-primary" @onclick="SaveEmployeeAsync">Save</button>
+
+                    <div class="attendance-filter-actions">
+                        <button type="button" class="attendance-filter-clear" @onclick="ClearFilters">Clear</button>
+                        <button type="button" class="btn btn-primary attendance-filter-apply" @onclick="CloseFilterMenu">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="attendance-filter-dropdown attendance-entries-counter">
+                <button type="button" class="btn btn-outline-secondary attendance-filter-button attendance-entries-button" @onclick="ToggleEntriesMenu">
+                    <span>@pageSize</span>
+                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                </button>
+
+                <div class="attendance-entries-menu attendance-filter-menu @(showEntriesMenu ? "show" : null)" @onclick:stopPropagation="true">
+                    @foreach (var option in PageSizeOptions)
+                    {
+                        <button type="button"
+                                class="attendance-entries-option @(pageSize == option ? "active" : null)"
+                                @onclick="() => SelectPageSize(option)">
+                            @option
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel-card attendance-table-card"
+         @onmouseenter="KeepRowMenuOpen"
+         @onmouseleave="HideRowMenuAsync">
+        @if (selectedEmployee is not null)
+        {
+            <div class="attendance-detail-overlay" @onclick="CloseEmployeeDetail">
+                <div class="attendance-detail-modal employee-detail-modal" @onclick:stopPropagation="true">
+                    <div class="attendance-detail-header">
+                        <div>
+                            <h2 class="attendance-detail-title">Employee Details</h2>
+                        </div>
+                        <div class="attendance-detail-header-actions">
+                            <button type="button"
+                                    class="attendance-detail-header-button"
+                                    @onclick="() => OpenEditEmployeeModal(selectedEmployee)"
+                                    disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                Edit Employee
+                            </button>
+                            <button type="button" class="attendance-detail-close" @onclick="CloseEmployeeDetail" aria-label="Close employee details">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-body">
+                        <div class="attendance-detail-section attendance-detail-hero">
+                            @{
+                                var selectedStatusParts = ParseEmployeeStatus(selectedEmployee.Status);
+                            }
+                            <div>
+                                <div class="attendance-detail-eyebrow">Employee</div>
+                                <div class="attendance-detail-person">@FormatName(selectedEmployee.LastName, selectedEmployee.FirstName, selectedEmployee.MiddleName)</div>
+                                <div class="attendance-detail-meta">@DisplayValue(selectedEmployee.IdNumber)</div>
+                            </div>
+                            <div class="employee-status-pills attendance-detail-status-pills" title="@DisplayValue(selectedEmployee.Status)">
+                                @if (!string.IsNullOrWhiteSpace(selectedStatusParts.Activity))
+                                {
+                                    <span class="@GetEmployeeActivityStatusClass(selectedStatusParts.Activity)">@selectedStatusParts.Activity</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(selectedStatusParts.EmploymentType))
+                                {
+                                    <span class="employee-status-pill employee-status-type">@selectedStatusParts.EmploymentType</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-section attendance-detail-section-primary">
+                            <div class="attendance-detail-grid">
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">ID Number</span>
+                                    <strong>@DisplayValue(selectedEmployee.IdNumber)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Last Name</span>
+                                    <strong>@DisplayValue(selectedEmployee.LastName)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">First Name</span>
+                                    <strong>@DisplayValue(selectedEmployee.FirstName)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Middle Name</span>
+                                    <strong>@DisplayValue(selectedEmployee.MiddleName)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Division / Unit</span>
+                                    <strong>@DisplayValue(selectedEmployee.DivisionCenterUnit)</strong>
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Designation</span>
+                                    <strong>@DisplayValue(selectedEmployee.Designation)</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-footer">
+                        <button type="button" class="attendance-detail-text-action" @onclick="CloseEmployeeDetail">Close</button>
                     </div>
                 </div>
             </div>
         }
+
+        @if (showEmployeeModal)
+        {
+            <div class="attendance-detail-overlay" @onclick="CloseEmployeeModal">
+                <div class="attendance-detail-modal attendance-input-modal employee-input-modal" @onclick="CloseEmployeeStatusDropdown" @onclick:stopPropagation="true">
+                    <div class="attendance-detail-header">
+                        <div>
+                            <h2 class="attendance-detail-title">@(isEditingEmployee ? "Edit Employee" : "Add Employee")</h2>
+                        </div>
+                        <button type="button" class="attendance-detail-close" @onclick="CloseEmployeeModal" aria-label="Close employee form">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <div class="attendance-detail-body attendance-input-body">
+                        <div class="attendance-detail-section attendance-detail-hero">
+                            <div>
+                                <div class="attendance-detail-eyebrow">Employee Record</div>
+                                <div class="attendance-detail-person">Enter the employee details.</div>
+                                <div class="attendance-detail-meta">This will @(isEditingEmployee ? "update the selected employee record" : "add a new employee to the master list").</div>
+                            </div>
+                            <div class="attendance-input-pill">@(isEditingEmployee ? "Edit" : "New")</div>
+                        </div>
+
+                        <div class="attendance-detail-section">
+                            <div class="attendance-input-grid">
+                                <div class="attendance-input-field">
+                                    <span class="attendance-detail-label">ID Number</span>
+                                    <input class="form-control attendance-input-control" @bind="employeeForm.IdNumber" />
+                                </div>
+                                <div class="attendance-input-field">
+                                    <span class="attendance-detail-label">Last Name</span>
+                                    <input class="form-control attendance-input-control" @bind="employeeForm.LastName" />
+                                </div>
+                                <div class="attendance-input-field">
+                                    <span class="attendance-detail-label">First Name</span>
+                                    <input class="form-control attendance-input-control" @bind="employeeForm.FirstName" />
+                                </div>
+                                <div class="attendance-input-field">
+                                    <span class="attendance-detail-label">Middle Name</span>
+                                    <input class="form-control attendance-input-control" @bind="employeeForm.MiddleName" />
+                                </div>
+                                <div class="attendance-input-field">
+                                    <span class="attendance-detail-label">Division / Unit</span>
+                                    <input class="form-control attendance-input-control" @bind="employeeForm.DivisionCenterUnit" />
+                                </div>
+                                <div class="attendance-input-field">
+                                    <span class="attendance-detail-label">Designation</span>
+                                    <input class="form-control attendance-input-control" @bind="employeeForm.Designation" />
+                                </div>
+                                <div class="attendance-input-field employee-status-field attendance-input-field-wide">
+                                    <span class="attendance-detail-label">Status</span>
+                                    <div class="employee-status-selector">
+                                        <div class="employee-status-option-group">
+                                            <label class="employee-status-option-heading" for="employeeStatusActivity">Employment Status</label>
+                                            <div class="attendance-filter-select-wrap employee-status-dropdown" @onclick:stopPropagation="true">
+                                                <button type="button"
+                                                        id="employeeStatusActivity"
+                                                        @ref="employeeStatusActivityButtonRef"
+                                                        class="attendance-filter-select-trigger attendance-input-control @(activeEmployeeStatusDropdown == "activity" ? "active" : null)"
+                                                        @onclick='() => ToggleEmployeeStatusDropdownAsync("activity")'>
+                                                    <span class="attendance-filter-select-value">@employeeStatusActivity</span>
+                                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                                </button>
+
+                                                <div class="@GetEmployeeStatusDropdownMenuClass("activity")">
+                                                    @foreach (var option in EmployeeActivityOptions)
+                                                    {
+                                                        <button type="button"
+                                                                class="attendance-filter-select-option @(string.Equals(employeeStatusActivity, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)"
+                                                                @onclick="() => SelectEmployeeStatusActivity(option)">
+                                                            @option
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="employee-status-option-group">
+                                            <label class="employee-status-option-heading" for="employeeStatusType">Employment Type</label>
+                                            <div class="attendance-filter-select-wrap employee-status-dropdown" @onclick:stopPropagation="true">
+                                                <button type="button"
+                                                        id="employeeStatusType"
+                                                        @ref="employeeStatusTypeButtonRef"
+                                                        class="attendance-filter-select-trigger attendance-input-control @(activeEmployeeStatusDropdown == "type" ? "active" : null)"
+                                                        @onclick='() => ToggleEmployeeStatusDropdownAsync("type")'>
+                                                    <span class="attendance-filter-select-value">@employeeStatusType</span>
+                                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                                </button>
+
+                                                <div class="@GetEmployeeStatusDropdownMenuClass("type")">
+                                                    @foreach (var option in EmployeeTypeOptions)
+                                                    {
+                                                        <button type="button"
+                                                                class="attendance-filter-select-option @(string.Equals(employeeStatusType, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)"
+                                                                @onclick="() => SelectEmployeeStatusType(option)">
+                                                            @option
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-footer">
+                        <button type="button" class="attendance-detail-text-action" @onclick="CloseEmployeeModal">Cancel</button>
+                        <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveEmployeeAsync">Save</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (showDeleteEmployeeModal && employeePendingDelete is not null)
+        {
+            <div class="attendance-detail-overlay" @onclick="CloseDeleteEmployeeModal">
+                <div class="attendance-detail-modal employee-delete-modal" @onclick:stopPropagation="true">
+                    <div class="attendance-detail-header">
+                        <div>
+                            <h2 class="attendance-detail-title">Delete Employee</h2>
+                        </div>
+                        <button type="button"
+                                class="attendance-detail-close"
+                                @onclick="CloseDeleteEmployeeModal"
+                                aria-label="Close delete confirmation"
+                                disabled="@isDeletingEmployee">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <div class="attendance-detail-body">
+                        <div class="attendance-detail-section attendance-delete-warning">
+                            <div class="attendance-delete-icon" aria-hidden="true">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                            <div>
+                                <div class="attendance-detail-eyebrow">Confirm Delete</div>
+                                <div class="attendance-detail-person">@FormatName(employeePendingDelete.LastName, employeePendingDelete.FirstName, employeePendingDelete.MiddleName)</div>
+                                <div class="attendance-detail-meta">
+                                    This will permanently delete the employee record and related attendance logs.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-footer">
+                        <button type="button"
+                                class="attendance-detail-text-action"
+                                @onclick="CloseDeleteEmployeeModal"
+                                disabled="@isDeletingEmployee">
+                            Cancel
+                        </button>
+                        <button type="button"
+                                class="btn btn-danger attendance-detail-done"
+                                @onclick="DeleteEmployeeAsync"
+                                disabled="@isDeletingEmployee">
+                            @(isDeletingEmployee ? "Deleting..." : "Delete")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (showExportEmployeesModal)
+        {
+            <div class="attendance-detail-overlay" @onclick="CloseExportEmployeesModal">
+                <div class="attendance-detail-modal employee-delete-modal" @onclick:stopPropagation="true">
+                    <div class="attendance-detail-header">
+                        <div>
+                            <h2 class="attendance-detail-title">Export Employees</h2>
+                        </div>
+                        <button type="button"
+                                class="attendance-detail-close"
+                                @onclick="CloseExportEmployeesModal"
+                                aria-label="Close export confirmation"
+                                disabled="@isExportingEmployees">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <div class="attendance-detail-body">
+                        <div class="attendance-detail-section attendance-delete-warning">
+                            <div class="attendance-export-icon" aria-hidden="true">
+                                <i class="fa-solid fa-file-export"></i>
+                            </div>
+                            <div>
+                                <div class="attendance-detail-eyebrow">Confirm Export</div>
+                                <div class="attendance-detail-person">Employees CSV</div>
+                                <div class="attendance-detail-meta">
+                                    This will download a CSV file containing all employee records.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-footer">
+                        <button type="button"
+                                class="attendance-detail-text-action"
+                                @onclick="CloseExportEmployeesModal"
+                                disabled="@isExportingEmployees">
+                            Cancel
+                        </button>
+                        <button type="button"
+                                class="btn btn-primary attendance-detail-done"
+                                @onclick="ExportEmployeesAsync"
+                                disabled="@isExportingEmployees">
+                            @(isExportingEmployees ? "Exporting..." : "Export")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (showImportEmployeesModal)
+        {
+            <div class="attendance-detail-overlay" @onclick="CloseImportEmployeesModal">
+                <div class="attendance-detail-modal employee-delete-modal" @onclick:stopPropagation="true">
+                    <div class="attendance-detail-header">
+                        <div>
+                            <h2 class="attendance-detail-title">Import Employees</h2>
+                        </div>
+                        <button type="button"
+                                class="attendance-detail-close"
+                                @onclick="CloseImportEmployeesModal"
+                                aria-label="Close import confirmation"
+                                disabled="@isImportingEmployees">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <div class="attendance-detail-body">
+                        <div class="attendance-detail-section attendance-delete-warning">
+                            <div class="attendance-import-icon" aria-hidden="true">
+                                <i class="fa-solid fa-file-import"></i>
+                            </div>
+                            <div>
+                                <div class="attendance-detail-eyebrow">Confirm Import</div>
+                                <div class="attendance-detail-person">Employees CSV</div>
+                                <div class="attendance-detail-meta">
+                                    Select a CSV file to insert new employees or update matching ID numbers.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-section">
+                            <label class="attendance-table-toolbar-label" for="employees-import-input">CSV file</label>
+                            <InputFile id="employees-import-input"
+                                       class="form-control attendance-import-file-input"
+                                       OnChange="SelectEmployeeImportFile"
+                                       accept=".csv"
+                                       disabled="@isImportingEmployees" />
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-footer">
+                        <button type="button"
+                                class="attendance-detail-text-action"
+                                @onclick="CloseImportEmployeesModal"
+                                disabled="@isImportingEmployees">
+                            Cancel
+                        </button>
+                        <button type="button"
+                                class="btn btn-primary attendance-detail-done"
+                                @onclick="ImportSelectedEmployeesAsync"
+                                disabled="@(isImportingEmployees || employeeImportFile is null)">
+                            @(isImportingEmployees ? "Importing..." : "Import")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
         <table class="table attendance-table">
             <thead>
                 <tr>
-                    <th>ID Number</th>
-                    <th>Name</th>
-                    <th>Division / Unit</th>
-                    <th>Designation</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th class="attendance-actions-column">Actions</th>
+                    <th>@SortHeader("ID Number", "id")</th>
+                    <th>@SortHeader("Name", "employee")</th>
+                    <th>@SortHeader("Division / Unit", "division")</th>
+                    <th>@SortHeader("Designation", "designation")</th>
+                    <th>@SortHeader("Status", "status")</th>
                 </tr>
             </thead>
             <tbody>
@@ -101,7 +578,38 @@
                 {
                     var statusParts = ParseEmployeeStatus(employee.Status);
 
-                    <tr>
+                    <tr class="attendance-log-row"
+                        data-row-menu-key="@GetEmployeeRowMenuKey(employee)"
+                        @ondblclick="() => OpenEmployeeDetail(employee)"
+                        @onmouseenter="e => ShowEmployeeRowMenuAsync(employee, e)">
+                        <td class="attendance-actions-cell">
+                            <button type="button"
+                                    class="attendance-action-button"
+                                    title="View"
+                                    aria-label="View employee details"
+                                    @onclick="() => OpenEmployeeDetail(employee)"
+                                    @onclick:stopPropagation="true">
+                                <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                            </button>
+                            <button type="button"
+                                    class="attendance-action-button"
+                                    title="Edit"
+                                    aria-label="Edit employee"
+                                    @onclick="() => OpenEditEmployeeModal(employee)"
+                                    @onclick:stopPropagation="true"
+                                    disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                            </button>
+                            <button type="button"
+                                    class="attendance-action-button attendance-action-button-danger"
+                                    title="Delete"
+                                    aria-label="Delete employee"
+                                    @onclick="() => OpenDeleteEmployeeModal(employee)"
+                                    @onclick:stopPropagation="true"
+                                    disabled="@(!CanDeleteEmployees)">
+                                <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+                            </button>
+                        </td>
                         <td><span class="cell-ellipsis" title="@DisplayValue(employee.IdNumber)">@DisplayValue(employee.IdNumber)</span></td>
                         <td><span class="cell-ellipsis" title="@FormatName(employee.LastName, employee.FirstName, employee.MiddleName)">@FormatName(employee.LastName, employee.FirstName, employee.MiddleName)</span></td>
                         <td><span class="cell-ellipsis" title="@DisplayValue(employee.DivisionCenterUnit)">@DisplayValue(employee.DivisionCenterUnit)</span></td>
@@ -122,16 +630,43 @@
                                 </div>
                             }
                         </td>
-                        <td>
-                            <button class="btn btn-link" @onclick="() => OpenEditEmployeeModal(employee)">Edit</button>
-                        </td>
+                    </tr>
+                }
+                @if (!PagedEmployees.Any())
+                {
+                    <tr>
+                        <td colspan="6" class="attendance-empty-state">No employees match the current search and filters.</td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
+    <div class="attendance-hover-row-menu @(HasHoveredRowMenu ? "show" : null)"
+         style="@RowActionMenuStyle"
+         @onmouseenter="KeepRowMenuOpen"
+         @onmouseleave="HideRowMenuAsync"
+         @onclick:stopPropagation="true">
+        @if (hoveredEmployeeRowMenuEmployee is not null)
+        {
+            <div class="attendance-hover-row-menu-title" title="@FormatName(hoveredEmployeeRowMenuEmployee.LastName, hoveredEmployeeRowMenuEmployee.FirstName, hoveredEmployeeRowMenuEmployee.MiddleName)">
+                @FormatName(hoveredEmployeeRowMenuEmployee.LastName, hoveredEmployeeRowMenuEmployee.FirstName, hoveredEmployeeRowMenuEmployee.MiddleName)
+            </div>
+            <button type="button" @onclick="OpenHoveredEmployeeDetail">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                <span>View</span>
+            </button>
+            <button type="button" @onclick="OpenHoveredEmployeeEdit" disabled="@(!CurrentUser.HasAccess("Edit"))">
+                <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                <span>Edit</span>
+            </button>
+            <button type="button" class="attendance-hover-row-menu-danger" @onclick="OpenHoveredEmployeeDelete" disabled="@(!CanDeleteEmployees)">
+                <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+                <span>Delete</span>
+            </button>
+        }
+    </div>
     <div class="table-footer">
-        <div class="table-entries">@GetEntriesText(employees.Count, employeePage)</div>
+        <div class="table-entries">@GetEntriesText(filteredEmployees.Count, employeePage, pageSize)</div>
         <div class="table-pagination">
             <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeEmployeePage(employeePage - 1)" disabled="@(employeePage <= 1)">&#8249;</button>
             @foreach (var pageItem in BuildPageItems(EmployeeTotalPages, employeePage))
@@ -147,6 +682,7 @@
             }
             <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangeEmployeePage(employeePage + 1)" disabled="@(employeePage >= EmployeeTotalPages)">&#8250;</button>
         </div>
+    </div>
     </div>
 </div>
 </RequireAccess>
@@ -190,10 +726,974 @@
         color: var(--etrs-gray-700);
         border-color: var(--etrs-gray-200);
     }
+
+    .attendance-table-toolbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .attendance-table-search {
+        flex: 1 1 420px;
+        max-width: 520px;
+    }
+
+    .attendance-table-search-input {
+        min-height: 2.85rem;
+    }
+
+    .attendance-table-search-input::-webkit-search-cancel-button {
+        cursor: pointer;
+        filter: grayscale(1) brightness(0);
+        opacity: 1;
+    }
+
+    .attendance-table-actions {
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .attendance-table-toolbar-label {
+        display: inline-block;
+        margin-bottom: 0.25rem;
+        color: var(--finance-text-muted);
+        font-size: 0.74rem;
+        font-weight: 600;
+    }
+
+    .attendance-filter-dropdown {
+        position: relative;
+    }
+
+    .attendance-filter-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.85rem;
+    }
+
+    .attendance-filter-button-clear {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 0.92rem;
+        height: 0.92rem;
+        border: 1px solid #d4d8e1;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted);
+        font-size: 0.62rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .attendance-filter-button-clear:hover {
+        border-color: #bcc4d2;
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .attendance-filter-menu {
+        position: absolute;
+        top: calc(100% + 0.55rem);
+        right: 0;
+        width: min(92vw, 560px);
+        padding: 0.55rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 20;
+    }
+
+    .attendance-filter-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .attendance-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .attendance-filter-field {
+        min-width: 0;
+        position: relative;
+    }
+
+    .attendance-filter-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        margin-top: 0.55rem;
+        font-size: 0.82rem;
+    }
+
+    .attendance-filter-clear {
+        border: 0;
+        padding: 0.3rem 0.45rem;
+        background: transparent;
+        color: var(--finance-text-muted);
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+
+    .attendance-filter-apply {
+        min-width: 64px;
+        min-height: 2rem;
+        padding: 0.32rem 0.72rem;
+        font-size: 0.82rem;
+    }
+
+    .attendance-entries-counter {
+        min-width: 92px;
+    }
+
+    .attendance-entries-button {
+        justify-content: space-between;
+        min-width: 92px;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .attendance-entries-menu {
+        width: 100%;
+        min-width: 92px;
+        padding: 0.35rem;
+    }
+
+    .attendance-entries-option {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 0.65rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        text-align: left;
+        font-size: 0.92rem;
+    }
+
+    .attendance-entries-option:hover,
+    .attendance-entries-option.active {
+        background: var(--finance-surface-soft);
+    }
+
+    .attendance-empty-state {
+        padding: 2rem 1rem;
+        text-align: center;
+        color: var(--finance-text-muted);
+    }
+
+    .attendance-sort-header {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .attendance-sort-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        letter-spacing: inherit;
+        text-transform: inherit;
+    }
+
+    .attendance-sort-trigger.active {
+        color: var(--finance-text, #25324b);
+    }
+
+    .attendance-sort-label {
+        white-space: nowrap;
+    }
+
+    .attendance-sort-icon {
+        color: var(--finance-text-muted);
+        line-height: 1;
+    }
+
+    .attendance-sort-icon.active {
+        color: var(--finance-primary, #1f3a8a);
+    }
+
+    .attendance-sort-clear {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 0.92rem;
+        height: 0.92rem;
+        padding: 0;
+        border: 1px solid #d4d8e1;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted);
+        font-size: 0.62rem;
+        font-weight: 500;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .attendance-sort-clear:hover {
+        border-color: #bcc4d2;
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .attendance-table tbody .attendance-log-row {
+        cursor: pointer;
+        transition: background-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .attendance-table tbody .attendance-log-row:hover {
+        background: #fbfcff;
+    }
+
+    .attendance-actions-column {
+        min-width: 10.75rem;
+    }
+
+    .attendance-actions-cell {
+        min-width: 10.75rem;
+    }
+
+    .attendance-table .attendance-actions-cell {
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .attendance-action-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        margin-right: 0.45rem;
+        border: 1px solid var(--finance-border, #d9dee7);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted, #6b7280);
+        transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+    }
+
+    .attendance-action-button:last-child {
+        margin-right: 0;
+    }
+
+    .attendance-action-button:hover,
+    .attendance-action-button:focus-visible {
+        border-color: var(--finance-border, #d9dee7);
+        color: var(--finance-text, #25324b);
+        background: #f5f7fb;
+    }
+
+    .attendance-action-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .attendance-action-button-danger:hover:not(:disabled),
+    .attendance-action-button-danger:focus-visible:not(:disabled) {
+        border-color: #fecaca;
+        color: #b91c1c;
+        background: #fef2f2;
+    }
+
+    .attendance-hover-row-menu {
+        position: fixed;
+        z-index: 1000;
+        min-width: 9.5rem;
+        padding: 0.35rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        opacity: 0;
+        transform: translateY(-4px) scale(0.98);
+        transform-origin: top right;
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+        visibility: hidden;
+    }
+
+    .attendance-hover-row-menu.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+        visibility: visible;
+    }
+
+    .attendance-hover-row-menu-title {
+        max-width: 13rem;
+        margin: 0.1rem 0.2rem 0.25rem;
+        padding: 0.35rem 0.4rem 0.45rem;
+        border-bottom: 1px solid var(--finance-border-soft);
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        font-weight: 600;
+        line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .attendance-hover-row-menu button {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        width: 100%;
+        padding: 0.5rem 0.6rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        font-size: 0.84rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .attendance-hover-row-menu button:hover:not(:disabled) {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .attendance-hover-row-menu button.attendance-hover-row-menu-danger:hover:not(:disabled) {
+        background: #fef2f2;
+        color: #b91c1c;
+    }
+
+    .attendance-hover-row-menu button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .employees-header-sep {
+        display: inline-block;
+        width: 1px;
+        height: 26px;
+        background: var(--finance-border);
+        margin: 0 0.75rem;
+        align-self: center;
+        opacity: 0.8;
+    }
+
+    .attendance-detail-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: rgba(30, 41, 57, 0.28);
+        backdrop-filter: blur(8px);
+    }
+
+    .attendance-detail-modal {
+        width: min(100%, 760px);
+        max-height: min(92vh, 900px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300) 88%, white);
+        border-radius: 10px;
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        animation: attendance-detail-enter 180ms ease-out;
+    }
+
+    .attendance-input-modal {
+        width: min(100%, 900px);
+    }
+
+    .employee-input-modal {
+        width: min(100%, 900px);
+        overflow: visible;
+    }
+
+    .employee-delete-modal {
+        width: min(100%, 520px);
+    }
+
+    .attendance-delete-warning {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: start;
+        gap: 1rem;
+    }
+
+    .attendance-delete-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 999px;
+        background: #fef2f2;
+        color: #b91c1c;
+        font-size: 1.1rem;
+    }
+
+    .attendance-export-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 999px;
+        background: #eef4ff;
+        color: var(--finance-primary, #2563eb);
+        font-size: 1.1rem;
+    }
+
+    .attendance-import-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 999px;
+        background: #ecfdf5;
+        color: #047857;
+        font-size: 1.1rem;
+    }
+
+    .attendance-import-file-input {
+        margin-top: 0.35rem;
+    }
+
+    @@media (min-height: 760px) {
+        .employee-input-modal {
+            max-height: calc(100vh - 2rem);
+        }
+
+        .employee-input-modal .attendance-detail-body {
+            overflow: visible;
+            padding-top: 0.85rem;
+            padding-bottom: 0.85rem;
+        }
+
+        .employee-input-modal .attendance-input-body {
+            gap: 0.75rem;
+        }
+
+        .employee-input-modal .attendance-detail-section {
+            margin-top: 0.75rem;
+            padding: 0.85rem 1rem;
+        }
+
+        .employee-input-modal .attendance-detail-section:first-child {
+            margin-top: 0;
+        }
+
+        .employee-input-modal .attendance-input-control {
+            min-height: 2.75rem;
+            padding-top: 0.65rem;
+            padding-bottom: 0.65rem;
+        }
+
+        .employee-input-modal .attendance-detail-footer {
+            padding-top: 0.75rem;
+            padding-bottom: 0.9rem;
+        }
+    }
+
+    .attendance-detail-header,
+    .attendance-detail-hero,
+    .attendance-detail-footer {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .employee-detail-modal {
+        width: min(100%, 760px);
+    }
+
+    .attendance-detail-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 1.15rem 1.5rem 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border-bottom: 1px solid var(--etrs-gray-200);
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+
+    .attendance-detail-title {
+        margin: 0;
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--etrs-gray-700);
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .attendance-detail-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .attendance-detail-header-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.5rem;
+        padding: 0.55rem 1rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 0.75rem;
+        background: #fff;
+        color: var(--etrs-black);
+        font-weight: 500;
+    }
+
+    .attendance-detail-header-button:hover,
+    .attendance-detail-header-button:focus-visible {
+        background: #f5f7fb;
+    }
+
+    .attendance-detail-header-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .attendance-detail-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 1rem 1.5rem;
+    }
+
+    .attendance-input-body {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .attendance-detail-section {
+        margin-top: 1rem;
+        padding: 1rem 1.05rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.9);
+        overflow: visible;
+    }
+
+    .attendance-detail-body .attendance-detail-section:first-child {
+        margin-top: 0;
+    }
+
+    .attendance-detail-hero {
+        align-items: center;
+        background: #ffffff;
+        border-color: var(--etrs-gray-200);
+        border-radius: 8px;
+    }
+
+    .attendance-detail-eyebrow {
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-person {
+        margin-top: 0.35rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-meta {
+        margin-top: 0.2rem;
+        font-weight: 400;
+        color: var(--etrs-gray-700);
+    }
+
+    .attendance-input-pill {
+        flex: 0 0 auto;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        background: var(--etrs-gray-100);
+        border: 1px solid var(--etrs-gray-200);
+        color: var(--etrs-gray-800);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .attendance-detail-status {
+        flex: 0 0 auto;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        background: var(--etrs-gray-100);
+        border: 1px solid var(--etrs-gray-200);
+        color: var(--etrs-gray-800);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .attendance-detail-status-pills {
+        flex: 0 0 auto;
+        justify-content: flex-end;
+    }
+
+    .attendance-detail-status-pills .employee-status-pill {
+        min-height: 3rem;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        font-size: 1rem;
+        font-weight: 600;
+        line-height: 1.2;
+    }
+
+    .attendance-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .attendance-detail-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+
+    .attendance-detail-field strong {
+        margin: 0;
+        color: var(--etrs-black);
+        overflow-wrap: anywhere;
+    }
+
+    .attendance-detail-section-primary .attendance-detail-label {
+        font-weight: 500;
+    }
+
+    .attendance-detail-section-primary .attendance-detail-field strong {
+        font-weight: 600;
+    }
+
+    .attendance-input-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .attendance-input-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+
+    .attendance-input-field-wide {
+        grid-column: 1 / -1;
+    }
+
+    .employee-status-selector {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+        padding: 0.9rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: #ffffff;
+    }
+
+    .employee-status-option-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        min-width: 0;
+    }
+
+    .employee-status-option-heading {
+        color: var(--etrs-gray-700);
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+
+    .attendance-filter-select-wrap {
+        position: relative;
+    }
+
+    .attendance-filter-select-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        width: 100%;
+        min-height: 2.15rem;
+        padding: 0.38rem 0.68rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+
+    .attendance-filter-select-trigger.active {
+        border-color: rgba(16, 77, 173, 0.35);
+        box-shadow: 0 0 0 3px rgba(16, 77, 173, 0.08);
+    }
+
+    .attendance-filter-select-value {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .attendance-filter-select-menu {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        max-height: 220px;
+        padding: 0.3rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        overflow-y: auto;
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 8;
+    }
+
+    .attendance-filter-select-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .attendance-filter-select-option {
+        display: block;
+        width: 100%;
+        padding: 0.45rem 0.55rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text);
+        font-size: 0.82rem;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .attendance-filter-select-option:hover,
+    .attendance-filter-select-option.active {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .employee-status-dropdown .attendance-filter-select-trigger {
+        justify-content: center;
+        min-height: 3rem;
+        padding: 0.75rem 0.9rem;
+        font-size: 1rem;
+        border-color: var(--etrs-gray-200);
+        color: var(--etrs-black);
+    }
+
+    .employee-status-dropdown .attendance-filter-select-trigger.active {
+        border-color: var(--etrs-gray-400);
+        box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
+    }
+
+    .employee-status-dropdown {
+        z-index: 30;
+    }
+
+    .employee-status-dropdown .attendance-filter-select-menu {
+        z-index: 60;
+    }
+
+    .employee-status-dropdown .attendance-filter-select-menu.open-upward {
+        top: auto;
+        bottom: calc(100% + 0.35rem);
+        transform: translateY(6px);
+    }
+
+    .employee-status-dropdown .attendance-filter-select-menu.open-upward.show {
+        transform: translateY(0);
+    }
+
+    .attendance-dropdown-caret {
+        font-size: 0.78rem;
+    }
+
+    .attendance-detail-label {
+        color: var(--etrs-gray-700);
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .attendance-input-control {
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        min-height: 3rem;
+        padding: 0.75rem 0.9rem;
+        background: #ffffff;
+        color: var(--etrs-black);
+        box-shadow: none;
+    }
+
+    .attendance-input-control:focus {
+        border-color: var(--etrs-gray-400);
+        box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
+    }
+
+    .attendance-detail-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 1rem 1.5rem 1.25rem;
+        background: linear-gradient(180deg, rgba(250, 250, 250, 0.92) 0%, var(--etrs-gray-50) 100%);
+        border-top: 1px solid var(--etrs-gray-200);
+        border-bottom-left-radius: 10px;
+        border-bottom-right-radius: 10px;
+    }
+
+    .attendance-detail-text-action {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--etrs-gray-700);
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .attendance-detail-text-action:hover,
+    .attendance-detail-text-action:focus-visible {
+        color: var(--etrs-black);
+        text-decoration: none;
+    }
+
+    .attendance-detail-done {
+        min-width: 7rem;
+        border-radius: 12px;
+        padding-inline: 1.25rem;
+    }
+
+    @@keyframes attendance-detail-enter {
+        from {
+            opacity: 0;
+            transform: translateY(10px) scale(0.985);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .attendance-detail-modal {
+            border-radius: 10px;
+        }
+
+        .attendance-table-toolbar,
+        .attendance-table-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .attendance-table-search {
+            max-width: none;
+        }
+
+        .attendance-filter-menu {
+            left: 0;
+            right: auto;
+            width: min(100vw - 2rem, 560px);
+        }
+
+        .attendance-filter-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attendance-detail-header,
+        .attendance-detail-hero {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .attendance-detail-header,
+        .attendance-detail-body,
+        .attendance-detail-footer {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        .attendance-input-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .employee-status-selector {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attendance-detail-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attendance-detail-done {
+            width: 100%;
+            text-align: center;
+        }
+    }
 </style>
 
 @code {
-    private const int PageSize = 10;
+    private sealed class RowMenuPosition
+    {
+        public double Left { get; set; }
+        public double Top { get; set; }
+    }
+
+    private const int MaxPageSize = 100;
+    private static readonly int[] PageSizeOptions = { 10, 25, 50, 100 };
     private static readonly string[] EmployeeCsvHeaders =
     {
         "IdNumber",
@@ -223,18 +1723,65 @@
         ["Designation"] = "Designation",
         ["Status"] = "Status"
     };
+    private static readonly string[] EmployeeActivityOptions = { "Active", "Inactive" };
+    private static readonly string[] EmployeeTypeOptions = { "Regular", "COS", "JO", "Casual", "Intern" };
 
     private List<Employee> employees = new();
+    private List<Employee> filteredEmployees = new();
     private int activeEmployees;
     private int inactiveEmployees;
     private int divisionCount;
     private int employeePage = 1;
+    private int pageSize = 10;
+    private string tableSearchText = string.Empty;
+    private string filterIdNumber = string.Empty;
+    private string filterEmployee = string.Empty;
+    private string filterDivision = string.Empty;
+    private string filterDesignation = string.Empty;
+    private string filterStatus = string.Empty;
+    private string? activeFilterField;
+    private string? sortColumn;
+    private bool sortDescending = true;
+    private bool showFilterMenu;
+    private bool showEntriesMenu;
+    private Employee? selectedEmployee;
+    private Employee? hoveredEmployeeRowMenuEmployee;
+    private double rowActionMenuLeft;
+    private double rowActionMenuTop;
+    private bool showRowActionMenu;
+    private bool rowActionMenuHovered;
+    private int rowActionMenuShowVersion;
+    private int rowActionMenuHideVersion;
+    private bool showDeleteEmployeeModal;
+    private bool showImportEmployeesModal;
+    private bool isImportingEmployees;
+    private bool showExportEmployeesModal;
+    private bool isExportingEmployees;
+    private bool isDeletingEmployee;
+    private IBrowserFile? employeeImportFile;
+    private Employee? employeePendingDelete;
 
-    private IEnumerable<Employee> PagedEmployees => employees
-        .Skip((employeePage - 1) * PageSize)
-        .Take(PageSize);
+    private bool HasHoveredRowMenu => showRowActionMenu && hoveredEmployeeRowMenuEmployee is not null;
+    private string RowActionMenuStyle => $"left:{rowActionMenuLeft:0}px;top:{rowActionMenuTop:0}px;";
+    private bool CanDeleteEmployees => string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase);
 
-    private int EmployeeTotalPages => Math.Max(1, (int)Math.Ceiling(employees.Count / (double)PageSize));
+    private IEnumerable<Employee> PagedEmployees => filteredEmployees
+        .Skip((employeePage - 1) * pageSize)
+        .Take(pageSize);
+
+    private int EmployeeTotalPages => Math.Max(1, (int)Math.Ceiling(filteredEmployees.Count / (double)pageSize));
+    private bool HasActiveTableFilters
+        => !string.IsNullOrWhiteSpace(filterIdNumber)
+            || !string.IsNullOrWhiteSpace(filterEmployee)
+            || !string.IsNullOrWhiteSpace(filterDivision)
+            || !string.IsNullOrWhiteSpace(filterDesignation)
+            || !string.IsNullOrWhiteSpace(filterStatus);
+
+    private IEnumerable<string> CurrentIdNumberOptions => GetDistinctOptions(employees.Select(employee => employee.IdNumber));
+    private IEnumerable<string> CurrentEmployeeOptions => GetDistinctOptions(employees.Select(employee => FormatName(employee.LastName, employee.FirstName, employee.MiddleName)));
+    private IEnumerable<string> CurrentDivisionOptions => GetDistinctOptions(employees.Select(employee => employee.DivisionCenterUnit));
+    private IEnumerable<string> CurrentDesignationOptions => GetDistinctOptions(employees.Select(employee => employee.Designation));
+    private IEnumerable<string> CurrentStatusOptions => GetDistinctOptions(employees.Select(employee => employee.Status));
 
     protected override async Task OnInitializedAsync()
     {
@@ -258,7 +1805,7 @@
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
 
-        employeePage = Math.Clamp(employeePage, 1, EmployeeTotalPages);
+        RefreshFilteredEmployees();
     }
 
     private static string FormatName(string lastName, string firstName, string middleName)
@@ -267,20 +1814,344 @@
         return $"{lastName}, {firstName}{middleInitial}";
     }
 
+    private void RefreshFilteredEmployees(bool resetPaging = false)
+    {
+        filteredEmployees = ApplyEmployeeSort(employees.Where(MatchesEmployeeFilters)).ToList();
+
+        if (resetPaging)
+        {
+            employeePage = 1;
+            return;
+        }
+
+        employeePage = Math.Clamp(employeePage, 1, EmployeeTotalPages);
+    }
+
+    private bool MatchesEmployeeFilters(Employee employee)
+    {
+        if (!MatchesSharedSearch(employee))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(employee.IdNumber, filterIdNumber))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(FormatName(employee.LastName, employee.FirstName, employee.MiddleName), filterEmployee))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(employee.DivisionCenterUnit, filterDivision))
+        {
+            return false;
+        }
+
+        if (!MatchesSelectedValue(employee.Designation, filterDesignation))
+        {
+            return false;
+        }
+
+        return MatchesSelectedValue(employee.Status, filterStatus);
+    }
+
+    private bool MatchesSharedSearch(Employee employee)
+    {
+        var query = tableSearchText.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return ContainsText(employee.IdNumber, query)
+            || MatchesEmployeeName(employee.LastName, employee.FirstName, employee.MiddleName, query)
+            || ContainsText(employee.DivisionCenterUnit, query)
+            || ContainsText(employee.Designation, query)
+            || ContainsText(employee.Status, query);
+    }
+
+    private static bool ContainsText(string? source, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(source)
+            && source.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesSelectedValue(string? source, string? selectedValue)
+    {
+        if (string.IsNullOrWhiteSpace(selectedValue))
+        {
+            return true;
+        }
+
+        return string.Equals(source?.Trim(), selectedValue.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesEmployeeName(string? lastName, string? firstName, string? middleName, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        var trimmedQuery = query.Trim();
+        var fullName = string.Join(" ", new[] { firstName, middleName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        var reversedName = string.Join(" ", new[] { lastName, firstName, middleName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        var formattedName = FormatName(lastName ?? string.Empty, firstName ?? string.Empty, middleName ?? string.Empty);
+
+        return ContainsText(firstName, trimmedQuery)
+            || ContainsText(middleName, trimmedQuery)
+            || ContainsText(lastName, trimmedQuery)
+            || ContainsText(fullName, trimmedQuery)
+            || ContainsText(reversedName, trimmedQuery)
+            || ContainsText(formattedName, trimmedQuery);
+    }
+
+    private static IEnumerable<string> GetDistinctOptions(IEnumerable<string?> values)
+        => values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase);
+
+    private Task HandleTableSearchInput(ChangeEventArgs e)
+    {
+        tableSearchText = e.Value?.ToString() ?? string.Empty;
+        RefreshFilteredEmployees(resetPaging: true);
+        return Task.CompletedTask;
+    }
+
+    private void ToggleFilterField(string fieldKey)
+    {
+        activeFilterField = string.Equals(activeFilterField, fieldKey, StringComparison.Ordinal) ? null : fieldKey;
+    }
+
+    private void SetFilterValue(string fieldKey, string value)
+    {
+        switch (fieldKey)
+        {
+            case "id":
+                filterIdNumber = value;
+                break;
+            case "employee":
+                filterEmployee = value;
+                break;
+            case "division":
+                filterDivision = value;
+                break;
+            case "designation":
+                filterDesignation = value;
+                break;
+            case "status":
+                filterStatus = value;
+                break;
+        }
+
+        activeFilterField = null;
+        RefreshFilteredEmployees(resetPaging: true);
+    }
+
+    private void ToggleEntriesMenu()
+    {
+        showEntriesMenu = !showEntriesMenu;
+        if (showEntriesMenu)
+        {
+            showFilterMenu = false;
+            activeFilterField = null;
+        }
+    }
+
+    private void SelectPageSize(int selectedPageSize)
+    {
+        pageSize = Math.Clamp(selectedPageSize, 1, MaxPageSize);
+        employeePage = 1;
+        showEntriesMenu = false;
+    }
+
+    private void ToggleFilterMenu()
+    {
+        showFilterMenu = !showFilterMenu;
+        if (showFilterMenu)
+        {
+            showEntriesMenu = false;
+        }
+        else
+        {
+            activeFilterField = null;
+        }
+    }
+
+    private void CloseFilterMenu()
+    {
+        showFilterMenu = false;
+        activeFilterField = null;
+    }
+
+    private void ClearFilters()
+    {
+        tableSearchText = string.Empty;
+        filterIdNumber = string.Empty;
+        filterEmployee = string.Empty;
+        filterDivision = string.Empty;
+        filterDesignation = string.Empty;
+        filterStatus = string.Empty;
+        RefreshFilteredEmployees(resetPaging: true);
+        showFilterMenu = false;
+        showEntriesMenu = false;
+        activeFilterField = null;
+    }
+
+    private void ClearFiltersFromButton(MouseEventArgs _)
+        => ClearFilters();
+
+    private RenderFragment SortHeader(string label, string column) => builder =>
+    {
+        var sequence = 0;
+        var isSorted = IsSortedColumn(column);
+        var isDescending = GetIsSortedDescending(column);
+        var showClear = HasCustomSort(column);
+
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "attendance-sort-header");
+
+        builder.OpenElement(sequence++, "button");
+        builder.AddAttribute(sequence++, "type", "button");
+        builder.AddAttribute(sequence++, "class", $"attendance-sort-trigger{(isSorted ? " active" : string.Empty)}");
+        builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => ToggleSort(column)));
+        builder.AddAttribute(sequence++, "title", $"Sort by {label}");
+
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", "attendance-sort-label");
+        builder.AddContent(sequence++, label);
+        builder.CloseElement();
+
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", $"attendance-sort-icon{(isSorted ? " active" : string.Empty)}");
+        builder.OpenElement(sequence++, "i");
+        builder.AddAttribute(sequence++, "class", isDescending ? "fa-solid fa-caret-down" : "fa-solid fa-caret-up");
+        builder.AddAttribute(sequence++, "aria-hidden", "true");
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+
+        if (showClear)
+        {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", "attendance-sort-clear");
+            builder.AddAttribute(sequence++, "title", "Clear sorting");
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, ClearSorting));
+            builder.AddAttribute(sequence++, "aria-label", "Clear sorting");
+            builder.AddContent(sequence++, "x");
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private bool HasCustomSort(string column)
+        => !string.IsNullOrWhiteSpace(sortColumn)
+            && string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsSortedColumn(string column)
+    {
+        if (!string.IsNullOrWhiteSpace(sortColumn))
+        {
+            return string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(column, "latest", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool GetIsSortedDescending(string column)
+    {
+        if (string.IsNullOrWhiteSpace(sortColumn))
+        {
+            return string.Equals(column, "latest", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase) && sortDescending;
+    }
+
+    private void ToggleSort(string column)
+    {
+        if (string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase))
+        {
+            sortDescending = !sortDescending;
+        }
+        else
+        {
+            sortColumn = column;
+            sortDescending = false;
+        }
+
+        employeePage = 1;
+        RefreshFilteredEmployees();
+    }
+
+    private void ClearSorting()
+    {
+        sortColumn = null;
+        sortDescending = true;
+        employeePage = 1;
+        RefreshFilteredEmployees();
+    }
+
+    private IEnumerable<Employee> ApplyEmployeeSort(IEnumerable<Employee> source)
+    {
+        var column = sortColumn?.Trim().ToLowerInvariant();
+        var descending = sortDescending;
+
+        return column switch
+        {
+            "id" => OrderByDirection(source, descending, employee => NormalizeSortValue(employee.IdNumber))
+                .ThenBy(employee => NormalizeSortValue(employee.LastName))
+                .ThenBy(employee => NormalizeSortValue(employee.FirstName)),
+            "employee" => OrderByDirection(source, descending, employee => NormalizeSortValue(employee.LastName))
+                .ThenBy(employee => NormalizeSortValue(employee.FirstName))
+                .ThenBy(employee => NormalizeSortValue(employee.MiddleName)),
+            "division" => OrderByDirection(source, descending, employee => NormalizeSortValue(employee.DivisionCenterUnit))
+                .ThenBy(employee => NormalizeSortValue(employee.LastName))
+                .ThenBy(employee => NormalizeSortValue(employee.FirstName)),
+            "designation" => OrderByDirection(source, descending, employee => NormalizeSortValue(employee.Designation))
+                .ThenBy(employee => NormalizeSortValue(employee.LastName))
+                .ThenBy(employee => NormalizeSortValue(employee.FirstName)),
+            "status" => OrderByDirection(source, descending, employee => NormalizeSortValue(employee.Status))
+                .ThenBy(employee => NormalizeSortValue(employee.LastName))
+                .ThenBy(employee => NormalizeSortValue(employee.FirstName)),
+            _ => source
+                .OrderByDescending(employee => employee.EmployeeId)
+                .ThenBy(employee => NormalizeSortValue(employee.LastName))
+                .ThenBy(employee => NormalizeSortValue(employee.FirstName))
+        };
+    }
+
+    private static IOrderedEnumerable<T> OrderByDirection<T, TKey>(IEnumerable<T> source, bool descending, Func<T, TKey> keySelector)
+        => descending ? source.OrderByDescending(keySelector) : source.OrderBy(keySelector);
+
+    private static string NormalizeSortValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
     private void ChangeEmployeePage(int page)
     {
         employeePage = Math.Clamp(page, 1, EmployeeTotalPages);
     }
 
-    private static string GetEntriesText(int totalCount, int currentPage)
+    private static string GetEntriesText(int totalCount, int currentPage, int currentPageSize)
     {
         if (totalCount == 0)
         {
             return "Showing 0 to 0 of 0 entries";
         }
 
-        var start = ((currentPage - 1) * PageSize) + 1;
-        var end = Math.Min(currentPage * PageSize, totalCount);
+        var start = ((currentPage - 1) * currentPageSize) + 1;
+        var end = Math.Min(currentPage * currentPageSize, totalCount);
         return $"Showing {start} to {end} of {totalCount} entries";
     }
 
@@ -317,6 +2188,9 @@
     }
 
     private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string DisplayValue(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value) ? fallback : value;
 
     private static (string Activity, string EmploymentType) ParseEmployeeStatus(string? status)
     {
@@ -389,8 +2263,27 @@
 
     private async Task ExportEmployeesAsync()
     {
-        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        await JS.InvokeVoidAsync("attendanceLogs.downloadCsv", $"employees_{timestamp}.csv", BuildEmployeesCsv());
+        if (isExportingEmployees)
+        {
+            return;
+        }
+
+        isExportingEmployees = true;
+
+        try
+        {
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            await JS.InvokeVoidAsync("attendanceLogs.downloadCsv", $"employees_{timestamp}.csv", BuildEmployeesCsv());
+            showExportEmployeesModal = false;
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Export failed", ex.Message);
+        }
+        finally
+        {
+            isExportingEmployees = false;
+        }
     }
 
     private string BuildEmployeesCsv()
@@ -414,17 +2307,23 @@
         return string.Join(Environment.NewLine, rows);
     }
 
-    private async Task ImportEmployeesAsync(InputFileChangeEventArgs args)
+    private void SelectEmployeeImportFile(InputFileChangeEventArgs args)
     {
-        var file = args.File;
-        if (file is null)
+        employeeImportFile = args.File;
+    }
+
+    private async Task ImportSelectedEmployeesAsync()
+    {
+        if (employeeImportFile is null || isImportingEmployees)
         {
             return;
         }
 
+        isImportingEmployees = true;
+
         try
         {
-            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            await using var stream = employeeImportFile.OpenReadStream(10 * 1024 * 1024);
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             var content = await reader.ReadToEndAsync();
             var rows = ParseCsv(content);
@@ -501,10 +2400,16 @@
                 ToastType.Success,
                 "Employees imported",
                 $"Inserted: {inserted}, Updated: {updated}, Skipped: {skipped}.");
+            showImportEmployeesModal = false;
+            employeeImportFile = null;
         }
         catch (Exception ex)
         {
             ShowToast(ToastType.Error, "Import failed", ex.Message);
+        }
+        finally
+        {
+            isImportingEmployees = false;
         }
     }
 
@@ -672,9 +2577,140 @@
     private bool showEmployeeModal;
     private bool isEditingEmployee;
     private Employee employeeForm = new();
+    private string employeeStatusActivity = "Active";
+    private string employeeStatusType = "Regular";
+    private string? activeEmployeeStatusDropdown;
+    private bool openEmployeeStatusActivityUpward;
+    private bool openEmployeeStatusTypeUpward;
+    private ElementReference employeeStatusActivityButtonRef;
+    private ElementReference employeeStatusTypeButtonRef;
+
+    private async Task ShowEmployeeRowMenuAsync(Employee employee, MouseEventArgs e)
+    {
+        await QueueRowMenuAsync(
+            GetEmployeeRowMenuKey(employee),
+            e,
+            () => hoveredEmployeeRowMenuEmployee = employee);
+    }
+
+    private async Task QueueRowMenuAsync(string rowKey, MouseEventArgs e, Action selectRow)
+    {
+        var showVersion = ++rowActionMenuShowVersion;
+        rowActionMenuHideVersion++;
+        rowActionMenuHovered = true;
+        showRowActionMenu = false;
+
+        await Task.Delay(1000);
+
+        if (!rowActionMenuHovered || showVersion != rowActionMenuShowVersion)
+        {
+            return;
+        }
+
+        selectRow();
+
+        var position = await JS.InvokeAsync<RowMenuPosition>("attendanceLogs.getRowMenuPosition", rowKey, e.ClientX, e.ClientY, 152, 88, 12);
+        rowActionMenuLeft = position.Left;
+        rowActionMenuTop = position.Top;
+        showRowActionMenu = true;
+    }
+
+    private async Task HideRowMenuAsync()
+    {
+        rowActionMenuHovered = false;
+        rowActionMenuShowVersion++;
+        var hideVersion = ++rowActionMenuHideVersion;
+
+        await Task.Delay(120);
+
+        if (rowActionMenuHovered || hideVersion != rowActionMenuHideVersion)
+        {
+            return;
+        }
+
+        showRowActionMenu = false;
+        await InvokeAsync(StateHasChanged);
+
+        await Task.Delay(190);
+
+        if (!showRowActionMenu && hideVersion == rowActionMenuHideVersion)
+        {
+            hoveredEmployeeRowMenuEmployee = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void KeepRowMenuOpen()
+    {
+        rowActionMenuHovered = true;
+        rowActionMenuHideVersion++;
+    }
+
+    private void CloseRowMenu()
+    {
+        showRowActionMenu = false;
+        hoveredEmployeeRowMenuEmployee = null;
+    }
+
+    private static string GetEmployeeRowMenuKey(Employee employee)
+        => $"employee-{employee.EmployeeId}";
+
+    private void OpenEmployeeDetail(Employee employee)
+    {
+        CloseRowMenu();
+        selectedEmployee = employee;
+    }
+
+    private void CloseEmployeeDetail()
+    {
+        selectedEmployee = null;
+    }
+
+    private void OpenHoveredEmployeeDetail()
+    {
+        if (hoveredEmployeeRowMenuEmployee is not { } employee)
+        {
+            return;
+        }
+
+        OpenEmployeeDetail(employee);
+    }
+
+    private void OpenHoveredEmployeeEdit()
+    {
+        if (hoveredEmployeeRowMenuEmployee is not { } employee)
+        {
+            return;
+        }
+
+        CloseRowMenu();
+        OpenEditEmployeeModal(employee);
+    }
+
+    private void OpenHoveredEmployeeDelete()
+    {
+        if (hoveredEmployeeRowMenuEmployee is not { } employee)
+        {
+            return;
+        }
+
+        OpenDeleteEmployeeModal(employee);
+    }
+
+    private void OpenAddEmployeeModal()
+    {
+        CloseEmployeeDetail();
+        CloseRowMenu();
+        isEditingEmployee = false;
+        employeeForm = new Employee();
+        SetEmployeeStatusSelections(employeeForm.Status);
+        showEmployeeModal = true;
+    }
 
     private void OpenEditEmployeeModal(Employee employee)
     {
+        CloseEmployeeDetail();
+        CloseRowMenu();
         isEditingEmployee = true;
         employeeForm = new Employee
         {
@@ -687,16 +2723,85 @@
             Designation = employee.Designation,
             Status = employee.Status
         };
+        SetEmployeeStatusSelections(employee.Status);
         showEmployeeModal = true;
+    }
+
+    private void OpenDeleteEmployeeModal(Employee employee)
+    {
+        if (!CanDeleteEmployees)
+        {
+            return;
+        }
+
+        CloseEmployeeDetail();
+        CloseEmployeeModal();
+        CloseRowMenu();
+        employeePendingDelete = employee;
+        showDeleteEmployeeModal = true;
+    }
+
+    private void OpenExportEmployeesModal()
+    {
+        CloseEmployeeDetail();
+        CloseEmployeeModal();
+        CloseRowMenu();
+        showImportEmployeesModal = false;
+        showExportEmployeesModal = true;
+    }
+
+    private void OpenImportEmployeesModal()
+    {
+        CloseEmployeeDetail();
+        CloseEmployeeModal();
+        CloseRowMenu();
+        showExportEmployeesModal = false;
+        employeeImportFile = null;
+        showImportEmployeesModal = true;
     }
 
     private void CloseEmployeeModal()
     {
         showEmployeeModal = false;
+        activeEmployeeStatusDropdown = null;
+    }
+
+    private void CloseDeleteEmployeeModal()
+    {
+        if (isDeletingEmployee)
+        {
+            return;
+        }
+
+        showDeleteEmployeeModal = false;
+        employeePendingDelete = null;
+    }
+
+    private void CloseExportEmployeesModal()
+    {
+        if (isExportingEmployees)
+        {
+            return;
+        }
+
+        showExportEmployeesModal = false;
+    }
+
+    private void CloseImportEmployeesModal()
+    {
+        if (isImportingEmployees)
+        {
+            return;
+        }
+
+        showImportEmployeesModal = false;
+        employeeImportFile = null;
     }
 
     private async Task SaveEmployeeAsync()
     {
+        SyncEmployeeFormStatus();
+
         if (isEditingEmployee)
         {
             var existing = await Db.Employees.FindAsync(employeeForm.EmployeeId);
@@ -713,7 +2818,147 @@
                 await LoadEmployeesAsync();
             }
         }
+        else
+        {
+            await Db.Employees.AddAsync(employeeForm);
+            await Db.SaveChangesAsync();
+            await LoadEmployeesAsync();
+        }
 
         showEmployeeModal = false;
+    }
+
+    private async Task DeleteEmployeeAsync()
+    {
+        if (employeePendingDelete is null || isDeletingEmployee)
+        {
+            return;
+        }
+
+        if (!CanDeleteEmployees)
+        {
+            ShowToast(ToastType.Warning, "Delete unavailable", "You do not have access to delete employees.");
+            return;
+        }
+
+        isDeletingEmployee = true;
+
+        try
+        {
+            var employeeId = employeePendingDelete.EmployeeId;
+            var employeeName = FormatName(employeePendingDelete.LastName, employeePendingDelete.FirstName, employeePendingDelete.MiddleName);
+            var existing = await Db.Employees.FindAsync(employeeId);
+
+            if (existing is null)
+            {
+                ShowToast(ToastType.Warning, "Employee not found", "The employee record no longer exists.");
+            }
+            else
+            {
+                Db.Employees.Remove(existing);
+                await Db.SaveChangesAsync();
+
+                if (selectedEmployee?.EmployeeId == employeeId)
+                {
+                    selectedEmployee = null;
+                }
+
+                showDeleteEmployeeModal = false;
+                employeePendingDelete = null;
+                await LoadEmployeesAsync();
+                ShowToast(ToastType.Success, "Employee deleted", $"{employeeName} was deleted.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Delete failed", ex.Message);
+        }
+        finally
+        {
+            isDeletingEmployee = false;
+        }
+    }
+
+    private void SelectEmployeeStatusActivity(string status)
+    {
+        employeeStatusActivity = status;
+        activeEmployeeStatusDropdown = null;
+        SyncEmployeeFormStatus();
+    }
+
+    private void SelectEmployeeStatusType(string type)
+    {
+        employeeStatusType = type;
+        activeEmployeeStatusDropdown = null;
+        SyncEmployeeFormStatus();
+    }
+
+    private async Task ToggleEmployeeStatusDropdownAsync(string dropdown)
+    {
+        if (string.Equals(activeEmployeeStatusDropdown, dropdown, StringComparison.Ordinal))
+        {
+            activeEmployeeStatusDropdown = null;
+            return;
+        }
+
+        if (string.Equals(dropdown, "activity", StringComparison.Ordinal))
+        {
+            openEmployeeStatusActivityUpward = await ShouldOpenEmployeeStatusMenuUpwardAsync(employeeStatusActivityButtonRef);
+            openEmployeeStatusTypeUpward = false;
+        }
+        else
+        {
+            openEmployeeStatusTypeUpward = await ShouldOpenEmployeeStatusMenuUpwardAsync(employeeStatusTypeButtonRef);
+            openEmployeeStatusActivityUpward = false;
+        }
+
+        activeEmployeeStatusDropdown = dropdown;
+    }
+
+    private void CloseEmployeeStatusDropdown()
+    {
+        activeEmployeeStatusDropdown = null;
+    }
+
+    private async Task<bool> ShouldOpenEmployeeStatusMenuUpwardAsync(ElementReference triggerRef)
+    {
+        try
+        {
+            return await JS.InvokeAsync<bool>("attendanceLogs.shouldOpenMenuUpward", triggerRef, 190, 16);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private string GetEmployeeStatusDropdownMenuClass(string dropdown)
+    {
+        var isOpen = string.Equals(activeEmployeeStatusDropdown, dropdown, StringComparison.Ordinal);
+        var opensUpward = string.Equals(dropdown, "activity", StringComparison.Ordinal)
+            ? openEmployeeStatusActivityUpward
+            : openEmployeeStatusTypeUpward;
+
+        return $"attendance-filter-select-menu{(isOpen ? " show" : string.Empty)}{(opensUpward ? " open-upward" : string.Empty)}";
+    }
+
+    private void SetEmployeeStatusSelections(string? status)
+    {
+        var (activity, employmentType) = ParseEmployeeStatus(status);
+
+        employeeStatusActivity = EmployeeActivityOptions.Contains(activity, StringComparer.OrdinalIgnoreCase)
+            ? activity
+            : "Active";
+
+        employeeStatusType = EmployeeTypeOptions.Contains(employmentType, StringComparer.OrdinalIgnoreCase)
+            ? employmentType
+            : "Regular";
+
+        SyncEmployeeFormStatus();
+    }
+
+    private void SyncEmployeeFormStatus()
+    {
+        employeeForm.Status = $"{employeeStatusActivity}, {employeeStatusType}";
     }
 }

@@ -1,17 +1,36 @@
 @page "/exceptions"
 @using Financial.Data
 @using Financial.Model.Dtr
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.JSInterop
 @inject ProcurementDbContext Db
 @inject IToastService ToastService
+@inject IJSRuntime JS
+
+@implements IAsyncDisposable
 
 <PageTitle>ETRS | Exceptions</PageTitle>
 
 <div class="dashboard-shell">
-    <div class="panel-heading attendance-logs-heading">
+    <div class="panel-heading attendance-logs-heading exceptions-heading">
         <div>
-            <h1 class="attendance-logs-title">WFH Exceptions</h1>
-            <p class="mb-0 text-muted">Tag all active employees as WFH, then override employees with daily exceptions.</p>
+            <h1 class="attendance-logs-title">Exceptions</h1>
+        </div>
+        <div class="exceptions-heading-actions">
+            <div class="exceptions-date-filter">
+                <input id="exceptions-table-date"
+                       type="date"
+                       class="form-control exceptions-date-input"
+                       aria-label="Table date"
+                       value="@selectedDate.ToString("yyyy-MM-dd")"
+                       @onchange="OnTableDateChangedAsync"
+                       disabled="@isBusy" />
+            </div>
+            <span class="period-sep" aria-hidden="true"></span>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn exceptions-calendar-button" @onclick="OpenCalendarModal" disabled="@isBusy">
+                Calendar
+            </button>
         </div>
     </div>
 
@@ -34,18 +53,147 @@
         </div>
     </div>
 
-    <div class="panel-card attendance-table-card mb-3">
-        <div class="exceptions-toolbar">
-            <div class="exceptions-toolbar-field">
-                <label for="exceptions-date">Attendance Date</label>
-                <InputDate id="exceptions-date" @bind-Value="selectedDate" class="form-control" />
+    <div class="exceptions-table-section">
+    <div class="attendance-table-toolbar">
+        <div class="attendance-table-search">
+            <input id="exceptionsTableSearch"
+                   class="form-control attendance-table-search-input"
+                   type="search"
+                   placeholder="Search..."
+                   value="@tableSearchText"
+                   @oninput="HandleTableSearchInput" />
+        </div>
+
+        <div class="attendance-table-actions" @ref="tableMenuControlsRef">
+            <div class="attendance-filter-dropdown">
+                <button type="button" class="btn btn-outline-secondary attendance-filter-button" @onclick="ToggleFilterMenu">
+                    <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i>
+                    <span>Filter</span>
+                    @if (HasActiveTableFilters)
+                    {
+                        <span class="attendance-filter-button-clear"
+                              title="Clear filters"
+                              role="button"
+                              tabindex="0"
+                              @onclick="ClearFiltersFromButton"
+                              @onclick:stopPropagation="true">x</span>
+                    }
+                </button>
+
+                <div class="attendance-filter-menu @(showFilterMenu ? "show" : null)" @onclick:stopPropagation="true">
+                    <div class="attendance-filter-grid">
+                        <div class="attendance-filter-field">
+                            <label class="attendance-table-toolbar-label" for="exceptionsFilterId">ID Number</label>
+                            <div class="attendance-filter-select-wrap">
+                                <button type="button"
+                                        id="exceptionsFilterId"
+                                        class="attendance-filter-select-trigger @(activeFilterField == "id" ? "active" : null)"
+                                        @onclick='() => ToggleFilterField("id")'>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterIdNumber, "All ID Numbers")</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(activeFilterField == "id" ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterIdNumber) ? "active" : null)" @onclick='() => SetFilterValue("id", string.Empty)'>All ID Numbers</button>
+                                    @foreach (var option in IdNumberOptions)
+                                    {
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(filterIdNumber, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("id", option)'>@option</button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="attendance-filter-field">
+                            <label class="attendance-table-toolbar-label" for="exceptionsFilterEmployee">Employee</label>
+                            <div class="attendance-filter-select-wrap">
+                                <button type="button"
+                                        id="exceptionsFilterEmployee"
+                                        class="attendance-filter-select-trigger @(activeFilterField == "employee" ? "active" : null)"
+                                        @onclick='() => ToggleFilterField("employee")'>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterEmployee, "All Employees")</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(activeFilterField == "employee" ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterEmployee) ? "active" : null)" @onclick='() => SetFilterValue("employee", string.Empty)'>All Employees</button>
+                                    @foreach (var option in EmployeeOptions)
+                                    {
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(filterEmployee, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("employee", option)'>@option</button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="attendance-filter-field">
+                            <label class="attendance-table-toolbar-label" for="exceptionsFilterDivision">Division / Unit</label>
+                            <div class="attendance-filter-select-wrap">
+                                <button type="button"
+                                        id="exceptionsFilterDivision"
+                                        class="attendance-filter-select-trigger @(activeFilterField == "division" ? "active" : null)"
+                                        @onclick='() => ToggleFilterField("division")'>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions / Units")</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(activeFilterField == "division" ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                    @foreach (var option in DivisionOptions)
+                                    {
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(filterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("division", option)'>@option</button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="attendance-filter-field">
+                            <label class="attendance-table-toolbar-label" for="exceptionsFilterDesignation">Designation</label>
+                            <div class="attendance-filter-select-wrap">
+                                <button type="button"
+                                        id="exceptionsFilterDesignation"
+                                        class="attendance-filter-select-trigger @(activeFilterField == "designation" ? "active" : null)"
+                                        @onclick='() => ToggleFilterField("designation")'>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterDesignation, "All Designations")</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(activeFilterField == "designation" ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDesignation) ? "active" : null)" @onclick='() => SetFilterValue("designation", string.Empty)'>All Designations</button>
+                                    @foreach (var option in DesignationOptions)
+                                    {
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(filterDesignation, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("designation", option)'>@option</button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="attendance-filter-actions">
+                        <button type="button" class="attendance-filter-clear" @onclick="ClearFilters">Clear</button>
+                        <button type="button" class="btn btn-primary attendance-filter-apply" @onclick="CloseFilterMenu">Apply</button>
+                    </div>
+                </div>
             </div>
-            <button type="button" class="btn btn-primary" @onclick="TagAllEmployeesAsync" disabled="@isBusy">Tag All Active Employees as WFH</button>
-            <button type="button" class="btn btn-outline-secondary" @onclick="LoadPageDataAsync" disabled="@isBusy">Refresh</button>
+
+            <div class="attendance-filter-dropdown attendance-entries-counter">
+                <button type="button" class="btn btn-outline-secondary attendance-filter-button attendance-entries-button" @onclick="ToggleEntriesMenu">
+                    <span>@pageSize</span>
+                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                </button>
+
+                <div class="attendance-entries-menu attendance-filter-menu @(showEntriesMenu ? "show" : null)" @onclick:stopPropagation="true">
+                    @foreach (var option in PageSizeOptions)
+                    {
+                        <button type="button"
+                                class="attendance-entries-option @(pageSize == option ? "active" : null)"
+                                @onclick="() => SelectPageSize(option)">
+                            @option
+                        </button>
+                    }
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="panel-card attendance-table-card">
+    <div class="panel-card attendance-table-card"
+         @onmouseenter="KeepRowMenuOpen"
+         @onmouseleave="HideRowMenuAsync">
         @if (rows.Count == 0)
         {
             <div class="empty-state">
@@ -58,20 +206,41 @@
             <table class="table attendance-table">
                 <thead>
                     <tr>
-                        <th>ID Number</th>
-                        <th>Employee</th>
-                        <th>Division / Unit</th>
-                        <th>Designation</th>
+                        <th class="attendance-actions-column">Actions</th>
+                        <th>@SortHeader("ID Number", "id")</th>
+                        <th>@SortHeader("Employee", "employee")</th>
+                        <th>@SortHeader("Division / Unit", "division")</th>
+                        <th>@SortHeader("Designation", "designation")</th>
                         <th>Current Tag</th>
-                        <th>Exception Setup</th>
                         <th>Updated</th>
-                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var row in PagedRows)
                     {
-                        <tr>
+                        <tr class="attendance-log-row"
+                            data-row-menu-key="@GetRowMenuKey(row)"
+                            @ondblclick="() => OpenDetailsModal(row)"
+                            @onmouseenter="e => ShowRowMenuAsync(row, e)">
+                            <td class="attendance-actions-cell">
+                                <button type="button"
+                                        class="attendance-action-button"
+                                        title="View"
+                                        aria-label="View exception details"
+                                        @onclick="() => OpenDetailsModal(row)"
+                                        @onclick:stopPropagation="true">
+                                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                </button>
+                                <button type="button"
+                                        class="attendance-action-button"
+                                        title="Exception Setup"
+                                        aria-label="Open exception setup"
+                                        @onclick="() => OpenExceptionSetupModal(row)"
+                                        @onclick:stopPropagation="true"
+                                        disabled="@(isBusy || isSelectedDateHoliday)">
+                                    <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                                </button>
+                            </td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(row.IdNumber)">@DisplayValue(row.IdNumber)</span></td>
                             <td><span class="cell-ellipsis" title="@row.EmployeeName">@row.EmployeeName</span></td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(row.DivisionCenterUnit)">@DisplayValue(row.DivisionCenterUnit)</span></td>
@@ -79,28 +248,42 @@
                             <td>
                                 <span class="status-badge @(row.IsException ? "status-warning" : "status-ok")">@row.CurrentArrangement</span>
                             </td>
-                            <td>
-                                <select class="form-select form-select-sm" value="@row.SelectedOption" @onchange="e => row.SelectedOption = e.Value?.ToString() ?? WfhOptionValue" disabled="@isBusy">
-                                    <option value="@WfhOptionValue">WFH</option>
-                                    @foreach (var condition in conditions.Where(c => c.IsActive))
-                                    {
-                                        <option value="@condition.ExceptionConditionId">@condition.ConditionName</option>
-                                    }
-                                </select>
-                            </td>
                             <td><span class="cell-ellipsis" title="@FormatDateTime(row.TagUpdatedAt)">@FormatDateTime(row.TagUpdatedAt)</span></td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveRowAsync(row)" disabled="@isBusy">Save</button>
-                            </td>
+                        </tr>
+                    }
+                    @if (!PagedRows.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="attendance-empty-state">No employees match the current search and filters.</td>
                         </tr>
                     }
                 </tbody>
             </table>
         }
     </div>
+    <div class="attendance-hover-row-menu @(showRowActionMenu ? "show" : null)"
+         style="@RowActionMenuStyle"
+         @onmouseenter="KeepRowMenuOpen"
+         @onmouseleave="HideRowMenuAsync"
+         @onclick:stopPropagation="true">
+        @if (hoveredRowMenuRow is not null)
+        {
+            <div class="attendance-hover-row-menu-title" title="@hoveredRowMenuRow.EmployeeName">
+                @hoveredRowMenuRow.EmployeeName
+            </div>
+            <button type="button" @onclick="OpenHoveredDetails">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                <span>View</span>
+            </button>
+            <button type="button" @onclick="OpenHoveredExceptionSetup" disabled="@(isBusy || isSelectedDateHoliday)">
+                <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                <span>Exception Setup</span>
+            </button>
+        }
+    </div>
 
     <div class="table-footer">
-        <div class="table-entries">@GetEntriesText(rows.Count, rowPage)</div>
+        <div class="table-entries">@GetEntriesText(filteredRows.Count, rowPage)</div>
         <div class="table-pagination">
             <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangePage(rowPage - 1)" disabled="@(rowPage <= 1)">&#8249;</button>
             @foreach (var pageItem in BuildPageItems(TotalPages, rowPage))
@@ -117,54 +300,1778 @@
             <button type="button" class="table-page-btn table-page-arrow" @onclick="() => ChangePage(rowPage + 1)" disabled="@(rowPage >= TotalPages)">&#8250;</button>
         </div>
     </div>
+    </div>
+
+    @if (selectedDetailRow is not null)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseDetailsModal">
+            <div class="attendance-detail-modal" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Exception Details</h2>
+                    </div>
+                    <div class="attendance-detail-header-actions">
+                        <button type="button"
+                                class="attendance-detail-header-button"
+                                @onclick="() => OpenExceptionSetupModal(selectedDetailRow)"
+                                disabled="@(isBusy || isSelectedDateHoliday)">
+                            Exception Setup
+                        </button>
+                        <button type="button" class="attendance-detail-close" @onclick="CloseDetailsModal" aria-label="Close details">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-body">
+                    <div class="attendance-detail-section attendance-detail-hero">
+                        <div>
+                            <div class="attendance-detail-eyebrow">Exception Record</div>
+                            <div class="attendance-detail-person">@selectedDetailRow.EmployeeName</div>
+                        </div>
+                        <div class="attendance-detail-status">@selectedDetailRow.CurrentArrangement</div>
+                    </div>
+
+                    <div class="attendance-detail-section attendance-detail-section-primary">
+                        <div class="attendance-detail-grid">
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">ID Number</span>
+                                <strong>@DisplayValue(selectedDetailRow.IdNumber)</strong>
+                            </div>
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Employee</span>
+                                <strong>@selectedDetailRow.EmployeeName</strong>
+                            </div>
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Division / Unit</span>
+                                <strong>@DisplayValue(selectedDetailRow.DivisionCenterUnit)</strong>
+                            </div>
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Designation</span>
+                                <strong>@DisplayValue(selectedDetailRow.Designation)</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-section">
+                        <div class="attendance-detail-grid attendance-detail-grid-compact">
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Current Tag</span>
+                                <strong>@selectedDetailRow.CurrentArrangement</strong>
+                            </div>
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Updated</span>
+                                <strong>@FormatDateTime(selectedDetailRow.TagUpdatedAt)</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseDetailsModal">Close</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (setupRow is not null)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseExceptionSetupModal">
+            <div class="attendance-detail-modal attendance-export-modal exceptions-setup-modal" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Exception Setup</h2>
+                    </div>
+                    <div class="attendance-detail-header-actions">
+                        <button type="button" class="attendance-detail-close" @onclick="CloseExceptionSetupModal" aria-label="Close setup">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-body attendance-input-body">
+                    <div class="attendance-detail-section attendance-detail-hero">
+                        <div>
+                            <div class="attendance-detail-eyebrow">@selectedDate.ToString("MMMM d, yyyy")</div>
+                            <div class="attendance-detail-person">@setupRow.EmployeeName</div>
+                            <div class="attendance-detail-meta">Select the arrangement for this employee on the table date.</div>
+                        </div>
+                        <div class="attendance-detail-status">@setupRow.CurrentArrangement</div>
+                    </div>
+
+                    <div class="attendance-detail-section attendance-detail-section-primary">
+                        <div class="attendance-detail-field">
+                            <span class="attendance-detail-label">Arrangement</span>
+                            <div class="attendance-filter-select-wrap exceptions-setup-select" @ref="setupOptionControlsRef">
+                                <button type="button"
+                                        class="attendance-filter-select-trigger @(showSetupOptionMenu ? "active" : null)"
+                                        @onclick="ToggleSetupOptionMenu"
+                                        disabled="@(isBusy || isSelectedDateHoliday)">
+                                    <span class="attendance-filter-select-value">@GetSetupOptionLabel(setupSelectedOption)</span>
+                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                </button>
+
+                                <div class="attendance-filter-select-menu @(showSetupOptionMenu ? "show" : null)">
+                                    <button type="button" class="attendance-filter-select-option @(string.Equals(setupSelectedOption, WfhOptionValue, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick="() => SelectSetupOption(WfhOptionValue)">WFH</button>
+                                    @foreach (var condition in ManualExceptionConditions)
+                                    {
+                                        var optionValue = condition.ExceptionConditionId.ToString();
+                                        <button type="button" class="attendance-filter-select-option @(string.Equals(setupSelectedOption, optionValue, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick="() => SelectSetupOption(optionValue)">@condition.ConditionName</button>
+                                    }
+                                    <button type="button" class="attendance-filter-select-option @(string.Equals(setupSelectedOption, AbsentOptionValue, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick="() => SelectSetupOption(AbsentOptionValue)">Absent</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseExceptionSetupModal" disabled="@isBusy">Cancel</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveSetupRowAsync" disabled="@(isBusy || isSelectedDateHoliday)">Save</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (isCalendarModalOpen)
+    {
+        <div class="attendance-detail-overlay exceptions-calendar-overlay" @onclick="CloseCalendarModal">
+            <div class="attendance-detail-modal exceptions-calendar-modal @(calendarViewMode == CalendarViewMode.List ? "list-mode" : null)" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header exceptions-calendar-topbar">
+                    <div class="exceptions-calendar-nav">
+                        <button type="button" class="exceptions-icon-button" @onclick="() => ChangeCalendarMonth(-1)" aria-label="Previous month">
+                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="exceptions-today-button" @onclick="GoToToday">Today</button>
+                        <button type="button" class="exceptions-icon-button" @onclick="() => ChangeCalendarMonth(1)" aria-label="Next month">
+                            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <div class="exceptions-calendar-title">@calendarCursor.ToString("MMMM yyyy")</div>
+                    <div class="attendance-detail-header-actions exceptions-calendar-tools">
+                        <button type="button" class="exceptions-icon-button @(calendarViewMode == CalendarViewMode.List ? "active" : null)" @onclick="() => SetCalendarViewMode(CalendarViewMode.List)" aria-label="List view"><i class="fa-solid fa-list" aria-hidden="true"></i></button>
+                        <button type="button" class="exceptions-icon-button @(calendarViewMode == CalendarViewMode.Month ? "active" : null)" @onclick="() => SetCalendarViewMode(CalendarViewMode.Month)" aria-label="Calendar view"><i class="fa-solid fa-calendar-day" aria-hidden="true"></i></button>
+                        <button type="button" class="attendance-detail-close exceptions-calendar-close" @onclick="CloseCalendarModal" aria-label="Close calendar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-body exceptions-calendar-body">
+                    @if (calendarViewMode == CalendarViewMode.Month)
+                    {
+                        <div class="exceptions-calendar-month @calendarTransitionClass @calendarViewTransitionClass" @key="calendarRenderKey">
+                            <div class="exceptions-calendar-weekdays">
+                                @foreach (var weekday in Weekdays)
+                                {
+                                    <div>@weekday</div>
+                                }
+                            </div>
+
+                            <div class="exceptions-calendar-grid">
+                                @foreach (var day in CalendarDays)
+                                {
+                                    <div class="exceptions-calendar-cell @(day.IsInCurrentMonth ? null : "muted") @(day.IsWeekend ? "weekend" : null) @(day.IsPast ? "past" : null) @(day.IsToday ? "today" : null)">
+                                        <div class="exceptions-calendar-date">@day.Date.Day</div>
+                                        <div class="exceptions-calendar-events">
+                                            @if (day.Summary?.WfhCount > 0)
+                                            {
+                                                <span class="exceptions-calendar-event wfh"><i class="fa-solid fa-house-laptop" aria-hidden="true"></i> WFH <b>@day.Summary.WfhCount</b></span>
+                                            }
+                                            @if (day.Summary?.HolidayCount > 0)
+                                            {
+                                                <span class="exceptions-calendar-event holiday"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Holiday <b>@day.Summary.HolidayCount</b></span>
+                                            }
+                                            @if (day.Summary?.ExceptionCount > 0)
+                                            {
+                                                <span class="exceptions-calendar-event exception"><i class="fa-solid fa-user-clock" aria-hidden="true"></i> Exception <b>@day.Summary.ExceptionCount</b></span>
+                                            }
+                                        </div>
+                                        @if (day.CanShowActions)
+                                        {
+                                            <div class="exceptions-calendar-cell-actions">
+                                                @if (day.HasCalendarTag)
+                                                {
+                                                    @if (day.CalendarCancelTag is { } cancelTag)
+                                                    {
+                                                        <button type="button" class="btn btn-sm btn-light" @onclick="() => OpenCalendarCancelConfirmation(day.Date, cancelTag)" disabled="@isBusy">@GetCancelButtonLabel(cancelTag)</button>
+                                                    }
+                                                    @if (!day.HasHolidayTag)
+                                                    {
+                                                        <button type="button" class="btn btn-sm btn-primary" @onclick="() => OpenExceptionsForDateAsync(day.Date)" disabled="@isBusy">Add Exception</button>
+                                                    }
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => OpenCalendarTagsForDateAsync(day.Date)" disabled="@isBusy">View All</button>
+                                                }
+                                                else
+                                                {
+                                                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => OpenCalendarTagConfirmation(day.Date, CalendarTagType.Wfh)" disabled="@isBusy">Set WFH</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => OpenCalendarTagConfirmation(day.Date, CalendarTagType.Holiday)" disabled="@isBusy">Set Holiday</button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="exceptions-calendar-list @calendarViewTransitionClass" @key="calendarRenderKey">
+                            @if (!CalendarListItems.Any())
+                            {
+                                <div class="exceptions-calendar-list-empty">
+                                    <strong>No scheduled WFH or Holiday dates.</strong>
+                                    <span>Select the calendar view to add dates for @calendarCursor.ToString("MMMM yyyy").</span>
+                                </div>
+                            }
+                            else
+                            {
+                                @foreach (var day in CalendarListItems)
+                                {
+                                    <div class="exceptions-calendar-list-row">
+                                        <div>
+                                            <div class="exceptions-calendar-list-date">@day.Date.ToString("dddd, MMMM d")</div>
+                                            <div class="exceptions-calendar-list-events">
+                                                @if (day.Summary?.WfhCount > 0)
+                                                {
+                                                    <span class="exceptions-calendar-event wfh"><i class="fa-solid fa-house-laptop" aria-hidden="true"></i> WFH <b>@day.Summary.WfhCount</b></span>
+                                                }
+                                                @if (day.Summary?.HolidayCount > 0)
+                                                {
+                                                    <span class="exceptions-calendar-event holiday"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> Holiday <b>@day.Summary.HolidayCount</b></span>
+                                                }
+                                                @if (day.Summary?.ExceptionCount > 0)
+                                                {
+                                                    <span class="exceptions-calendar-event exception"><i class="fa-solid fa-user-clock" aria-hidden="true"></i> Exception <b>@day.Summary.ExceptionCount</b></span>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="exceptions-calendar-list-actions">
+                                            @if (day.CanChangeDate)
+                                            {
+                                                @if (day.CalendarCancelTag is { } cancelTag)
+                                                {
+                                                    <button type="button" class="btn btn-sm btn-light" @onclick="() => OpenCalendarCancelConfirmation(day.Date, cancelTag)" disabled="@isBusy">@GetCancelButtonLabel(cancelTag)</button>
+                                                }
+                                                @if (!day.HasHolidayTag)
+                                                {
+                                                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => OpenExceptionsForDateAsync(day.Date)" disabled="@isBusy">Add Exception</button>
+                                                }
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => OpenCalendarTagsForDateAsync(day.Date)" disabled="@isBusy">View All</button>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+
+                @if (pendingCalendarAction is { } pendingAction)
+                {
+                    <div class="exceptions-confirm-overlay" @onclick="CloseCalendarTagConfirmation">
+                        <div class="exceptions-confirm-modal" @onclick:stopPropagation="true">
+                            <div class="exceptions-confirm-header">
+                                <h2>@GetCalendarConfirmationTitle(pendingAction)</h2>
+                                <button type="button" class="attendance-detail-close exceptions-calendar-close" @onclick="CloseCalendarTagConfirmation" aria-label="Close confirmation">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div class="exceptions-confirm-body">
+                                @GetCalendarConfirmationLead(pendingAction)
+                                <strong>@pendingAction.Date.ToString("MMMM d, yyyy")</strong>?
+                            </div>
+                            <div class="attendance-detail-footer exceptions-confirm-actions">
+                                <button type="button" class="attendance-detail-text-action" @onclick="CloseCalendarTagConfirmation" disabled="@isBusy">Cancel</button>
+                                <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ConfirmCalendarTagAsync" disabled="@isBusy">Confirm</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @if (calendarTableModalMode is { } tableMode)
+                {
+                    <div class="exceptions-table-overlay" @onclick="CloseCalendarTableModal">
+                        <div class="exceptions-table-modal" @onclick:stopPropagation="true">
+                            <div class="exceptions-table-header">
+                                <div>
+                                    <h2>@GetCalendarTableTitle(tableMode)</h2>
+                                    <span>@calendarTableDate.ToString("dddd, MMMM d, yyyy")</span>
+                                </div>
+                                <button type="button" class="attendance-detail-close exceptions-calendar-close" @onclick="CloseCalendarTableModal" aria-label="Close table">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div class="exceptions-table-body">
+                                @if (!calendarTableRows.Any())
+                                {
+                                    <div class="exceptions-calendar-list-empty">
+                                        <strong>No active employees found.</strong>
+                                        <span>Import employees first before applying exception tags.</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <table class="table attendance-table exceptions-modal-table">
+                                        <thead>
+                                            <tr>
+                                                <th>ID Number</th>
+                                                <th>Employee</th>
+                                                <th>Division / Unit</th>
+                                                <th>Current Tag</th>
+                                                @if (CanEditCalendarTable(tableMode))
+                                                {
+                                                    <th>Exception Setup</th>
+                                                    <th>Action</th>
+                                                }
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var row in calendarTableRows)
+                                            {
+                                                <tr>
+                                                    <td><span class="cell-ellipsis" title="@DisplayValue(row.IdNumber)">@DisplayValue(row.IdNumber)</span></td>
+                                                    <td><span class="cell-ellipsis" title="@row.EmployeeName">@row.EmployeeName</span></td>
+                                                    <td><span class="cell-ellipsis" title="@DisplayValue(row.DivisionCenterUnit)">@DisplayValue(row.DivisionCenterUnit)</span></td>
+                                                    <td><span class="status-badge @(row.IsException ? "status-warning" : "status-ok")">@row.CurrentArrangement</span></td>
+                                                    @if (CanEditCalendarTable(tableMode))
+                                                    {
+                                                        <td>
+                                                            <select class="form-select form-select-sm" value="@row.SelectedOption" @onchange="e => row.SelectedOption = e.Value?.ToString() ?? WfhOptionValue" disabled="@isBusy">
+                                                                <option value="@WfhOptionValue">WFH</option>
+                                                                @foreach (var condition in ManualExceptionConditions)
+                                                                {
+                                                                    <option value="@condition.ExceptionConditionId">@condition.ConditionName</option>
+                                                                }
+                                                                <option value="@AbsentOptionValue">Absent</option>
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SaveCalendarTableRowAsync(row)" disabled="@isBusy">Save</button>
+                                                        </td>
+                                                    }
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            </div>
+                            <div class="attendance-detail-footer exceptions-table-footer">
+                                <button type="button" class="btn btn-primary attendance-detail-done" @onclick="CloseCalendarTableModal" disabled="@isBusy">Done</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
 </div>
 
 <style>
-    .exceptions-toolbar {
+    .exceptions-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .exceptions-heading-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: auto;
+    }
+
+    .exceptions-calendar-button {
+        align-self: center;
+        white-space: nowrap;
+    }
+
+    .attendance-table-toolbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .attendance-table-card {
+        padding: 1rem;
+        overflow-x: auto;
+    }
+
+    .attendance-table-search {
+        flex: 1 1 420px;
+        max-width: 520px;
+    }
+
+    .attendance-table-search-input {
+        min-height: 2.85rem;
+    }
+
+    .attendance-table-actions {
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .attendance-table-toolbar-label {
+        display: inline-block;
+        margin-bottom: 0.25rem;
+        color: var(--finance-text-muted, #64748b);
+        font-size: 0.74rem;
+        font-weight: 600;
+    }
+
+    .attendance-filter-dropdown {
+        position: relative;
+    }
+
+    .attendance-filter-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.85rem;
+    }
+
+    .attendance-filter-button-clear {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 0.92rem;
+        height: 0.92rem;
+        border: 1px solid #d4d8e1;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted, #64748b);
+        font-size: 0.62rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .attendance-filter-menu {
+        position: absolute;
+        top: calc(100% + 0.55rem);
+        right: 0;
+        width: min(92vw, 560px);
+        padding: 0.55rem;
+        border: 1px solid var(--finance-border, #dbe3ef);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 20;
+    }
+
+    .attendance-filter-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .attendance-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .attendance-filter-field {
+        min-width: 0;
+        position: relative;
+    }
+
+    .attendance-filter-select-wrap {
+        position: relative;
+    }
+
+    .attendance-filter-select-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        width: 100%;
+        min-height: 2.15rem;
+        padding: 0.38rem 0.68rem;
+        border: 1px solid var(--finance-border, #dbe3ef);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--finance-text, #0f172a);
+        font-size: 0.82rem;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+
+    .attendance-filter-select-trigger.active {
+        border-color: rgba(16, 77, 173, 0.35);
+        box-shadow: 0 0 0 3px rgba(16, 77, 173, 0.08);
+    }
+
+    .attendance-filter-select-trigger:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+    }
+
+    .attendance-filter-select-menu {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        max-height: 220px;
+        padding: 0.3rem;
+        border: 1px solid var(--finance-border, #dbe3ef);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        overflow-y: auto;
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 8;
+    }
+
+    .attendance-filter-select-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .attendance-filter-select-option {
+        display: block;
+        width: 100%;
+        padding: 0.45rem 0.55rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text, #0f172a);
+        font-size: 0.82rem;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .attendance-filter-select-option:hover,
+    .attendance-filter-select-option.active {
+        background: var(--finance-surface-soft, #f3f6fb);
+        color: var(--finance-primary, #104dad);
+    }
+
+    .attendance-filter-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        margin-top: 0.55rem;
+        font-size: 0.82rem;
+    }
+
+    .attendance-filter-clear {
+        border: 0;
+        padding: 0.3rem 0.45rem;
+        background: transparent;
+        color: var(--finance-text-muted, #64748b);
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+
+    .attendance-filter-apply {
+        min-width: 64px;
+        min-height: 2rem;
+        padding: 0.32rem 0.72rem;
+        font-size: 0.82rem;
+    }
+
+    .attendance-entries-counter {
+        min-width: 92px;
+    }
+
+    .attendance-entries-button {
+        justify-content: space-between;
+        min-width: 92px;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .attendance-entries-menu {
+        width: 100%;
+        min-width: 92px;
+        padding: 0.35rem;
+    }
+
+    .attendance-entries-option {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 0.65rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text, #0f172a);
+        text-align: left;
+        font-size: 0.92rem;
+    }
+
+    .attendance-entries-option:hover,
+    .attendance-entries-option.active {
+        background: var(--finance-surface-soft, #f3f6fb);
+    }
+
+    .attendance-dropdown-caret {
+        font-size: 0.78rem;
+    }
+
+    .attendance-actions-column {
+        min-width: 8.5rem;
+    }
+
+    .attendance-actions-cell {
+        min-width: 8.5rem;
+    }
+
+    .attendance-table .attendance-actions-cell {
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .attendance-action-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        margin-right: 0.45rem;
+        border: 1px solid var(--finance-border, #d9dee7);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted, #6b7280);
+        transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+    }
+
+    .attendance-action-button:last-child {
+        margin-right: 0;
+    }
+
+    .attendance-action-button:hover,
+    .attendance-action-button:focus-visible {
+        border-color: var(--finance-border, #d9dee7);
+        color: var(--finance-text, #25324b);
+        background: #f5f7fb;
+    }
+
+    .attendance-action-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .attendance-table tbody .attendance-log-row {
+        cursor: pointer;
+        transition: background-color 0.18s ease;
+    }
+
+    .attendance-table tbody .attendance-log-row:hover {
+        background: #fbfcff;
+    }
+
+    .attendance-hover-row-menu {
+        position: fixed;
+        z-index: 1000;
+        min-width: 11.5rem;
+        padding: 0.35rem;
+        border: 1px solid var(--finance-border, #dbe3ef);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        opacity: 0;
+        transform: translateY(-4px) scale(0.98);
+        transform-origin: top right;
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+        visibility: hidden;
+    }
+
+    .attendance-hover-row-menu.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+        visibility: visible;
+    }
+
+    .attendance-hover-row-menu-title {
+        max-width: 14rem;
+        margin: 0.1rem 0.2rem 0.25rem;
+        padding: 0.35rem 0.4rem 0.45rem;
+        border-bottom: 1px solid var(--finance-border-soft, #eef2f7);
+        color: var(--finance-text, #0f172a);
+        font-size: 0.82rem;
+        font-weight: 600;
+        line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .attendance-hover-row-menu button {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        width: 100%;
+        padding: 0.5rem 0.6rem;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text, #0f172a);
+        font-size: 0.84rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .attendance-hover-row-menu button:hover:not(:disabled) {
+        background: var(--finance-surface-soft, #f3f6fb);
+        color: var(--finance-primary, #104dad);
+    }
+
+    .attendance-hover-row-menu button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .attendance-empty-state {
+        padding: 2rem 1rem;
+        text-align: center;
+        color: var(--finance-text-muted, #64748b);
+    }
+
+    .attendance-sort-header {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .attendance-sort-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        letter-spacing: inherit;
+        text-transform: inherit;
+    }
+
+    .attendance-sort-trigger.active {
+        color: var(--finance-text, #25324b);
+    }
+
+    .attendance-sort-label {
+        white-space: nowrap;
+    }
+
+    .attendance-sort-icon {
+        color: var(--finance-text-muted, #64748b);
+        line-height: 1;
+    }
+
+    .attendance-sort-icon.active {
+        color: var(--finance-primary, #104dad);
+    }
+
+    .attendance-sort-clear {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 0.92rem;
+        height: 0.92rem;
+        padding: 0;
+        border: 1px solid #d4d8e1;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--finance-text-muted, #64748b);
+        font-size: 0.62rem;
+        font-weight: 500;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .attendance-detail-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: rgba(30, 41, 57, 0.28);
+        backdrop-filter: blur(8px);
+    }
+
+    .attendance-detail-modal {
+        width: min(100%, 760px);
+        max-height: min(92vh, 900px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50, #f9fafb) 100%);
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300, #d1d5db) 88%, white);
+        border-radius: 10px;
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        animation: exceptions-calendar-enter 180ms ease-out;
+    }
+
+    .attendance-detail-modal.attendance-export-modal {
+        width: min(100%, 600px);
+        max-height: none;
+        overflow: visible;
+        position: relative;
+        z-index: 1201;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+    }
+
+    .attendance-detail-modal.attendance-export-modal::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300, #d1d5db) 88%, white);
+        border-radius: 10px;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50, #f9fafb) 100%);
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    .attendance-export-modal > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .attendance-export-modal .attendance-detail-body {
+        flex: 0 0 auto;
+        overflow: visible;
+        padding-bottom: 0.5rem;
+        position: relative;
+        z-index: 4;
+    }
+
+    .attendance-export-modal .attendance-detail-header {
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+
+    .attendance-export-modal .attendance-detail-footer {
+        padding-top: 1rem;
+        position: relative;
+        z-index: 1;
+        border-bottom-left-radius: 10px;
+        border-bottom-right-radius: 10px;
+    }
+
+    .attendance-detail-header,
+    .attendance-detail-hero,
+    .attendance-detail-footer {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .attendance-detail-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 1.15rem 1.5rem 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50, #f9fafb) 100%);
+        border-bottom: 1px solid var(--etrs-gray-200, #e5e7eb);
+    }
+
+    .attendance-detail-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 1rem 1.5rem;
+    }
+
+    .attendance-detail-title {
+        margin: 0;
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--etrs-black, #111827);
+    }
+
+    .attendance-detail-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .attendance-detail-header-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.5rem;
+        padding: 0.55rem 1rem;
+        border: 1px solid var(--etrs-gray-200, #e5e7eb);
+        border-radius: 0.75rem;
+        background: #fff;
+        color: var(--etrs-black, #111827);
+        font-weight: 500;
+    }
+
+    .attendance-detail-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--etrs-gray-700, #374151);
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .attendance-detail-section {
+        margin-top: 1rem;
+        padding: 1rem 1.05rem;
+        border: 1px solid var(--etrs-gray-200, #e5e7eb);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.9);
+        overflow: visible;
+    }
+
+    .attendance-detail-hero {
+        align-items: center;
+        background: #ffffff;
+        border-color: var(--etrs-gray-200, #e5e7eb);
+    }
+
+    .attendance-detail-eyebrow {
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--etrs-black, #111827);
+    }
+
+    .attendance-detail-person {
+        margin-top: 0.35rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--etrs-black, #111827);
+    }
+
+    .attendance-detail-meta {
+        margin-top: 0.2rem;
+        font-weight: 400;
+        color: var(--etrs-gray-700, #374151);
+    }
+
+    .attendance-detail-status {
+        flex: 0 0 auto;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        background: var(--etrs-gray-100, #f3f4f6);
+        border: 1px solid var(--etrs-gray-200, #e5e7eb);
+        color: var(--etrs-gray-800, #1f2937);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .attendance-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .attendance-detail-grid-compact {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .attendance-detail-preserve-spacing {
+        white-space: break-spaces;
+    }
+
+    .attendance-detail-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+
+    .attendance-detail-field strong,
+    .attendance-detail-field p,
+    .attendance-detail-field a {
+        margin: 0;
+        color: var(--etrs-black, #111827);
+        overflow-wrap: anywhere;
+    }
+
+    .attendance-detail-field-wide {
+        width: 100%;
+    }
+
+    .attendance-detail-label {
+        color: var(--etrs-gray-700, #374151);
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .attendance-detail-section-primary .attendance-detail-label {
+        font-weight: 500;
+    }
+
+    .attendance-detail-section-primary .attendance-detail-field strong,
+    .attendance-detail-section-primary .attendance-detail-field a {
+        font-weight: 600;
+    }
+
+    .attendance-detail-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 1rem 1.5rem 1.25rem;
+        background: linear-gradient(180deg, rgba(250, 250, 250, 0.92) 0%, var(--etrs-gray-50, #f9fafb) 100%);
+        border-top: 1px solid var(--etrs-gray-200, #e5e7eb);
+    }
+
+    .attendance-detail-done {
+        min-width: 7rem;
+        border-radius: 12px;
+        padding-inline: 1.25rem;
+    }
+
+    .attendance-detail-text-action {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--etrs-gray-700, #374151);
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .exceptions-setup-modal {
+        width: min(100%, 560px);
+    }
+
+    .exceptions-setup-modal .attendance-detail-hero {
+        align-items: flex-start;
+        text-align: left;
+    }
+
+    .exceptions-setup-modal .attendance-detail-status {
+        align-self: center;
+        margin-left: auto;
+    }
+
+    .exceptions-setup-select .attendance-filter-select-menu {
+        z-index: 1302;
+    }
+
+    .exceptions-date-filter {
+        display: flex;
+        align-items: center;
+        min-height: 2.5rem;
+    }
+
+    .exceptions-date-input {
+        width: 178px;
+        min-height: 2.5rem;
+        padding: 0.5rem 0.75rem;
+        border-color: var(--finance-border, #dbe3ef);
+        border-radius: 8px;
+        color: var(--finance-text, #0f172a);
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+
+    .exceptions-date-input:focus {
+        border-color: rgba(16, 77, 173, 0.35);
+        box-shadow: 0 0 0 3px rgba(16, 77, 173, 0.08);
+    }
+
+    .period-sep {
+        display: inline-block;
+        width: 1px;
+        height: 26px;
+        margin: 0 0.75rem;
+        align-self: center;
+        background: var(--finance-border, #dbe3ef);
+        opacity: 0.8;
+    }
+
+    .exceptions-calendar-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: rgba(30, 41, 57, 0.28);
+        backdrop-filter: blur(8px);
+    }
+
+    .exceptions-calendar-modal {
+        width: min(1180px, calc(100vw - 2rem));
+        max-height: min(92vh, 900px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50, #f9fafb) 100%);
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300, #d1d5db) 88%, white);
+        border-radius: 10px;
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        animation: exceptions-calendar-enter 180ms ease-out;
+        transition: width 220ms ease, max-width 220ms ease;
+    }
+
+    .exceptions-calendar-modal.list-mode {
+        width: min(760px, calc(100vw - 2rem));
+    }
+
+    .exceptions-calendar-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.8rem 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50, #f9fafb) 100%);
+        border-bottom: 1px solid var(--etrs-gray-200, #e5e7eb);
+    }
+
+    .exceptions-calendar-nav,
+    .exceptions-calendar-tools {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+
+    .exceptions-calendar-tools {
+        justify-content: flex-end;
+    }
+
+    .exceptions-calendar-title {
+        color: #111827;
+        font-size: 1.05rem;
+        font-weight: 800;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .exceptions-icon-button,
+    .exceptions-today-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        min-height: 2.25rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.35rem;
+        background: #ffffff;
+        color: #111827;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .exceptions-icon-button {
+        width: 2.25rem;
+        padding: 0;
+    }
+
+    .exceptions-icon-button.active {
+        background: #f3f4f6;
+    }
+
+    .exceptions-today-button {
+        padding: 0 0.8rem;
+    }
+
+    .exceptions-calendar-close {
+        width: 2.25rem;
+        height: 2.25rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        background: transparent;
+        color: var(--etrs-gray-700, #374151);
+    }
+
+    .exceptions-calendar-body {
+        flex: 1 1 auto;
+        padding: 0;
+        overflow: auto;
+        background: #ffffff;
+    }
+
+    .exceptions-calendar-month {
+        min-width: 100%;
+        will-change: opacity, transform;
+    }
+
+    .exceptions-calendar-month.slide-next {
+        animation: exceptions-calendar-slide-next 220ms ease-out both;
+    }
+
+    .exceptions-calendar-month.slide-prev {
+        animation: exceptions-calendar-slide-prev 220ms ease-out both;
+    }
+
+    .exceptions-calendar-month.view-enter,
+    .exceptions-calendar-list.view-enter {
+        animation: exceptions-calendar-view-enter 220ms ease-out both;
+    }
+
+    .exceptions-calendar-weekdays {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        background: #f3f5f7;
+        color: #374151;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .exceptions-calendar-weekdays div {
+        padding: 0.7rem 0.35rem;
+    }
+
+    .exceptions-calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        min-height: min(700px, calc(92vh - 6rem));
+        background: #edf0f3;
+        gap: 1px;
+    }
+
+    .exceptions-calendar-cell {
+        position: relative;
+        min-height: 7.8rem;
+        padding: 0.7rem 0.65rem;
+        background: #ffffff;
+        overflow: hidden;
+    }
+
+    .exceptions-calendar-cell::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(9px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+    }
+
+    .exceptions-calendar-cell:hover::before,
+    .exceptions-calendar-cell:focus-within::before {
+        opacity: 1;
+    }
+
+    .exceptions-calendar-cell.weekend,
+    .exceptions-calendar-cell.past {
+        background-color: #fbfbfc;
+        background-image: repeating-linear-gradient(135deg, rgba(156, 163, 175, 0.16) 0, rgba(156, 163, 175, 0.16) 1px, transparent 1px, transparent 6px);
+    }
+
+    .exceptions-calendar-cell.muted .exceptions-calendar-date,
+    .exceptions-calendar-cell.weekend .exceptions-calendar-date,
+    .exceptions-calendar-cell.past .exceptions-calendar-date {
+        color: #9ca3af;
+    }
+
+    .exceptions-calendar-cell.today {
+        outline: 2px solid #2563eb;
+        outline-offset: -2px;
+        z-index: 2;
+    }
+
+    .exceptions-calendar-cell.today .exceptions-calendar-date {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 999px;
+        background: #2563eb;
+        color: #ffffff;
+    }
+
+    .exceptions-calendar-date {
+        position: relative;
+        z-index: 0;
+        color: #111827;
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+
+    .exceptions-calendar-events {
+        position: relative;
+        z-index: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-top: 2.45rem;
+    }
+
+    .exceptions-calendar-event {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        width: fit-content;
+        max-width: 100%;
+        color: #111827;
+        font-size: 0.75rem;
+        line-height: 1.1;
+        white-space: nowrap;
+    }
+
+    .exceptions-calendar-event b {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1rem;
+        height: 1rem;
+        padding: 0 0.25rem;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #374151;
+        font-size: 0.65rem;
+    }
+
+    .exceptions-calendar-event.wfh i {
+        color: #2563eb;
+    }
+
+    .exceptions-calendar-event.holiday i {
+        color: #dc2626;
+    }
+
+    .exceptions-calendar-event.exception i {
+        color: #92400e;
+    }
+
+    .exceptions-calendar-cell-actions {
+        position: absolute;
+        inset: auto 0.5rem 0.5rem 0.5rem;
+        z-index: 2;
         display: flex;
         flex-wrap: wrap;
-        gap: 0.75rem;
-        align-items: end;
+        gap: 0.35rem;
+        opacity: 0;
+        transform: translateY(0.25rem);
+        pointer-events: none;
+        transition: opacity 0.15s ease, transform 0.15s ease;
     }
 
-    .exceptions-toolbar-field {
-        min-width: 14rem;
+    .exceptions-calendar-cell:hover .exceptions-calendar-cell-actions,
+    .exceptions-calendar-cell:focus-within .exceptions-calendar-cell-actions {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
     }
 
-    .exceptions-toolbar-field label {
+    .exceptions-calendar-cell-actions .btn {
+        min-height: 1.8rem;
+        padding: 0.15rem 0.45rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .exceptions-calendar-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        min-height: min(520px, calc(92vh - 6rem));
+        background: #ffffff;
+    }
+
+    .exceptions-calendar-list-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        min-height: 4.5rem;
+        padding: 0.9rem 1.1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .exceptions-calendar-list-row:hover {
+        background: #f9fafb;
+    }
+
+    .exceptions-calendar-list-date {
+        color: #111827;
+        font-weight: 800;
+    }
+
+    .exceptions-calendar-list-events,
+    .exceptions-calendar-list-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+    }
+
+    .exceptions-calendar-list-events {
+        margin-top: 0.45rem;
+    }
+
+    .exceptions-calendar-list-empty {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 16rem;
+        padding: 2rem;
+        color: #6b7280;
+        text-align: center;
+    }
+
+    .exceptions-calendar-list-empty strong {
+        color: #111827;
+        font-size: 1rem;
+    }
+
+    .exceptions-confirm-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(30, 41, 57, 0.22);
+        backdrop-filter: blur(4px);
+    }
+
+    .exceptions-confirm-modal {
+        width: min(420px, 100%);
+        overflow: hidden;
+        border: 1px solid var(--etrs-gray-200, #e5e7eb);
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 22px 50px rgba(30, 41, 57, 0.22);
+    }
+
+    .exceptions-confirm-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 1rem 0.85rem;
+        border-bottom: 1px solid var(--etrs-gray-200, #e5e7eb);
+    }
+
+    .exceptions-confirm-header h2 {
+        margin: 0;
+        color: #111827;
+        font-size: 1.05rem;
+        font-weight: 800;
+    }
+
+    .exceptions-confirm-body {
+        padding: 1rem;
+        color: #4b5563;
+        line-height: 1.5;
+    }
+
+    .exceptions-confirm-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.9rem 1rem 1rem;
+        background: #f9fafb;
+        border-top: 1px solid var(--etrs-gray-200, #e5e7eb);
+    }
+
+    .exceptions-confirm-actions .attendance-detail-text-action {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--etrs-gray-700, #374151);
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .exceptions-confirm-actions .attendance-detail-text-action:hover,
+    .exceptions-confirm-actions .attendance-detail-text-action:focus-visible {
+        color: var(--etrs-black, #111827);
+        text-decoration: none;
+    }
+
+    .exceptions-confirm-actions .attendance-detail-text-action:disabled {
+        color: var(--etrs-gray-500, #6b7280);
+        text-decoration: none;
+    }
+
+    .exceptions-confirm-actions .attendance-detail-done {
+        min-width: 7rem;
+        border-radius: 12px;
+        padding-inline: 1.25rem;
+    }
+
+    .exceptions-table-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(30, 41, 57, 0.2);
+        backdrop-filter: blur(5px);
+    }
+
+    .exceptions-table-modal {
+        display: flex;
+        flex-direction: column;
+        width: min(980px, 100%);
+        max-height: min(82vh, 720px);
+        overflow: hidden;
+        border: 1px solid var(--etrs-gray-200, #e5e7eb);
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 24px 60px rgba(30, 41, 57, 0.24);
+    }
+
+    .exceptions-table-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem;
+        border-bottom: 1px solid var(--etrs-gray-200, #e5e7eb);
+    }
+
+    .exceptions-table-header h2 {
+        margin: 0;
+        color: #111827;
+        font-size: 1.05rem;
+        font-weight: 800;
+    }
+
+    .exceptions-table-header span {
         display: block;
-        margin-bottom: 0.35rem;
+        margin-top: 0.2rem;
+        color: #6b7280;
+        font-size: 0.82rem;
         font-weight: 600;
+    }
+
+    .exceptions-table-body {
+        min-height: 18rem;
+        overflow: auto;
+        background: #ffffff;
+    }
+
+    .exceptions-modal-table {
+        margin-bottom: 0;
+    }
+
+    .exceptions-modal-table th,
+    .exceptions-modal-table td {
+        white-space: nowrap;
+    }
+
+    .exceptions-table-footer {
+        justify-content: flex-end;
+        padding: 0.9rem 1rem;
+        border-top: 1px solid var(--etrs-gray-200, #e5e7eb);
+        background: #f9fafb;
+    }
+
+    @@keyframes exceptions-calendar-enter {
+        from {
+            opacity: 0;
+            transform: translateY(0.5rem) scale(0.985);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @@keyframes exceptions-calendar-slide-next {
+        from {
+            opacity: 0;
+            transform: translateX(2rem);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes exceptions-calendar-slide-prev {
+        from {
+            opacity: 0;
+            transform: translateX(-2rem);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes exceptions-calendar-view-enter {
+        from {
+            opacity: 0;
+            transform: translateY(0.7rem) scale(0.985);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @@media (max-width: 900px) {
+        .exceptions-heading,
+        .exceptions-calendar-topbar {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .exceptions-calendar-topbar {
+            display: flex;
+        }
+
+        .exceptions-heading-actions,
+        .exceptions-calendar-tools {
+            justify-content: flex-start;
+            margin-left: 0;
+        }
+
+        .exceptions-calendar-grid {
+            min-width: 760px;
+        }
+
+        .exceptions-calendar-modal {
+            overflow: auto;
+        }
     }
 </style>
 
 @code {
-    private const int PageSize = 10;
+    private const int DefaultPageSize = 10;
+    private const int MaxPageSize = 100;
     private const string WfhOptionValue = "WFH";
+    private const string AbsentOptionValue = "Absent";
+    private const string HolidayConditionName = "Holiday";
+    private static readonly int[] PageSizeOptions = [10, 25, 50, 100];
 
     private readonly List<EmployeeTagRow> rows = new();
+    private readonly List<EmployeeTagRow> filteredRows = new();
+    private readonly List<CalendarDayItem> calendarDays = new();
+    private readonly List<EmployeeTagRow> calendarTableRows = new();
+    private readonly Dictionary<DateTime, CalendarDaySummary> calendarSummaries = new();
     private List<ExceptionCondition> conditions = new();
     private DateTime selectedDate = DateTime.Today;
+    private DateTime calendarCursor = DateTime.Today;
+    private string calendarTransitionClass = string.Empty;
+    private string calendarViewTransitionClass = string.Empty;
+    private int calendarRenderKey;
     private int activeEmployeeCount;
     private int wfhTaggedCount;
     private int exceptionTaggedCount;
     private int rowPage = 1;
+    private int pageSize = DefaultPageSize;
+    private string tableSearchText = string.Empty;
+    private string filterIdNumber = string.Empty;
+    private string filterEmployee = string.Empty;
+    private string filterDivision = string.Empty;
+    private string filterDesignation = string.Empty;
+    private string? activeFilterField;
+    private string? sortColumn;
+    private bool sortDescending;
+    private bool showFilterMenu;
+    private bool showEntriesMenu;
+    private bool showSetupOptionMenu;
     private bool isBusy;
+    private bool isSelectedDateHoliday;
+    private bool isCalendarModalOpen;
+    private CalendarViewMode calendarViewMode = CalendarViewMode.Month;
+    private CalendarTableMode? calendarTableModalMode;
+    private DateTime calendarTableDate = DateTime.Today;
+    private bool isCalendarTableDateHoliday;
+    private PendingCalendarAction? pendingCalendarAction;
+    private EmployeeTagRow? selectedDetailRow;
+    private EmployeeTagRow? setupRow;
+    private EmployeeTagRow? hoveredRowMenuRow;
+    private string setupSelectedOption = WfhOptionValue;
+    private double rowActionMenuLeft;
+    private double rowActionMenuTop;
+    private bool showRowActionMenu;
+    private bool rowActionMenuHovered;
+    private int rowActionMenuShowVersion;
+    private int rowActionMenuHideVersion;
+    private ElementReference tableMenuControlsRef;
+    private ElementReference setupOptionControlsRef;
+    private DotNetObjectReference<Index>? tableMenuDotNetRef;
+    private DotNetObjectReference<Index>? setupOptionDotNetRef;
+    private bool tableMenuDismissRegistered;
+    private bool setupOptionDismissRegistered;
 
-    private IEnumerable<EmployeeTagRow> PagedRows => rows
-        .Skip((rowPage - 1) * PageSize)
-        .Take(PageSize);
+    private IEnumerable<EmployeeTagRow> PagedRows => filteredRows
+        .Skip((rowPage - 1) * pageSize)
+        .Take(pageSize);
 
-    private int TotalPages => Math.Max(1, (int)Math.Ceiling(rows.Count / (double)PageSize));
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(filteredRows.Count / (double)pageSize));
+    private IReadOnlyList<CalendarDayItem> CalendarDays => calendarDays;
+    private IEnumerable<CalendarDayItem> CalendarListItems => calendarDays
+        .Where(d => d.IsInCurrentMonth && d.HasAnyEvent)
+        .OrderBy(d => d.Date);
+    private IEnumerable<ExceptionCondition> ManualExceptionConditions => conditions
+        .Where(c => c.IsActive && !string.Equals(c.ConditionName, HolidayConditionName, StringComparison.OrdinalIgnoreCase));
+    private IEnumerable<string> IdNumberOptions => GetDistinctOptions(rows.Select(r => r.IdNumber));
+    private IEnumerable<string> EmployeeOptions => GetDistinctOptions(rows.Select(r => r.EmployeeName));
+    private IEnumerable<string> DivisionOptions => GetDistinctOptions(rows.Select(r => r.DivisionCenterUnit));
+    private IEnumerable<string> DesignationOptions => GetDistinctOptions(rows.Select(r => r.Designation));
+    private bool HasActiveTableFilters
+        => !string.IsNullOrWhiteSpace(filterIdNumber)
+            || !string.IsNullOrWhiteSpace(filterEmployee)
+            || !string.IsNullOrWhiteSpace(filterDivision)
+            || !string.IsNullOrWhiteSpace(filterDesignation);
+    private string RowActionMenuStyle => $"left:{rowActionMenuLeft:0}px;top:{rowActionMenuTop:0}px;";
+    private static readonly string[] Weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
     protected override async Task OnInitializedAsync()
     {
+        await Financial.Data.Seeders.ExceptionConditionSeeder.SeedAsync(Db);
+
         conditions = await Db.ExceptionConditions
             .AsNoTracking()
             .OrderBy(c => c.ConditionName)
             .ToListAsync();
 
         await LoadPageDataAsync();
+        await LoadCalendarDataAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await SyncTableMenuDismissRegistrationAsync();
+        await SyncSetupOptionDismissRegistrationAsync();
     }
 
     private async Task LoadPageDataAsync()
@@ -178,10 +2085,12 @@
             var attendanceDate = selectedDate.Date;
             var employees = await Db.Employees
                 .AsNoTracking()
-                .Where(e => string.Equals(e.Status, "Active"))
                 .OrderBy(e => e.LastName)
                 .ThenBy(e => e.FirstName)
                 .ToListAsync();
+            employees = employees
+                .Where(e => IsActiveEmployeeStatus(e.Status))
+                .ToList();
 
             var logs = await Db.AttendanceLogsWfh
                 .AsNoTracking()
@@ -190,6 +2099,7 @@
                 .ToListAsync();
 
             var logsByEmployeeId = logs.ToDictionary(l => l.EmployeeId);
+            isSelectedDateHoliday = logs.Any(IsHolidayArrangement);
 
             foreach (var employee in employees)
             {
@@ -204,8 +2114,13 @@
                     DivisionCenterUnit = employee.DivisionCenterUnit,
                     Designation = employee.Designation,
                     CurrentArrangement = arrangement,
-                    SelectedOption = log?.ExceptionConditionId?.ToString() ?? WfhOptionValue,
+                    SelectedOption = GetSelectedOptionValue(log, arrangement),
                     TagUpdatedAt = log?.TagUpdatedAt,
+                    TimeIn = log?.TimeIn,
+                    TimeOut = log?.TimeOut,
+                    Target = log?.Target,
+                    Accomplishment = log?.Accomplishment,
+                    Mov = log?.Mov,
                     IsException = !string.Equals(arrangement, WfhOptionValue, StringComparison.OrdinalIgnoreCase)
                 });
             }
@@ -213,7 +2128,7 @@
             activeEmployeeCount = employees.Count;
             wfhTaggedCount = logs.Count(l => string.Equals(l.WorkArrangement, WfhOptionValue, StringComparison.OrdinalIgnoreCase));
             exceptionTaggedCount = logs.Count(l => !string.Equals(l.WorkArrangement, WfhOptionValue, StringComparison.OrdinalIgnoreCase));
-            rowPage = Math.Clamp(rowPage, 1, TotalPages);
+            RefreshFilteredRows();
         }
         finally
         {
@@ -221,60 +2136,387 @@
         }
     }
 
-    private async Task TagAllEmployeesAsync()
+    private void RefreshFilteredRows(bool resetPaging = false)
     {
+        filteredRows.Clear();
+        filteredRows.AddRange(ApplyRowSort(rows.Where(MatchesRowFilters)));
+
+        if (resetPaging)
+        {
+            rowPage = 1;
+            return;
+        }
+
+        rowPage = Math.Clamp(rowPage, 1, TotalPages);
+    }
+
+    private bool MatchesRowFilters(EmployeeTagRow row)
+    {
+        var query = tableSearchText.Trim();
+        if (!string.IsNullOrWhiteSpace(query)
+            && !ContainsText(row.IdNumber, query)
+            && !ContainsText(row.EmployeeName, query)
+            && !ContainsText(row.DivisionCenterUnit, query)
+            && !ContainsText(row.Designation, query))
+        {
+            return false;
+        }
+
+        return MatchesSelectedValue(row.IdNumber, filterIdNumber)
+            && MatchesSelectedValue(row.EmployeeName, filterEmployee)
+            && MatchesSelectedValue(row.DivisionCenterUnit, filterDivision)
+            && MatchesSelectedValue(row.Designation, filterDesignation);
+    }
+
+    private IEnumerable<EmployeeTagRow> ApplyRowSort(IEnumerable<EmployeeTagRow> source)
+    {
+        var column = sortColumn?.Trim().ToLowerInvariant();
+        var descending = sortDescending;
+
+        return column switch
+        {
+            "id" => OrderByDirection(source, descending, row => NormalizeSortValue(row.IdNumber))
+                .ThenBy(row => NormalizeSortValue(row.EmployeeName)),
+            "division" => OrderByDirection(source, descending, row => NormalizeSortValue(row.DivisionCenterUnit))
+                .ThenBy(row => NormalizeSortValue(row.EmployeeName)),
+            "designation" => OrderByDirection(source, descending, row => NormalizeSortValue(row.Designation))
+                .ThenBy(row => NormalizeSortValue(row.EmployeeName)),
+            "employee" or null or "" => OrderByDirection(source, descending, row => NormalizeSortValue(row.EmployeeName))
+                .ThenBy(row => NormalizeSortValue(row.IdNumber)),
+            _ => OrderByDirection(source, false, row => NormalizeSortValue(row.EmployeeName))
+                .ThenBy(row => NormalizeSortValue(row.IdNumber))
+        };
+    }
+
+    private Task HandleTableSearchInput(ChangeEventArgs e)
+    {
+        tableSearchText = e.Value?.ToString() ?? string.Empty;
+        RefreshFilteredRows(resetPaging: true);
+        return Task.CompletedTask;
+    }
+
+    private void ToggleFilterMenu()
+    {
+        showFilterMenu = !showFilterMenu;
+        if (showFilterMenu)
+        {
+            showEntriesMenu = false;
+        }
+        else
+        {
+            activeFilterField = null;
+        }
+    }
+
+    private void CloseFilterMenu()
+    {
+        showFilterMenu = false;
+        activeFilterField = null;
+    }
+
+    private void ToggleFilterField(string fieldKey)
+    {
+        activeFilterField = string.Equals(activeFilterField, fieldKey, StringComparison.Ordinal) ? null : fieldKey;
+    }
+
+    private void SetFilterValue(string fieldKey, string value)
+    {
+        switch (fieldKey)
+        {
+            case "id":
+                filterIdNumber = value;
+                break;
+            case "employee":
+                filterEmployee = value;
+                break;
+            case "division":
+                filterDivision = value;
+                break;
+            case "designation":
+                filterDesignation = value;
+                break;
+        }
+
+        activeFilterField = null;
+        RefreshFilteredRows(resetPaging: true);
+    }
+
+    private void ToggleEntriesMenu()
+    {
+        showEntriesMenu = !showEntriesMenu;
+        if (showEntriesMenu)
+        {
+            showFilterMenu = false;
+            activeFilterField = null;
+        }
+    }
+
+    private void SelectPageSize(int selectedPageSize)
+    {
+        pageSize = Math.Clamp(selectedPageSize, 1, MaxPageSize);
+        rowPage = 1;
+        showEntriesMenu = false;
+    }
+
+    private void ClearFilters()
+    {
+        tableSearchText = string.Empty;
+        filterIdNumber = string.Empty;
+        filterEmployee = string.Empty;
+        filterDivision = string.Empty;
+        filterDesignation = string.Empty;
+        showFilterMenu = false;
+        showEntriesMenu = false;
+        activeFilterField = null;
+        RefreshFilteredRows(resetPaging: true);
+    }
+
+    private void ClearFiltersFromButton(MouseEventArgs _)
+        => ClearFilters();
+
+    private RenderFragment SortHeader(string label, string column) => builder =>
+    {
+        var sequence = 0;
+        var isSorted = IsSortedColumn(column);
+        var isDescending = isSorted && sortDescending;
+
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "attendance-sort-header");
+
+        builder.OpenElement(sequence++, "button");
+        builder.AddAttribute(sequence++, "type", "button");
+        builder.AddAttribute(sequence++, "class", $"attendance-sort-trigger{(isSorted ? " active" : string.Empty)}");
+        builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => ToggleSort(column)));
+        builder.AddAttribute(sequence++, "title", $"Sort by {label}");
+
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", "attendance-sort-label");
+        builder.AddContent(sequence++, label);
+        builder.CloseElement();
+
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", $"attendance-sort-icon{(isSorted ? " active" : string.Empty)}");
+        builder.OpenElement(sequence++, "i");
+        builder.AddAttribute(sequence++, "class", isDescending ? "fa-solid fa-caret-down" : "fa-solid fa-caret-up");
+        builder.AddAttribute(sequence++, "aria-hidden", "true");
+        builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+
+        if (!string.IsNullOrWhiteSpace(sortColumn)
+            && string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase))
+        {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", "attendance-sort-clear");
+            builder.AddAttribute(sequence++, "title", "Clear sorting");
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, ClearSorting));
+            builder.AddAttribute(sequence++, "aria-label", "Clear sorting");
+            builder.AddContent(sequence++, "x");
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private bool IsSortedColumn(string column)
+    {
+        if (!string.IsNullOrWhiteSpace(sortColumn))
+        {
+            return string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(column, "employee", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ToggleSort(string column)
+    {
+        if (string.Equals(sortColumn, column, StringComparison.OrdinalIgnoreCase))
+        {
+            sortDescending = !sortDescending;
+        }
+        else
+        {
+            sortColumn = column;
+            sortDescending = false;
+        }
+
+        RefreshFilteredRows(resetPaging: true);
+    }
+
+    private void ClearSorting()
+    {
+        sortColumn = null;
+        sortDescending = false;
+        RefreshFilteredRows(resetPaging: true);
+    }
+
+    private void OpenDetailsModal(EmployeeTagRow row)
+    {
+        CloseRowMenu();
+        selectedDetailRow = row;
+    }
+
+    private void CloseDetailsModal()
+    {
+        selectedDetailRow = null;
+    }
+
+    private void OpenExceptionSetupModal(EmployeeTagRow row)
+    {
+        CloseRowMenu();
+        setupRow = row;
+        setupSelectedOption = row.SelectedOption;
+        showSetupOptionMenu = false;
+        selectedDetailRow = null;
+    }
+
+    private async Task ShowRowMenuAsync(EmployeeTagRow row, MouseEventArgs e)
+    {
+        var showVersion = ++rowActionMenuShowVersion;
+        rowActionMenuHideVersion++;
+        rowActionMenuHovered = true;
+        showRowActionMenu = false;
+
+        await Task.Delay(1000);
+
+        if (!rowActionMenuHovered || showVersion != rowActionMenuShowVersion)
+        {
+            return;
+        }
+
+        hoveredRowMenuRow = row;
+
+        try
+        {
+            var position = await JS.InvokeAsync<RowMenuPosition>("attendanceLogs.getRowMenuPosition", GetRowMenuKey(row), e.ClientX, e.ClientY, 184, 108, 12);
+            rowActionMenuLeft = position.Left;
+            rowActionMenuTop = position.Top;
+        }
+        catch
+        {
+            rowActionMenuLeft = e.ClientX + 12;
+            rowActionMenuTop = e.ClientY + 12;
+        }
+
+        showRowActionMenu = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HideRowMenuAsync()
+    {
+        rowActionMenuHovered = false;
+        rowActionMenuShowVersion++;
+        var hideVersion = ++rowActionMenuHideVersion;
+
+        await Task.Delay(120);
+
+        if (rowActionMenuHovered || hideVersion != rowActionMenuHideVersion)
+        {
+            return;
+        }
+
+        showRowActionMenu = false;
+        await InvokeAsync(StateHasChanged);
+
+        await Task.Delay(190);
+
+        if (!showRowActionMenu && hideVersion == rowActionMenuHideVersion)
+        {
+            hoveredRowMenuRow = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void KeepRowMenuOpen()
+    {
+        rowActionMenuHovered = true;
+        rowActionMenuHideVersion++;
+    }
+
+    private void CloseRowMenu()
+    {
+        showRowActionMenu = false;
+        hoveredRowMenuRow = null;
+    }
+
+    private void OpenHoveredDetails()
+    {
+        if (hoveredRowMenuRow is { } row)
+        {
+            OpenDetailsModal(row);
+        }
+    }
+
+    private void OpenHoveredExceptionSetup()
+    {
+        if (hoveredRowMenuRow is { } row)
+        {
+            OpenExceptionSetupModal(row);
+        }
+    }
+
+    private static string GetRowMenuKey(EmployeeTagRow row)
+        => $"exception-{row.EmployeeId}";
+
+    private void CloseExceptionSetupModal()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        setupRow = null;
+        setupSelectedOption = WfhOptionValue;
+        showSetupOptionMenu = false;
+    }
+
+    private void ToggleSetupOptionMenu()
+    {
+        showSetupOptionMenu = !showSetupOptionMenu;
+    }
+
+    private void SelectSetupOption(string value)
+    {
+        setupSelectedOption = value;
+        showSetupOptionMenu = false;
+    }
+
+    private async Task SaveSetupRowAsync()
+    {
+        if (setupRow is null)
+        {
+            return;
+        }
+
+        setupRow.SelectedOption = setupSelectedOption;
+        await SaveRowAsync(setupRow);
+        CloseExceptionSetupModal();
+    }
+
+    private async Task TagCalendarDateAsync(DateTime date, CalendarTagType tagType)
+    {
+        if (!CanChangeCalendarDate(date))
+        {
+            ShowToast(ToastType.Warning, "Date unavailable", "Only current or future weekdays in this month can be set as WFH or Holiday.");
+            return;
+        }
+
         isBusy = true;
 
         try
         {
-            var attendanceDate = selectedDate.Date;
-            var now = DateTime.Now;
-            var employees = await Db.Employees
-                .Where(e => string.Equals(e.Status, "Active"))
-                .ToListAsync();
-
-            var logs = await Db.AttendanceLogsWfh
-                .Where(l => l.AttendanceDate == attendanceDate)
-                .ToListAsync();
-
-            var logsByEmployeeId = logs.ToDictionary(l => l.EmployeeId);
-
-            foreach (var employee in employees)
-            {
-                if (!logsByEmployeeId.TryGetValue(employee.EmployeeId, out var log))
-                {
-                    log = new AttendanceLogWfh
-                    {
-                        EmployeeId = employee.EmployeeId,
-                        AttendanceDate = attendanceDate,
-                        IdNumber = employee.IdNumber,
-                        LastName = employee.LastName,
-                        FirstName = employee.FirstName,
-                        MiddleName = employee.MiddleName,
-                        DivisionCenterUnit = employee.DivisionCenterUnit,
-                        Designation = employee.Designation
-                    };
-
-                    Db.AttendanceLogsWfh.Add(log);
-                }
-
-                log.IdNumber = employee.IdNumber;
-                log.LastName = employee.LastName;
-                log.FirstName = employee.FirstName;
-                log.MiddleName = employee.MiddleName;
-                log.DivisionCenterUnit = employee.DivisionCenterUnit;
-                log.Designation = employee.Designation;
-                log.WorkArrangement = WfhOptionValue;
-                log.ExceptionConditionId = null;
-                log.TagUpdatedAt = now;
-            }
+            var attendanceDate = date.Date;
+            await ApplyCalendarTagAsync(attendanceDate, tagType);
 
             await Db.SaveChangesAsync();
-            ShowToast(ToastType.Success, "WFH tags updated", $"All active employees were tagged as WFH for {attendanceDate:MMM dd, yyyy}.");
+
+            var label = tagType == CalendarTagType.Holiday ? HolidayConditionName : WfhOptionValue;
+            ShowToast(ToastType.Success, $"{label} date set", $"All active employees were tagged as {label} for {attendanceDate:MMM dd, yyyy}.");
         }
         catch (Exception ex)
         {
-            ShowToast(ToastType.Error, "Tagging failed", ex.Message);
+            ShowToast(ToastType.Error, "Calendar update failed", ex.Message);
         }
         finally
         {
@@ -282,15 +2524,233 @@
         }
 
         await LoadPageDataAsync();
+        await LoadCalendarDataAsync();
     }
 
-    private async Task SaveRowAsync(EmployeeTagRow row)
+    private void OpenCalendarTagConfirmation(DateTime date, CalendarTagType tagType)
+    {
+        if (!CanChangeCalendarDate(date))
+        {
+            ShowToast(ToastType.Warning, "Date unavailable", "Only current or future weekdays in this month can be set as WFH or Holiday.");
+            return;
+        }
+
+        pendingCalendarAction = PendingCalendarAction.ForTag(date.Date, tagType);
+    }
+
+    private void OpenCalendarCancelConfirmation(DateTime date, CalendarTagType tagType)
+    {
+        if (!CanChangeCalendarDate(date))
+        {
+            ShowToast(ToastType.Warning, "Date unavailable", "Only current or future weekdays can be changed from the calendar.");
+            return;
+        }
+
+        pendingCalendarAction = PendingCalendarAction.ForCancel(date.Date, tagType);
+    }
+
+    private void CloseCalendarTagConfirmation()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        pendingCalendarAction = null;
+    }
+
+    private async Task ConfirmCalendarTagAsync()
+    {
+        if (pendingCalendarAction is not { } action)
+        {
+            return;
+        }
+
+        pendingCalendarAction = null;
+
+        if (action.ActionType == CalendarActionType.Cancel)
+        {
+            await CancelCalendarDateAsync(action.Date, action.TagType ?? CalendarTagType.Wfh);
+            return;
+        }
+
+        await TagCalendarDateAsync(action.Date, action.TagType ?? CalendarTagType.Wfh);
+    }
+
+    private async Task CancelCalendarDateAsync(DateTime date, CalendarTagType tagType)
+    {
+        if (!CanChangeCalendarDate(date))
+        {
+            ShowToast(ToastType.Warning, "Date unavailable", "Only current or future weekdays can be changed from the calendar.");
+            return;
+        }
+
+        isBusy = true;
+
+        try
+        {
+            var attendanceDate = date.Date;
+            var logs = await Db.AttendanceLogsWfh
+                .Where(l => l.AttendanceDate == attendanceDate)
+                .ToListAsync();
+
+            var removableLogs = logs
+                .Where(log => IsEmptyCalendarTag(log, tagType))
+                .ToList();
+
+            var label = GetCalendarTagLabel(tagType);
+            if (removableLogs.Count == 0)
+            {
+                ShowToast(ToastType.Warning, $"No {label} tags removed", "This date has submitted log details or employee exceptions that should be changed from the employee table.");
+            }
+            else
+            {
+                Db.AttendanceLogsWfh.RemoveRange(removableLogs);
+                await Db.SaveChangesAsync();
+                ShowToast(ToastType.Success, $"{label} cancelled", $"Empty {label} tags were removed for {attendanceDate:MMM dd, yyyy}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Cancel failed", ex.Message);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+
+        await LoadPageDataAsync();
+        await LoadCalendarDataAsync();
+    }
+
+    private async Task OpenExceptionsForDateAsync(DateTime date)
+    {
+        if (!CanChangeCalendarDate(date))
+        {
+            ShowToast(ToastType.Warning, "Date unavailable", "Only current or future weekdays can be changed from the calendar.");
+            return;
+        }
+
+        if (await IsHolidayDateAsync(date.Date))
+        {
+            ShowToast(ToastType.Warning, "Holiday date locked", "Cancel the Holiday setup before adding manual exceptions for this date.");
+            return;
+        }
+
+        await OpenCalendarTableModalAsync(date.Date, CalendarTableMode.EditExceptions);
+    }
+
+    private async Task OpenCalendarTagsForDateAsync(DateTime date)
+    {
+        await OpenCalendarTableModalAsync(date.Date, CalendarTableMode.ViewAll);
+    }
+
+    private async Task OpenCalendarTableModalAsync(DateTime date, CalendarTableMode mode)
+    {
+        calendarTableDate = date.Date;
+        calendarTableModalMode = mode;
+        await LoadCalendarTableRowsAsync(calendarTableDate);
+    }
+
+    private void CloseCalendarTableModal()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        calendarTableModalMode = null;
+        calendarTableRows.Clear();
+    }
+
+    private async Task LoadCalendarTableRowsAsync(DateTime attendanceDate)
     {
         isBusy = true;
 
         try
         {
-            var attendanceDate = selectedDate.Date;
+            calendarTableRows.Clear();
+
+            var employees = await Db.Employees
+                .AsNoTracking()
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .ToListAsync();
+            employees = employees
+                .Where(e => IsActiveEmployeeStatus(e.Status))
+                .ToList();
+
+            var logs = await Db.AttendanceLogsWfh
+                .AsNoTracking()
+                .Include(l => l.ExceptionCondition)
+                .Where(l => l.AttendanceDate == attendanceDate.Date)
+                .ToListAsync();
+
+            var logsByEmployeeId = logs.ToDictionary(l => l.EmployeeId);
+            isCalendarTableDateHoliday = logs.Any(IsHolidayArrangement);
+
+            foreach (var employee in employees)
+            {
+                logsByEmployeeId.TryGetValue(employee.EmployeeId, out var log);
+                var arrangement = ResolveArrangement(log);
+
+                calendarTableRows.Add(new EmployeeTagRow
+                {
+                    EmployeeId = employee.EmployeeId,
+                    IdNumber = employee.IdNumber,
+                    EmployeeName = FormatName(employee.LastName, employee.FirstName, employee.MiddleName),
+                    DivisionCenterUnit = employee.DivisionCenterUnit,
+                    Designation = employee.Designation,
+                    CurrentArrangement = arrangement,
+                    SelectedOption = GetSelectedOptionValue(log, arrangement),
+                    TagUpdatedAt = log?.TagUpdatedAt,
+                    IsException = !string.Equals(arrangement, WfhOptionValue, StringComparison.OrdinalIgnoreCase)
+                });
+            }
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task SaveCalendarTableRowAsync(EmployeeTagRow row)
+    {
+        if (isCalendarTableDateHoliday)
+        {
+            ShowToast(ToastType.Warning, "Holiday date locked", "Cancel the Holiday setup before changing employee arrangements for this date.");
+            return;
+        }
+
+        await SaveEmployeeTagForDateAsync(row, calendarTableDate);
+        await LoadCalendarTableRowsAsync(calendarTableDate);
+        if (calendarTableDate.Date == selectedDate.Date)
+        {
+            await LoadPageDataAsync();
+        }
+
+        await LoadCalendarDataAsync();
+    }
+
+    private async Task SaveRowAsync(EmployeeTagRow row)
+    {
+        await SaveEmployeeTagForDateAsync(row, selectedDate.Date);
+        await LoadPageDataAsync();
+        await LoadCalendarDataAsync();
+    }
+
+    private async Task SaveEmployeeTagForDateAsync(EmployeeTagRow row, DateTime attendanceDate)
+    {
+        isBusy = true;
+
+        try
+        {
+            if (await IsHolidayDateAsync(attendanceDate.Date))
+            {
+                ShowToast(ToastType.Warning, "Holiday date locked", "Cancel the Holiday setup before changing employee arrangements for this date.");
+                return;
+            }
+
             var employee = await Db.Employees.FirstOrDefaultAsync(e => e.EmployeeId == row.EmployeeId);
             if (employee is null)
             {
@@ -322,6 +2782,11 @@
                 log.WorkArrangement = WfhOptionValue;
                 log.ExceptionConditionId = null;
             }
+            else if (string.Equals(row.SelectedOption, AbsentOptionValue, StringComparison.OrdinalIgnoreCase))
+            {
+                log.WorkArrangement = AbsentOptionValue;
+                log.ExceptionConditionId = null;
+            }
             else if (int.TryParse(row.SelectedOption, out var exceptionConditionId))
             {
                 var condition = await Db.ExceptionConditions.FirstOrDefaultAsync(c => c.ExceptionConditionId == exceptionConditionId && c.IsActive);
@@ -341,7 +2806,7 @@
             }
 
             await Db.SaveChangesAsync();
-            ShowToast(ToastType.Success, "Employee tag saved", $"{employee.FirstName} {employee.LastName} was tagged as {log.WorkArrangement}.");
+            ShowToast(ToastType.Success, "Employee tag saved", $"{employee.FirstName} {employee.LastName} was tagged as {log.WorkArrangement} for {attendanceDate:MMM dd, yyyy}.");
         }
         catch (Exception ex)
         {
@@ -351,7 +2816,212 @@
         {
             isBusy = false;
         }
+    }
 
+    private async Task ApplyCalendarTagAsync(DateTime attendanceDate, CalendarTagType tagType)
+    {
+        var now = DateTime.Now;
+        if (!CanChangeCalendarDate(attendanceDate))
+        {
+            throw new InvalidOperationException("Only current or future weekdays can be set as WFH or Holiday.");
+        }
+
+        var employees = await Db.Employees
+            .ToListAsync();
+        employees = employees
+            .Where(e => IsActiveEmployeeStatus(e.Status))
+            .ToList();
+
+        var logs = await Db.AttendanceLogsWfh
+            .Where(l => l.AttendanceDate == attendanceDate)
+            .ToListAsync();
+
+        var logsByEmployeeId = logs.ToDictionary(l => l.EmployeeId);
+        ExceptionCondition? holidayCondition = null;
+
+        if (tagType == CalendarTagType.Holiday)
+        {
+            holidayCondition = await Db.ExceptionConditions
+                .FirstOrDefaultAsync(c => c.IsActive && c.ConditionName == HolidayConditionName);
+
+            if (holidayCondition is null)
+            {
+                throw new InvalidOperationException("Holiday condition is not available.");
+            }
+        }
+
+        foreach (var employee in employees)
+        {
+            if (!logsByEmployeeId.TryGetValue(employee.EmployeeId, out var log))
+            {
+                log = new AttendanceLogWfh
+                {
+                    EmployeeId = employee.EmployeeId,
+                    AttendanceDate = attendanceDate
+                };
+
+                Db.AttendanceLogsWfh.Add(log);
+            }
+
+            log.IdNumber = employee.IdNumber;
+            log.LastName = employee.LastName;
+            log.FirstName = employee.FirstName;
+            log.MiddleName = employee.MiddleName;
+            log.DivisionCenterUnit = employee.DivisionCenterUnit;
+            log.Designation = employee.Designation;
+            log.TagUpdatedAt = now;
+
+            if (tagType == CalendarTagType.Holiday && holidayCondition is not null)
+            {
+                log.WorkArrangement = holidayCondition.ConditionName;
+                log.ExceptionConditionId = holidayCondition.ExceptionConditionId;
+            }
+            else
+            {
+                log.WorkArrangement = WfhOptionValue;
+                log.ExceptionConditionId = null;
+            }
+        }
+    }
+
+    private async Task LoadCalendarDataAsync()
+    {
+        var monthStart = new DateTime(calendarCursor.Year, calendarCursor.Month, 1);
+        var firstGridDate = monthStart.AddDays(-GetSundayBasedDayIndex(monthStart));
+        var lastGridDate = firstGridDate.AddDays(41);
+
+        var logs = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Include(l => l.ExceptionCondition)
+            .Where(l => l.AttendanceDate >= firstGridDate && l.AttendanceDate <= lastGridDate)
+            .ToListAsync();
+
+        calendarSummaries.Clear();
+
+        foreach (var group in logs.GroupBy(l => l.AttendanceDate.Date))
+        {
+            var wfhCount = 0;
+            var holidayCount = 0;
+            var exceptionCount = 0;
+
+            foreach (var log in group)
+            {
+                var arrangement = ResolveArrangement(log);
+                if (string.Equals(arrangement, WfhOptionValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    wfhCount++;
+                }
+                else if (string.Equals(arrangement, HolidayConditionName, StringComparison.OrdinalIgnoreCase))
+                {
+                    holidayCount++;
+                }
+                else
+                {
+                    exceptionCount++;
+                }
+            }
+
+            var calendarTag = ResolveCalendarCancelTag(wfhCount, holidayCount);
+            calendarSummaries[group.Key] = new CalendarDaySummary(wfhCount, holidayCount, exceptionCount, calendarTag);
+        }
+
+        calendarDays.Clear();
+
+        for (var dayOffset = 0; dayOffset < 42; dayOffset++)
+        {
+            var date = firstGridDate.AddDays(dayOffset);
+            calendarSummaries.TryGetValue(date.Date, out var summary);
+            calendarDays.Add(new CalendarDayItem
+            {
+                Date = date.Date,
+                IsInCurrentMonth = date.Month == calendarCursor.Month,
+                IsWeekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday,
+                IsPast = date.Date < DateTime.Today,
+                IsToday = date.Date == DateTime.Today,
+                Summary = summary
+            });
+        }
+    }
+
+    private async Task ChangeCalendarMonth(int offset)
+    {
+        calendarCursor = new DateTime(calendarCursor.Year, calendarCursor.Month, 1).AddMonths(offset);
+        calendarTransitionClass = offset >= 0 ? "slide-next" : "slide-prev";
+        calendarRenderKey++;
+        await LoadCalendarDataAsync();
+        await ResetCalendarTransitionAsync();
+    }
+
+    private async Task GoToToday()
+    {
+        var currentMonth = new DateTime(calendarCursor.Year, calendarCursor.Month, 1);
+        var todayMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        calendarCursor = DateTime.Today;
+        calendarTransitionClass = todayMonth >= currentMonth ? "slide-next" : "slide-prev";
+        calendarRenderKey++;
+        await LoadCalendarDataAsync();
+        await ResetCalendarTransitionAsync();
+    }
+
+    private async Task OpenCalendarModal()
+    {
+        isCalendarModalOpen = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await LoadCalendarDataAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Calendar failed to load", ex.Message);
+        }
+    }
+
+    private void CloseCalendarModal()
+    {
+        pendingCalendarAction = null;
+        isCalendarModalOpen = false;
+    }
+
+    private async Task SetCalendarViewMode(CalendarViewMode viewMode)
+    {
+        if (calendarViewMode == viewMode)
+        {
+            return;
+        }
+
+        calendarViewMode = viewMode;
+        calendarTransitionClass = string.Empty;
+        calendarViewTransitionClass = "view-enter";
+        calendarRenderKey++;
+        await ResetCalendarViewTransitionAsync();
+    }
+
+    private async Task ResetCalendarTransitionAsync()
+    {
+        await Task.Delay(240);
+        calendarTransitionClass = string.Empty;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ResetCalendarViewTransitionAsync()
+    {
+        await Task.Delay(240);
+        calendarViewTransitionClass = string.Empty;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnTableDateChangedAsync(ChangeEventArgs e)
+    {
+        if (!DateTime.TryParse(e.Value?.ToString(), out var date))
+        {
+            ShowToast(ToastType.Warning, "Invalid date", "Choose a valid date for the table filter.");
+            return;
+        }
+
+        selectedDate = date.Date;
+        rowPage = 1;
         await LoadPageDataAsync();
     }
 
@@ -383,17 +3053,184 @@
 
     private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
 
+    private static string DisplayValue(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
+
+    private static bool ContainsText(string? source, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(source)
+            && source.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesSelectedValue(string? source, string? selectedValue)
+    {
+        if (string.IsNullOrWhiteSpace(selectedValue))
+        {
+            return true;
+        }
+
+        return string.Equals(source?.Trim(), selectedValue.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<string> GetDistinctOptions(IEnumerable<string?> values)
+        => values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase);
+
+    private static IOrderedEnumerable<T> OrderByDirection<T, TKey>(IEnumerable<T> source, bool descending, Func<T, TKey> selector)
+        => descending ? source.OrderByDescending(selector) : source.OrderBy(selector);
+
+    private static string NormalizeSortValue(string? value) => value?.Trim() ?? string.Empty;
+
     private static string FormatDateTime(DateTime? value) => value?.ToString("MMM dd, yyyy hh:mm tt") ?? "-";
 
-    private static string GetEntriesText(int totalCount, int currentPage)
+    private static string FormatClockTime(DateTime? value) => value?.ToString("hh:mm tt") ?? "-";
+
+    private string GetSetupOptionLabel(string? optionValue)
+    {
+        if (string.Equals(optionValue, WfhOptionValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return WfhOptionValue;
+        }
+
+        if (string.Equals(optionValue, AbsentOptionValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return AbsentOptionValue;
+        }
+
+        return int.TryParse(optionValue, out var conditionId)
+            ? conditions.FirstOrDefault(c => c.ExceptionConditionId == conditionId)?.ConditionName ?? "Select arrangement"
+            : "Select arrangement";
+    }
+
+    private static int GetSundayBasedDayIndex(DateTime date) => (int)date.DayOfWeek;
+
+    private static bool CanChangeCalendarDate(DateTime date)
+        => date.Date >= DateTime.Today
+            && date.DayOfWeek is not DayOfWeek.Saturday
+            && date.DayOfWeek is not DayOfWeek.Sunday;
+
+    private static string GetCalendarTagLabel(CalendarTagType tagType)
+        => tagType == CalendarTagType.Holiday ? HolidayConditionName : WfhOptionValue;
+
+    private static string GetCancelButtonLabel(CalendarTagType tagType)
+        => $"Cancel {GetCalendarTagLabel(tagType)}";
+
+    private static CalendarTagType? ResolveCalendarCancelTag(int wfhCount, int holidayCount)
+    {
+        if (holidayCount > 0 && holidayCount >= wfhCount)
+        {
+            return CalendarTagType.Holiday;
+        }
+
+        return wfhCount > 0 ? CalendarTagType.Wfh : null;
+    }
+
+    private static string GetCalendarTableTitle(CalendarTableMode mode)
+        => mode == CalendarTableMode.EditExceptions ? "Add Exception" : "View All Tags";
+
+    private bool CanEditCalendarTable(CalendarTableMode mode)
+        => mode == CalendarTableMode.EditExceptions && !isCalendarTableDateHoliday;
+
+    private static string GetCalendarConfirmationTitle(PendingCalendarAction action)
+        => action.ActionType == CalendarActionType.Cancel
+            ? $"Confirm Cancel {GetCalendarTagLabel(action.TagType ?? CalendarTagType.Wfh)}"
+            : $"Confirm {GetCalendarTagLabel(action.TagType ?? CalendarTagType.Wfh)}";
+
+    private static MarkupString GetCalendarConfirmationLead(PendingCalendarAction action)
+    {
+        if (action.ActionType == CalendarActionType.Cancel)
+        {
+            var cancelLabel = GetCalendarTagLabel(action.TagType ?? CalendarTagType.Wfh);
+            return new MarkupString($"Cancel the <strong>{cancelLabel}</strong> tag for all active employees on ");
+        }
+
+        var tagLabel = GetCalendarTagLabel(action.TagType ?? CalendarTagType.Wfh);
+        return new MarkupString($"Set <strong>{tagLabel}</strong> for all active employees on ");
+    }
+
+    private static bool IsActiveEmployeeStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return false;
+        }
+
+        var normalizedStatus = status.Trim();
+        var separatorIndex = normalizedStatus.IndexOf(',');
+
+        if (separatorIndex < 0)
+        {
+            separatorIndex = normalizedStatus.IndexOf(' ');
+        }
+
+        var activity = separatorIndex < 0
+            ? normalizedStatus
+            : normalizedStatus[..separatorIndex];
+
+        return string.Equals(activity.Trim(), "Active", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetSelectedOptionValue(AttendanceLogWfh? log, string arrangement)
+    {
+        if (log?.ExceptionConditionId is int exceptionConditionId
+            && !string.Equals(arrangement, HolidayConditionName, StringComparison.OrdinalIgnoreCase))
+        {
+            return exceptionConditionId.ToString();
+        }
+
+        if (string.Equals(arrangement, AbsentOptionValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return AbsentOptionValue;
+        }
+
+        return WfhOptionValue;
+    }
+
+    private async Task<bool> IsHolidayDateAsync(DateTime attendanceDate)
+    {
+        var logs = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .Include(l => l.ExceptionCondition)
+            .Where(l => l.AttendanceDate == attendanceDate.Date)
+            .ToListAsync();
+
+        return logs.Any(IsHolidayArrangement);
+    }
+
+    private static bool IsHolidayArrangement(AttendanceLogWfh log)
+        => string.Equals(ResolveArrangement(log), HolidayConditionName, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsEmptyCalendarTag(AttendanceLogWfh log, CalendarTagType tagType)
+    {
+        var arrangement = string.IsNullOrWhiteSpace(log.WorkArrangement) ? WfhOptionValue : log.WorkArrangement;
+        var isCalendarArrangement = tagType == CalendarTagType.Holiday
+            ? string.Equals(arrangement, HolidayConditionName, StringComparison.OrdinalIgnoreCase)
+            : string.Equals(arrangement, WfhOptionValue, StringComparison.OrdinalIgnoreCase);
+
+        return isCalendarArrangement
+            && string.IsNullOrWhiteSpace(log.Target)
+            && string.IsNullOrWhiteSpace(log.Accomplishment)
+            && string.IsNullOrWhiteSpace(log.Mov)
+            && log.TimeIn is null
+            && log.TimeOut is null;
+    }
+
+    private string GetEntriesText(int totalCount, int currentPage)
     {
         if (totalCount == 0)
         {
             return "Showing 0 to 0 of 0 entries";
         }
 
-        var start = ((currentPage - 1) * PageSize) + 1;
-        var end = Math.Min(currentPage * PageSize, totalCount);
+        var start = ((currentPage - 1) * pageSize) + 1;
+        var end = Math.Min(currentPage * pageSize, totalCount);
         return $"Showing {start} to {end} of {totalCount} entries";
     }
 
@@ -439,6 +3276,83 @@
         });
     }
 
+    [JSInvokable]
+    public void CloseTableMenus()
+    {
+        if (!showFilterMenu && !showEntriesMenu && string.IsNullOrWhiteSpace(activeFilterField) && !showSetupOptionMenu)
+        {
+            return;
+        }
+
+        showFilterMenu = false;
+        showEntriesMenu = false;
+        activeFilterField = null;
+        showSetupOptionMenu = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SyncTableMenuDismissRegistrationAsync()
+    {
+        var shouldRegister = showFilterMenu || showEntriesMenu;
+
+        if (shouldRegister && !tableMenuDismissRegistered)
+        {
+            tableMenuDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("attendanceLogs.registerTableMenuDismiss", tableMenuControlsRef, tableMenuDotNetRef);
+            tableMenuDismissRegistered = true;
+        }
+        else if (!shouldRegister && tableMenuDismissRegistered)
+        {
+            await JS.InvokeVoidAsync("attendanceLogs.unregisterTableMenuDismiss", tableMenuControlsRef);
+            tableMenuDismissRegistered = false;
+        }
+    }
+
+    private async Task SyncSetupOptionDismissRegistrationAsync()
+    {
+        var shouldRegister = showSetupOptionMenu && setupRow is not null;
+
+        if (shouldRegister && !setupOptionDismissRegistered)
+        {
+            setupOptionDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("attendanceLogs.registerTableMenuDismiss", setupOptionControlsRef, setupOptionDotNetRef);
+            setupOptionDismissRegistered = true;
+        }
+        else if (!shouldRegister && setupOptionDismissRegistered)
+        {
+            await JS.InvokeVoidAsync("attendanceLogs.unregisterTableMenuDismiss", setupOptionControlsRef);
+            setupOptionDismissRegistered = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (tableMenuDismissRegistered)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("attendanceLogs.unregisterTableMenuDismiss", tableMenuControlsRef);
+            }
+            catch
+            {
+            }
+        }
+
+        if (setupOptionDismissRegistered)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("attendanceLogs.unregisterTableMenuDismiss", setupOptionControlsRef);
+            }
+            catch
+            {
+            }
+        }
+
+        tableMenuDotNetRef?.Dispose();
+        setupOptionDotNetRef?.Dispose();
+    }
+
     private sealed class EmployeeTagRow
     {
         public int EmployeeId { get; set; }
@@ -449,6 +3363,68 @@
         public string CurrentArrangement { get; set; } = "Not Tagged";
         public string SelectedOption { get; set; } = WfhOptionValue;
         public DateTime? TagUpdatedAt { get; set; }
+        public DateTime? TimeIn { get; set; }
+        public DateTime? TimeOut { get; set; }
+        public string? Target { get; set; }
+        public string? Accomplishment { get; set; }
+        public string? Mov { get; set; }
         public bool IsException { get; set; }
+    }
+
+    private sealed class RowMenuPosition
+    {
+        public double Left { get; set; }
+        public double Top { get; set; }
+    }
+
+    private sealed class CalendarDayItem
+    {
+        public DateTime Date { get; set; }
+        public bool IsInCurrentMonth { get; set; }
+        public bool IsWeekend { get; set; }
+        public bool IsPast { get; set; }
+        public bool IsToday { get; set; }
+        public CalendarDaySummary? Summary { get; set; }
+        public bool HasCalendarTag => Summary?.WfhCount > 0 || Summary?.HolidayCount > 0;
+        public bool HasHolidayTag => Summary?.HolidayCount > 0;
+        public CalendarTagType? CalendarCancelTag => Summary?.CalendarTag;
+        public bool HasAnyEvent => HasCalendarTag || Summary?.ExceptionCount > 0;
+        public bool CanChangeDate => CanChangeCalendarDate(Date);
+        public bool CanShowActions => IsInCurrentMonth && CanChangeDate;
+    }
+
+    private sealed record CalendarDaySummary(int WfhCount, int HolidayCount, int ExceptionCount, CalendarTagType? CalendarTag);
+
+    private sealed record PendingCalendarAction(DateTime Date, CalendarActionType ActionType, CalendarTagType? TagType)
+    {
+        public static PendingCalendarAction ForTag(DateTime date, CalendarTagType tagType)
+            => new(date, CalendarActionType.Tag, tagType);
+
+        public static PendingCalendarAction ForCancel(DateTime date, CalendarTagType tagType)
+            => new(date, CalendarActionType.Cancel, tagType);
+    }
+
+    private enum CalendarTagType
+    {
+        Wfh,
+        Holiday
+    }
+
+    private enum CalendarViewMode
+    {
+        Month,
+        List
+    }
+
+    private enum CalendarTableMode
+    {
+        EditExceptions,
+        ViewAll
+    }
+
+    private enum CalendarActionType
+    {
+        Tag,
+        Cancel
     }
 }
