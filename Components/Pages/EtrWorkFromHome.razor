@@ -19,13 +19,22 @@
 <PageTitle>ETRS</PageTitle>
 
 <div class="etr-shell">
-    <img class="corner-logo logo-left" src="/images/bswm-light.png" alt="bswm" />
-    <img class="corner-logo logo-right" src="/images/bagong-pilipinas.png" alt="bagong-pilipinas" />
-    <div class="etr-card">
-        <h1 class="etr-title">Electronic Time Record<br>Work From Home</h1>
+    <div class="etr-stage">
+        <section class="etr-copy-panel" aria-labelledby="etrWfhTitle">
+            <div class="etr-logo-row">
+                <img class="etr-logo etr-logo-bagong" src="/images/bagong-pilipinas.png" alt="bagong-pilipinas" />
+                <img class="etr-logo" src="/images/bswm-light.png" alt="bswm" />
+            </div>
+            <div class="etr-copy-content">
+                <h1 id="etrWfhTitle" class="etr-title">Electronic Time Record<br>Work From Home</h1>
+                <div class="etr-sub">
+                    <p>Log your WFH attendance using your employee ID number.</p>
+                    <p>Time in records target, while time out records accomplishment and optional MOV upload.</p>
+                </div>
+            </div>
+        </section>
 
         <div class="etr-form-wrap">
-            <p class="etr-sub">Log your WFH attendance using your employee ID number. Time in records target, while time out records accomplishment and optional MOV upload.</p>
             <EditForm EditContext="editContext" OnSubmit="HandleSubmit">
                 <DataAnnotationsValidator />
 
@@ -92,7 +101,7 @@
                 </div>
 
                 <div class="@GetSectionClass("IN")" aria-hidden="@(entryModel.LogType != "IN")">
-                <div class="form-row">
+                    <div class="form-row">
                         <label class="required-star">Target</label>
                         <textarea value="@entryModel.Target"
                                   @oninput="HandleTargetInputChanged"
@@ -140,6 +149,69 @@
             </EditForm>
         </div>
     </div>
+
+    @if (showSubmitConfirmation && selectedEmployee is not null)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseSubmitConfirmation">
+            <div class="attendance-detail-modal etr-confirmation-modal" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Confirm WFH @entryModel.LogType</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseSubmitConfirmation" aria-label="Close confirmation" disabled="@isSubmitting">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body">
+                    <div class="attendance-detail-section attendance-detail-hero">
+                        <div>
+                            <div class="attendance-detail-eyebrow">Employee Verification</div>
+                            <div class="attendance-detail-person">@FormatEmployeeName(selectedEmployee)</div>
+                            <div class="attendance-detail-meta">Confirm this is the correct employee before recording time @entryModel.LogType.</div>
+                        </div>
+                        <div class="attendance-detail-status">WFH @entryModel.LogType</div>
+                    </div>
+
+                    <div class="attendance-detail-section attendance-detail-section-primary">
+                        <div class="attendance-detail-grid">
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">ID Number</span>
+                                <strong>@DisplayValue(selectedEmployee.IdNumber)</strong>
+                            </div>
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Attendance Date</span>
+                                <strong>@DateTime.Today.ToString("MMMM d, yyyy")</strong>
+                            </div>
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Division / Unit</span>
+                                <strong>@DisplayValue(selectedEmployee.DivisionCenterUnit)</strong>
+                            </div>
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Designation</span>
+                                <strong>@DisplayValue(selectedEmployee.Designation)</strong>
+                            </div>
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Time In</span>
+                                <strong>@FormatClockTime(confirmationTimeIn)</strong>
+                            </div>
+                            <div class="attendance-detail-field">
+                                <span class="attendance-detail-label">Time Out</span>
+                                <strong>@FormatClockTime(confirmationTimeOut)</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseSubmitConfirmation" disabled="@isSubmitting">Cancel</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ConfirmSubmitAsync" disabled="@isSubmitting">
+                        @(isSubmitting ? "Submitting..." : $"Confirm {entryModel.LogType}")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 <style>
@@ -151,69 +223,86 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('/images/etr-bg.jpg');
+        background-image: linear-gradient(rgba(0,0,0,0.44), rgba(0,0,0,0.44)), url('/images/etr-bg.jpg');
         background-position: center;
         background-size: cover;
         background-repeat: no-repeat;
         overflow-x: hidden;
-        padding: 2rem;
+        padding: clamp(1.25rem, 4vw, 4.5rem);
     }
 
-    .corner-logo {
-        position: absolute;
-        top: 1.25rem;
-        /* increased default width to make images bigger */
-        width: 220px;
-        /* allow a larger relative size on small viewports */
-        max-width: 36%;
+    .etr-stage {
+        width: min(100%, 1320px);
+        display: grid;
+        grid-template-columns: minmax(520px, 560px) minmax(440px, 520px);
+        align-items: center;
+        gap: clamp(6rem, 12vw, 12rem);
+    }
+
+    .etr-copy-panel {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        color: #ffffff;
+    }
+
+    .etr-logo-row {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.25rem;
+        margin-bottom: clamp(1rem, 3vh, 1.75rem);
+    }
+
+    .etr-logo {
+        width: clamp(72px, 8vw, 112px);
         height: auto;
         object-fit: contain;
-        z-index: 30;
+        filter: drop-shadow(0 8px 16px rgba(0,0,0,0.35));
     }
 
-    .logo-left { left: 1.25rem; }
-    .logo-right { right: 1.25rem; }
-
-    @@media (max-width: 1024px) {
-        /* reduce image size for tablet view */
-        .corner-logo { width: 160px; top: 1rem; max-width: 30%; }
-        .logo-left { left: 1rem; }
-        .logo-right { right: 1rem; }
+    .etr-logo-bagong {
+        width: clamp(58px, 6.6vw, 94px);
     }
 
-    @@media (max-width: 640px) {
-        /* make images smaller on mobile while keeping them responsive */
-        .corner-logo { width: 120px; top: 0.6rem; }
-        .logo-left { left: 0.5rem; }
-        .logo-right { right: 0.5rem; }
-    }
-
-    .etr-card {
-        width: min(100%, 560px);
-        background: transparent;
-        padding: 0.8rem 0.9rem;
-        border: 0;
-        border-radius: 0;
-        box-shadow: none;
+    .etr-copy-content {
+        width: 100%;
+        text-align: left;
+        margin-inline: auto;
     }
 
     .etr-title {
-        margin: 0 0 1rem;
-        text-align: center;
-        font-size: clamp(1.75rem, 3.6vw, 2.4rem);
+        margin: 0 0 1.25rem;
+        font-size: clamp(1.8rem, 3.45vw, 2.75rem);
+        line-height: 1.08;
         font-weight: 800;
         color: #ffffff;
-        letter-spacing: -0.02em;
+        letter-spacing: 0;
+        white-space: nowrap;
+        text-shadow: 0 4px 18px rgba(0,0,0,0.42);
     }
 
     .etr-sub {
-        margin: 0 0 0.9rem;
+        margin: 0;
+        max-width: none;
         color: rgba(255,255,255,0.95);
-        font-size: 0.9rem;
-        text-align: center;
+        font-size: clamp(0.8rem, 1.05vw, 0.9rem);
+        line-height: 1.5;
+        text-shadow: 0 3px 14px rgba(0,0,0,0.38);
+    }
+
+    .etr-sub p {
+        margin: 0;
+    }
+
+    .etr-sub p + p {
+        margin-top: 0.45rem;
     }
 
     .etr-form-wrap {
+        width: 100%;
         padding: 1.15rem;
         border-radius: 24px;
         background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08));
@@ -221,6 +310,63 @@
         box-shadow: 0 18px 40px rgba(0,0,0,0.24);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
+    }
+
+    @@media (max-width: 1024px) {
+        .etr-stage {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            max-width: 620px;
+        }
+
+        .etr-copy-panel {
+            min-height: 0;
+        }
+
+        .etr-logo-row {
+            margin-bottom: 1rem;
+        }
+
+        .etr-title {
+            font-size: clamp(1.7rem, 5.4vw, 2.2rem);
+        }
+    }
+
+    @@media (max-width: 640px) {
+        .etr-shell {
+            align-items: flex-start;
+            padding: 1rem;
+        }
+
+        .etr-stage {
+            gap: 1rem;
+        }
+
+        .etr-logo {
+            width: 68px;
+        }
+
+        .etr-logo-bagong {
+            width: 58px;
+        }
+
+        .etr-copy-content {
+            max-width: 360px;
+            text-align: center;
+        }
+
+        .etr-sub {
+            margin-inline: auto;
+        }
+
+        .etr-title {
+            font-size: 1.55rem;
+            white-space: normal;
+        }
+
+        .etr-sub {
+            font-size: 0.78rem;
+        }
     }
 
     .form-row {
@@ -486,6 +632,217 @@
         font-weight: 500;
     }
 
+    .attendance-detail-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: rgba(30, 41, 57, 0.28);
+        backdrop-filter: blur(8px);
+    }
+
+    .attendance-detail-modal {
+        width: min(100%, 760px);
+        max-height: min(92vh, 900px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300) 88%, white);
+        border-radius: 10px;
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+        animation: attendance-detail-enter 180ms ease-out;
+    }
+
+    .etr-confirmation-modal {
+        width: min(100%, 680px);
+    }
+
+    .attendance-detail-header,
+    .attendance-detail-hero,
+    .attendance-detail-footer {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .attendance-detail-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 1.15rem 1.5rem 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border-bottom: 1px solid var(--etrs-gray-200);
+    }
+
+    .attendance-detail-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 1rem 1.5rem;
+    }
+
+    .attendance-detail-title {
+        margin: 0;
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--etrs-gray-700);
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .attendance-detail-close:disabled {
+        opacity: 0.5;
+    }
+
+    .attendance-detail-section {
+        margin-top: 1rem;
+        padding: 1rem 1.05rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.9);
+        overflow: visible;
+    }
+
+    .attendance-detail-hero {
+        align-items: center;
+        background: #ffffff;
+        border-color: var(--etrs-gray-200);
+        border-radius: 8px;
+    }
+
+    .attendance-detail-eyebrow {
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-person {
+        margin-top: 0.35rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--etrs-black);
+    }
+
+    .attendance-detail-meta {
+        margin-top: 0.2rem;
+        font-weight: 400;
+        color: var(--etrs-gray-700);
+    }
+
+    .attendance-detail-status {
+        flex: 0 0 auto;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        background: var(--etrs-gray-100);
+        border: 1px solid var(--etrs-gray-200);
+        color: var(--etrs-gray-800);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .attendance-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .attendance-detail-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+
+    .attendance-detail-field strong {
+        margin: 0;
+        color: var(--etrs-black);
+        overflow-wrap: anywhere;
+    }
+
+    .attendance-detail-label {
+        color: var(--etrs-gray-700);
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .attendance-detail-section-primary .attendance-detail-label {
+        font-weight: 500;
+    }
+
+    .attendance-detail-section-primary .attendance-detail-field strong {
+        font-weight: 600;
+    }
+
+    .attendance-detail-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 1rem 1.5rem 1.25rem;
+        background: linear-gradient(180deg, rgba(250, 250, 250, 0.92) 0%, var(--etrs-gray-50) 100%);
+        border-top: 1px solid var(--etrs-gray-200);
+    }
+
+    .attendance-detail-done {
+        min-width: 7rem;
+        border-radius: 12px;
+        padding-inline: 1.25rem;
+    }
+
+    .etr-confirmation-modal .attendance-detail-done {
+        color: var(--finance-text);
+        background: var(--etrs-gray-100);
+        border-color: var(--finance-border);
+    }
+
+    .etr-confirmation-modal .attendance-detail-done:hover,
+    .etr-confirmation-modal .attendance-detail-done:focus-visible {
+        color: var(--finance-text);
+        background: var(--etrs-gray-200);
+        border-color: var(--etrs-gray-300);
+    }
+
+    .attendance-detail-text-action {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--etrs-gray-700);
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .attendance-detail-text-action:hover,
+    .attendance-detail-text-action:focus-visible {
+        color: var(--etrs-black);
+        text-decoration: none;
+    }
+
+    .attendance-detail-text-action:disabled {
+        color: var(--etrs-gray-500);
+        text-decoration: none;
+    }
+
     .spinner {
         width: 16px;
         height: 16px;
@@ -513,6 +870,69 @@
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
     }
+
+    @@keyframes attendance-detail-enter {
+        from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.98);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @@media (max-width: 640px) {
+        .attendance-detail-modal {
+            border-radius: 10px;
+        }
+
+        .etr-confirmation-modal .attendance-detail-header {
+            position: relative;
+            flex-direction: row;
+            align-items: flex-start;
+            padding-right: 3rem;
+        }
+
+        .etr-confirmation-modal .attendance-detail-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+        }
+
+        .attendance-detail-header,
+        .attendance-detail-hero {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .attendance-detail-header,
+        .attendance-detail-body,
+        .attendance-detail-footer {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        .attendance-detail-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attendance-detail-status,
+        .attendance-detail-done {
+            width: 100%;
+            text-align: center;
+        }
+
+        .etr-confirmation-modal .attendance-detail-footer {
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .etr-confirmation-modal .attendance-detail-done {
+            width: auto;
+            min-width: 8.5rem;
+        }
+    }
 </style>
 
 @code {
@@ -527,6 +947,10 @@
     private ElementReference employeeSearchWrapRef;
     private DotNetObjectReference<EtrWorkFromHome>? dotNetRef;
     private bool pendingRegisterOutsideClick;
+    private bool showSubmitConfirmation;
+    private DateTime? pendingSubmissionTime;
+    private DateTime? confirmationTimeIn;
+    private DateTime? confirmationTimeOut;
 
     private class EtrEntryModel
         : IValidatableObject
@@ -581,11 +1005,92 @@
             return;
         }
 
-        // Proceed with actual submit logic
-        await HandleValidSubmit();
+        var shouldOpenConfirmation = await PrepareSubmitConfirmationAsync();
+        if (!shouldOpenConfirmation)
+        {
+            return;
+        }
+
+        showEmployeeResults = false;
+        await UnregisterOutsideClickAsync();
+        showSubmitConfirmation = true;
     }
 
-    private async Task HandleValidSubmit()
+    private async Task<bool> PrepareSubmitConfirmationAsync()
+    {
+        var employee = selectedEmployee;
+        if (employee is null)
+        {
+            return false;
+        }
+
+        if (!IsActiveEmployeeStatus(employee.Status))
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Inactive employee",
+                Message = $"{employee.FirstName} {employee.LastName} is inactive and cannot submit a WFH log.",
+                Duration = 5000
+            });
+            return false;
+        }
+
+        var todayLog = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == DateTime.Today);
+
+        pendingSubmissionTime = DateTime.Now;
+
+        if (entryModel.LogType == "IN")
+        {
+            confirmationTimeIn = pendingSubmissionTime;
+            confirmationTimeOut = todayLog?.TimeOut;
+            return true;
+        }
+
+        if (todayLog is null || !todayLog.TimeIn.HasValue)
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Time IN required",
+                Message = "Record your WFH time IN first before submitting time OUT.",
+                Duration = 4000
+            });
+            return false;
+        }
+
+        confirmationTimeIn = todayLog.TimeIn;
+        confirmationTimeOut = pendingSubmissionTime;
+        return true;
+    }
+
+    private void CloseSubmitConfirmation()
+    {
+        if (isSubmitting)
+        {
+            return;
+        }
+
+        showSubmitConfirmation = false;
+        pendingSubmissionTime = null;
+        confirmationTimeIn = null;
+        confirmationTimeOut = null;
+    }
+
+    private async Task ConfirmSubmitAsync()
+    {
+        if (isSubmitting)
+        {
+            return;
+        }
+
+        showSubmitConfirmation = false;
+        await HandleValidSubmit(pendingSubmissionTime);
+    }
+
+    private async Task HandleValidSubmit(DateTime? submissionTime = null)
     {
         isSubmitting = true;
 
@@ -619,10 +1124,22 @@
             }
 
             var today = DateTime.Today;
-            var now = DateTime.Now;
+            var now = submissionTime ?? DateTime.Now;
             var log = await Db.AttendanceLogsWfh
                 .Include(l => l.ExceptionCondition)
                 .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == today);
+
+            if (entryModel.LogType == "OUT" && (log is null || !log.TimeIn.HasValue))
+            {
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = "Time IN required",
+                    Message = "Record your WFH time IN first before submitting time OUT.",
+                    Duration = 4000
+                });
+                return;
+            }
 
             if (log is null)
             {
@@ -714,6 +1231,9 @@
             employeeSearchResults.Clear();
             employeeSearchText = string.Empty;
             showEmployeeResults = false;
+            pendingSubmissionTime = null;
+            confirmationTimeIn = null;
+            confirmationTimeOut = null;
         }
         finally
         {
@@ -729,6 +1249,10 @@
         {
             selectedEmployee = null;
             entryModel.IdNumber = employeeSearchText;
+            showSubmitConfirmation = false;
+            pendingSubmissionTime = null;
+            confirmationTimeIn = null;
+            confirmationTimeOut = null;
         }
 
         ClearFieldValidation(nameof(EtrEntryModel.IdNumber));
@@ -845,6 +1369,10 @@
         entryModel.IdNumber = employee.IdNumber;
         employeeSearchText = $"{employee.IdNumber} - {FormatEmployeeName(employee)}";
         showEmployeeResults = false;
+        showSubmitConfirmation = false;
+        pendingSubmissionTime = null;
+        confirmationTimeIn = null;
+        confirmationTimeOut = null;
         ClearFieldValidation(nameof(EtrEntryModel.IdNumber));
         editContext.NotifyFieldChanged(new FieldIdentifier(entryModel, nameof(EtrEntryModel.IdNumber)));
         await UnregisterOutsideClickAsync();
@@ -893,6 +1421,12 @@
         return $"{employee.FirstName} {employee.LastName}{middleInitial}";
     }
 
+    private static string DisplayValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+
+    private static string FormatClockTime(DateTime? value)
+        => value.HasValue ? value.Value.ToString("h:mm tt") : "-";
+
     private static bool IsMeaningfulEntry(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -923,7 +1457,7 @@
 
         var safeName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Path.GetFileName(file.Name)}";
 
-        async Task<string?> WriteToPathAsync(string root, bool returnWebRelative)
+        async Task<string?> WriteToPathAsync(string root, bool returnWebRelative, bool showFailureToast)
         {
             try
             {
@@ -947,14 +1481,16 @@
             }
             catch (Exception ex)
             {
-                // Let caller decide fallback; log toast to inform user
-                ToastService.Show(new ToastMessage
+                if (showFailureToast)
                 {
-                    Type = ToastType.Error,
-                    Title = "File upload failed",
-                    Message = $"Could not save MOV to '{root}': {ex.Message}",
-                    Duration = 6000
-                });
+                    ToastService.Show(new ToastMessage
+                    {
+                        Type = ToastType.Error,
+                        Title = "File upload failed",
+                        Message = $"Could not save MOV: {ex.Message}",
+                        Duration = 6000
+                    });
+                }
 
                 return null;
             }
@@ -963,7 +1499,7 @@
         // Try configured path first
         if (!string.IsNullOrWhiteSpace(configuredPath))
         {
-            var result = await WriteToPathAsync(configuredPath, false);
+            var result = await WriteToPathAsync(configuredPath, false, false);
             if (!string.IsNullOrWhiteSpace(result))
             {
                 return result;
@@ -971,13 +1507,13 @@
 
             // fallback to wwwroot/uploads/wfh-mov if configured path failed
             var fallback = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
-            var fallbackResult = await WriteToPathAsync(fallback, true);
+            var fallbackResult = await WriteToPathAsync(fallback, true, true);
             return fallbackResult;
         }
 
         // No configured path: write under wwwroot/uploads/wfh-mov and return web relative path
         var defaultRoot = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
-        return await WriteToPathAsync(defaultRoot, true);
+        return await WriteToPathAsync(defaultRoot, true, true);
     }
 
     private static string CalculateWfhTardiness(DateTime? timeIn)
