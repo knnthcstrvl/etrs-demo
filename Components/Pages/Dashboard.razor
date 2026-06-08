@@ -585,6 +585,9 @@
 
                 <div class="attendance-detail-body attendance-input-body">
                     <div class="attendance-detail-section attendance-detail-hero">
+                        <div class="attendance-export-icon" aria-hidden="true">
+                            <i class="fa-solid fa-file-export"></i>
+                        </div>
                         <div>
                             <div class="attendance-detail-eyebrow">CSV Export</div>
                             <div class="attendance-detail-person">Select the period range to include in the export.</div>
@@ -714,10 +717,73 @@
         display: flex;
         flex-direction: column;
         min-height: 0;
+        overflow: hidden;
     }
 
     .dashboard-log-card .table-responsive {
         flex: 1 1 auto;
+    }
+
+    body.etrs-dark-theme .dashboard-log-card {
+        background: #111c2d !important;
+        border-color: #2a3a52 !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .dashboard-log-card .panel-heading {
+        color: #ffffff;
+    }
+
+    body.etrs-dark-theme .dashboard-log-card .table-responsive {
+        background: #101a2a !important;
+        border-top-color: #26364c !important;
+        scrollbar-color: #516178 #253246;
+        scrollbar-width: thin;
+    }
+
+    body.etrs-dark-theme .dashboard-log-card .table-responsive::-webkit-scrollbar {
+        height: 0.7rem;
+        width: 0.7rem;
+    }
+
+    body.etrs-dark-theme .dashboard-log-card .table-responsive::-webkit-scrollbar-track {
+        background: #253246;
+    }
+
+    body.etrs-dark-theme .dashboard-log-card .table-responsive::-webkit-scrollbar-thumb {
+        background: #516178;
+        border-radius: 999px;
+        border: 2px solid #253246;
+    }
+
+    body.etrs-dark-theme .dashboard-log-card .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: #6b7b92;
+    }
+
+    body.etrs-dark-theme .dashboard-log-table {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .dashboard-log-table > thead > tr > th {
+        background: #19283a !important;
+        border-bottom-color: #2f4058 !important;
+        color: #b9c9e7 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-log-table > tbody > tr > td {
+        background: #101a2a !important;
+        border-bottom-color: #1f2e42 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .dashboard-log-table > tbody > tr:hover > td {
+        background: #162437 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-log-table tbody:empty::after {
+        content: "";
+        display: block;
+        height: 4rem;
     }
 
     .dashboard-chart-card,
@@ -767,6 +833,20 @@
         background: #4B5694;
     }
 
+    body.etrs-dark-theme .dashboard-chart-totals {
+        color: #b9c9e7;
+    }
+
+    body.etrs-dark-theme .dashboard-chart-dot.late {
+        background: #8EA2FF;
+        box-shadow: 0 0 0 3px rgba(142, 162, 255, 0.12);
+    }
+
+    body.etrs-dark-theme .dashboard-chart-dot.undertime {
+        background: #F3C96B;
+        box-shadow: 0 0 0 3px rgba(243, 201, 107, 0.12);
+    }
+
     .dashboard-chart-dot.onsite {
         background: #111844;
     }
@@ -774,6 +854,18 @@
     .dashboard-chart-dot.wfh {
         background: #EAE0CF;
         border: 1px solid #d8ccb8;
+    }
+
+    body.etrs-dark-theme .dashboard-chart-dot.onsite {
+        background: #8EA2FF;
+        border: 0;
+        box-shadow: 0 0 0 3px rgba(142, 162, 255, 0.12);
+    }
+
+    body.etrs-dark-theme .dashboard-chart-dot.wfh {
+        background: #F3C96B;
+        border: 0;
+        box-shadow: 0 0 0 3px rgba(243, 201, 107, 0.12);
     }
 
     .dashboard-late-chart {
@@ -826,6 +918,15 @@
         box-shadow: 0 10px 24px rgba(30, 41, 57, 0.12);
         font-size: 0.8rem;
         font-weight: 500;
+    }
+
+    .dashboard-apex-tooltip-dot {
+        display: inline-block;
+        width: 0.55rem;
+        height: 0.55rem;
+        margin-right: 0.45rem;
+        border-radius: 999px;
+        vertical-align: -0.03rem;
     }
 
     .dashboard-apex-pie .apexcharts-pie-area {
@@ -956,9 +1057,11 @@
     }
 
     .dashboard-division-menu {
-        right: 0;
-        left: auto;
-        width: min(18rem, 84vw);
+        left: 0;
+        right: auto;
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
         max-height: 16rem;
         overflow-y: auto;
     }
@@ -1071,6 +1174,51 @@
         font-size: 0.8rem;
     }
 
+    body.etrs-dark-theme .dashboard-apex-pie .apexcharts-tooltip,
+    body.etrs-dark-theme .dashboard-apex-pie .apexcharts-tooltip-title,
+    body.etrs-dark-theme .dashboard-apex-pie .dashboard-apex-tooltip {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        color: #dbe7f6 !important;
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38) !important;
+    }
+
+    body.etrs-dark-theme .dashboard-apex-pie .dashboard-apex-tooltip strong {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .dashboard-pie-legend-row {
+        color: #dbe7f6;
+    }
+
+    body.etrs-dark-theme .dashboard-pie-legend-row strong {
+        color: #f8fafc;
+    }
+
+    body.etrs-dark-theme .dashboard-pie-counts {
+        border-top-color: #2f4058;
+        color: #9fb3d0;
+    }
+
+    body.etrs-dark-theme .dashboard-late-chart {
+        background: #101a2a !important;
+        border-color: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-apex-chart .apexcharts-tooltip,
+    body.etrs-dark-theme .dashboard-apex-chart .apexcharts-tooltip-title {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38) !important;
+    }
+
+    body.etrs-dark-theme .dashboard-apex-chart .apexcharts-tooltip-text,
+    body.etrs-dark-theme .dashboard-apex-chart .apexcharts-tooltip-y-group,
+    body.etrs-dark-theme .dashboard-apex-chart .apexcharts-tooltip-series-group {
+        color: #dbe7f6 !important;
+    }
+
     @@media (max-width: 1180px) {
         .dashboard-log-grid,
         .dashboard-chart-row {
@@ -1128,6 +1276,16 @@
         color: var(--finance-text);
     }
 
+    body.etrs-dark-theme .dashboard-table-action-trigger {
+        color: #b9c9e7;
+    }
+
+    body.etrs-dark-theme .dashboard-table-action-trigger:hover,
+    body.etrs-dark-theme .dashboard-table-action-trigger.active {
+        background: #1b2a3d;
+        color: #ffffff;
+    }
+
     .dashboard-table-action-menu {
         position: absolute;
         top: calc(100% + 0.35rem);
@@ -1137,7 +1295,7 @@
         padding: 0.35rem;
         border: 1px solid var(--finance-border);
         border-radius: 8px;
-        background: #ffffff;
+        background: var(--finance-surface);
         box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
         opacity: 0;
         transform: translateY(-6px);
@@ -1169,6 +1327,25 @@
     .dashboard-table-action-menu button:hover {
         background: var(--finance-surface-soft);
         color: var(--finance-primary, var(--finance-text));
+    }
+
+    body.etrs-dark-theme .dashboard-table-action-menu {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36) !important;
+    }
+
+    body.etrs-dark-theme .dashboard-table-action-menu button {
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-table-action-menu button i {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-table-action-menu button:hover {
+        background: #1b2a3d !important;
+        color: #ffffff !important;
     }
 
     .dashboard-log-table {
@@ -1340,6 +1517,21 @@
         margin-top: 0.2rem;
         font-weight: 400;
         color: var(--etrs-gray-700);
+    }
+
+    .attendance-export-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        align-self: flex-start;
+        margin-top: 0.1rem;
+        flex: 0 0 auto;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 999px;
+        background: #eef4ff;
+        color: var(--finance-primary, #2563eb);
+        font-size: 1.1rem;
     }
 
     .attendance-detail-label {
@@ -1571,8 +1763,9 @@
         min-height: 2.5rem;
         padding: 0.5rem 0.8rem;
         border-radius: 8px;
-        border: 1px solid var(--etrs-gray-200);
-        background: #fff;
+        border: 1px solid var(--finance-border);
+        background: var(--finance-surface);
+        color: var(--finance-text);
     }
 
     /* ensure proper spacing between period selector and add button in the hero */
@@ -1582,7 +1775,10 @@
         align-items: center;
         gap: 1rem;
         border: 0;
+        background: transparent !important;
         box-shadow: none;
+        padding-left: 0;
+        padding-right: 0;
     }
 
     .dashboard-live-clock {
@@ -2016,12 +2212,18 @@
 
     .period-selected {
         font-weight:600;
+        color: var(--finance-text);
         max-width: 160px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         display: inline-block;
         vertical-align: middle;
+    }
+
+    .period-current-text {
+        color: var(--finance-text-muted);
+        font-weight: 600;
     }
 
     .period-menu {
@@ -2042,7 +2244,7 @@
 
     .attendance-filter-select-option.active {
         background: var(--finance-surface-soft);
-        color: var(--finance-primary, var(--finance-text));
+        color: var(--finance-text);
     }
 
     /* force circular close button style to match AttendanceLogs page */
@@ -2054,7 +2256,7 @@
         height: 18px;
         border-radius: 50%;
         border: 1px solid var(--finance-border);
-        background: #fff;
+        background: var(--finance-surface);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -2085,7 +2287,7 @@
         padding: 0.38rem 0.68rem;
         border: 1px solid var(--finance-border);
         border-radius: 8px;
-        background: #ffffff;
+        background: var(--finance-surface);
         color: var(--finance-text);
         font-size: 0.82rem;
         text-align: left;
@@ -2094,8 +2296,12 @@
     }
 
     .attendance-filter-select-trigger.active {
-        border-color: rgba(16, 77, 173, 0.35);
-        box-shadow: 0 0 0 3px rgba(16, 77, 173, 0.08);
+        border-color: var(--finance-brand-strong);
+        box-shadow: none;
+    }
+
+    .attendance-dropdown-caret {
+        color: var(--finance-text-muted);
     }
 
     .attendance-filter-select-menu {
@@ -2107,8 +2313,8 @@
         padding: 0.3rem;
         border: 1px solid var(--finance-border);
         border-radius: 8px;
-        background: #ffffff;
-        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        background: var(--finance-surface);
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.1);
         overflow-y: auto;
         opacity: 0;
         transform: translateY(-6px);
@@ -2121,6 +2327,51 @@
         opacity: 1;
         transform: translateY(0);
         pointer-events: auto;
+    }
+
+    body.etrs-dark-theme .dashboard-hero {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .period-button,
+    body.etrs-dark-theme .attendance-filter-select-trigger {
+        background: var(--finance-surface) !important;
+        border-width: 1px !important;
+        border-color: var(--finance-border) !important;
+        color: var(--finance-text) !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .period-button.active,
+    body.etrs-dark-theme .attendance-filter-select-trigger.active {
+        border-color: var(--finance-brand-strong) !important;
+    }
+
+    body.etrs-dark-theme .period-label,
+    body.etrs-dark-theme .period-current-text,
+    body.etrs-dark-theme .attendance-dropdown-caret {
+        color: var(--finance-text-muted) !important;
+    }
+
+    body.etrs-dark-theme .period-selected,
+    body.etrs-dark-theme .period-option-label {
+        color: var(--finance-text) !important;
+    }
+
+    body.etrs-dark-theme .attendance-filter-select-menu,
+    body.etrs-dark-theme .period-menu {
+        background: var(--finance-surface) !important;
+        border-width: 1px !important;
+        border-color: var(--finance-border) !important;
+        box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28) !important;
+    }
+
+    body.etrs-dark-theme .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .attendance-filter-select-option.active {
+        background: var(--finance-surface-soft) !important;
+        color: var(--finance-text) !important;
     }
 
     .attendance-filter-select-option {
@@ -2396,6 +2647,205 @@
         padding: 2rem 1rem;
         text-align: center;
         color: var(--finance-text-muted);
+    }
+
+    body.etrs-dark-theme .dashboard-modal-overlay {
+        background: rgba(6, 12, 22, 0.68) !important;
+        backdrop-filter: blur(10px) !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-modal.dashboard-logs-modal,
+    body.etrs-dark-theme .attendance-detail-modal.attendance-export-modal {
+        background: #111c2d !important;
+        border: 1px solid #2f4058 !important;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48) !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-modal.attendance-export-modal {
+        overflow: visible !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-modal.attendance-export-modal::before {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48) !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-detail-header,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-detail-footer,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-header,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-footer {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-detail-body,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-body {
+        background: #111c2d !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-detail-title,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-title {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-detail-close,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-close,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-detail-text-action,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-text-action {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-detail-close:hover,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-close:hover,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-detail-text-action:hover,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-text-action:hover {
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-table-search-input,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-filter-button,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-entries-button {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-table-search-input::placeholder {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-filter-menu,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-filter-select-menu,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-entries-menu {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42) !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-filter-select-trigger {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-filter-select-trigger.active {
+        border-color: #d7b252 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-filter-select-option,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-entries-option {
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-filter-select-option.active,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-entries-option:hover,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-entries-option.active {
+        background: #1b2a3d !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .dashboard-modal-table-wrap {
+        background: #101a2a !important;
+        border-color: #2f4058 !important;
+        scrollbar-color: #516178 #253246;
+        scrollbar-width: thin;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .dashboard-modal-table-wrap::-webkit-scrollbar {
+        height: 0.7rem;
+        width: 0.7rem;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .dashboard-modal-table-wrap::-webkit-scrollbar-track {
+        background: #253246;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .dashboard-modal-table-wrap::-webkit-scrollbar-thumb {
+        background: #516178;
+        border-radius: 999px;
+        border: 2px solid #253246;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .dashboard-log-table > thead > tr > th {
+        background: #19283a !important;
+        border-bottom-color: #2f4058 !important;
+        color: #b9c9e7 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .dashboard-log-table > tbody > tr > td {
+        background: #101a2a !important;
+        border-bottom-color: #1f2e42 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-empty-state {
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .dashboard-logs-modal .table-entries,
+    body.etrs-dark-theme .dashboard-logs-modal .attendance-table-toolbar-label,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-label,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-meta {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-section,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-hero {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-eyebrow,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-person {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-icon {
+        background: rgba(142, 162, 255, 0.16) !important;
+        color: #8ea2ff !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .period-button,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-trigger {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .period-button.active,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-trigger.active {
+        border-color: #d7b252 !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-menu,
+    body.etrs-dark-theme .attendance-export-modal .period-menu {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42) !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .period-add-button.attendance-export-period-add {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-done {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-done:hover {
+        background: #243852 !important;
+        border-color: #3a506f !important;
     }
 
     /* metric percent badge on the right edge of metric cards */

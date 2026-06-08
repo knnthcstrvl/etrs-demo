@@ -4,12 +4,21 @@
 @using Syncfusion.Blazor.Notifications
 @inject Financial.Services.IToastService ToastService
 @inject Financial.Services.CurrentUserService CurrentUser
+@inject IJSRuntime JS
 
 @rendermode InteractiveServer
 
 <PageTitle>ETRS</PageTitle>
 
 <div class="login-page">
+    <button type="button"
+            class="login-theme-toggle"
+            title="Dark mode"
+            aria-label="Toggle dark mode"
+            @onclick="ToggleThemeAsync">
+        <i class="fa-solid fa-moon" aria-hidden="true"></i>
+    </button>
+
     <div class="login-card">
         <h1 class="login-title">Welcome Back</h1>
 
@@ -40,12 +49,38 @@
 
 <style>
     .login-page {
+        position: relative;
         background: #ffffff;
         min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 1rem;
+    }
+
+    .login-theme-toggle {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 10;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--finance-text);
+        font-size: 1.35rem;
+        line-height: 1;
+        padding: 0;
+        transition: color 0.16s ease, transform 0.16s ease;
+    }
+
+    .login-theme-toggle:hover {
+        color: var(--finance-brand-strong);
+        transform: translateY(-1px);
     }
 
     .login-card {
@@ -242,5 +277,10 @@
                 Duration = 5000
             });
         }
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        await JS.InvokeVoidAsync("etrsLayoutSync.toggleTheme");
     }
 }

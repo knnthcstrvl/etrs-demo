@@ -3,7 +3,7 @@
 
 <div class="app-container">
     <div class="app-body">
-        <Sidebar @bind-IsOpen="SidebarOpen" />
+        <Sidebar IsOpen="SidebarOpen" IsOpenChanged="SetSidebarOpenAsync" />
 
         <main class="app-content">
             <Header />
@@ -24,6 +24,18 @@
         if (firstRender)
         {
             await JS.InvokeVoidAsync("etrsLayoutSync.init");
+            var savedSidebarOpen = await JS.InvokeAsync<bool?>("etrsLayoutSync.getSidebarOpen");
+            if (savedSidebarOpen.HasValue && savedSidebarOpen.Value != SidebarOpen)
+            {
+                SidebarOpen = savedSidebarOpen.Value;
+                StateHasChanged();
+            }
         }
+    }
+
+    private async Task SetSidebarOpenAsync(bool isOpen)
+    {
+        SidebarOpen = isOpen;
+        await JS.InvokeVoidAsync("etrsLayoutSync.setSidebarOpen", isOpen);
     }
 }

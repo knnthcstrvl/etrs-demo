@@ -77,5 +77,64 @@ window.etrsLayoutSync = (() => {
         queueSync();
     }
 
-    return { init };
+    function getSidebarOpen() {
+        try {
+            const value = window.localStorage.getItem('etrs.sidebar.isOpen');
+            if (value === null) {
+                return null;
+            }
+
+            return value === 'true';
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function setSidebarOpen(isOpen) {
+        try {
+            window.localStorage.setItem('etrs.sidebar.isOpen', isOpen ? 'true' : 'false');
+        } catch (e) {
+            /* ignore storage failures */
+        }
+    }
+
+    function getStoredTheme() {
+        try {
+            return window.localStorage.getItem('etrs.theme');
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function setStoredTheme(theme) {
+        try {
+            window.localStorage.setItem('etrs.theme', theme);
+        } catch (e) {
+            /* ignore storage failures */
+        }
+    }
+
+    function applyTheme(theme) {
+        const isDark = theme === 'dark';
+        document.documentElement.classList.toggle('etrs-dark-theme', isDark);
+        document.body.classList.toggle('etrs-dark-theme', isDark);
+        document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+        document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        window.dispatchEvent(new CustomEvent('etrs:theme-changed', { detail: { theme } }));
+    }
+
+    function initTheme() {
+        const savedTheme = getStoredTheme();
+        applyTheme(savedTheme === 'dark' ? 'dark' : 'light');
+    }
+
+    function toggleTheme() {
+        const nextTheme = document.body.classList.contains('etrs-dark-theme') ? 'light' : 'dark';
+        setStoredTheme(nextTheme);
+        applyTheme(nextTheme);
+    }
+
+    initTheme();
+
+    return { init, getSidebarOpen, setSidebarOpen, initTheme, toggleTheme };
 })();

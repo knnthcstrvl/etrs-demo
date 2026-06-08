@@ -216,6 +216,35 @@
 
 <style>
     .etr-shell {
+        --etrs-black: #1e2939;
+        --etrs-gray-950: #1e2939;
+        --etrs-gray-900: #334155;
+        --etrs-gray-800: #475569;
+        --etrs-gray-700: #64748b;
+        --etrs-gray-600: #94a3b8;
+        --etrs-gray-500: #cbd5e1;
+        --etrs-gray-400: #dbe2ea;
+        --etrs-gray-300: #e2e8f0;
+        --etrs-gray-200: #edf2f7;
+        --etrs-gray-100: #f5f7fa;
+        --etrs-gray-50: #f8fafc;
+        --etrs-surface: #ffffff;
+        --etrs-surface-soft: #f5f7fa;
+        --etrs-border: #e2e8f0;
+        --etrs-border-soft: #edf2f7;
+        --etrs-text: #1e2939;
+        --etrs-text-muted: #64748b;
+        --etrs-brand: #2f6b3d;
+        --etrs-brand-strong: #204d2b;
+        --etrs-gold: #d7b252;
+        --finance-surface: #ffffff;
+        --finance-surface-soft: #f5f7fa;
+        --finance-border: #e2e8f0;
+        --finance-border-soft: #edf2f7;
+        --finance-text: #1e2939;
+        --finance-text-muted: #64748b;
+        --finance-brand: #1e2939;
+        --finance-brand-strong: #1e2939;
         position: relative;
         box-sizing: border-box;
         min-height: 100vh;
@@ -229,6 +258,108 @@
         background-repeat: no-repeat;
         overflow-x: hidden;
         padding: clamp(1.25rem, 4vw, 4.5rem);
+    }
+
+    body.etrs-dark-theme .etr-shell {
+        color-scheme: light;
+        color: #1e2939 !important;
+        background-image: linear-gradient(rgba(0,0,0,0.44), rgba(0,0,0,0.44)), url('/images/etr-bg.jpg') !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .etr-copy-panel,
+    body.etrs-dark-theme .etr-shell .etr-title,
+    body.etrs-dark-theme .etr-shell .etr-sub,
+    body.etrs-dark-theme .etr-shell .form-row label,
+    body.etrs-dark-theme .etr-shell .required-star,
+    body.etrs-dark-theme .etr-shell .upload-note {
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .etr-input,
+    body.etrs-dark-theme .etr-shell .etr-textarea,
+    body.etrs-dark-theme .etr-shell input,
+    body.etrs-dark-theme .etr-shell textarea {
+        background: #ffffff !important;
+        border-color: transparent !important;
+        color: #1f2937 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .file-upload-wrap .etr-file-button {
+        background: #ffffff !important;
+        border-color: #e5e7eb !important;
+        color: #111827 !important;
+        opacity: 1 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .file-upload-wrap .etr-file-button:hover {
+        background: #f8fafc !important;
+        border-color: #d1d5db !important;
+        color: #111827 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .etr-file-input::file-selector-button,
+    body.etrs-dark-theme .etr-shell .etr-file-input::-webkit-file-upload-button {
+        background: #ffffff !important;
+        border-color: #e5e7eb !important;
+        color: #111827 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .employee-search-icon,
+    body.etrs-dark-theme .etr-shell .etr-input::placeholder,
+    body.etrs-dark-theme .etr-shell .etr-textarea::placeholder {
+        color: #4b5563 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .option-card {
+        background: #ffffff !important;
+        border-color: #ffffff !important;
+        color: #111827 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .option-card.selected {
+        border-color: #10b981 !important;
+        box-shadow: 0 0 0 3px rgba(16,185,129,0.18) !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .employee-results-overlay {
+        background: rgba(255,255,255,0.96) !important;
+        border-color: rgba(209,213,219,0.9) !important;
+        color: #111827 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .employee-result-card {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #111827 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .employee-result-name,
+    body.etrs-dark-theme .etr-shell .employee-empty-state {
+        color: #6b7280 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .etr-submit,
+    body.etrs-dark-theme .etr-shell .btn-primary {
+        background: #ebca4a !important;
+        border-color: #ebca4a !important;
+        color: #111827 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .attendance-detail-modal,
+    body.etrs-dark-theme .etr-shell .attendance-detail-header,
+    body.etrs-dark-theme .etr-shell .attendance-detail-footer,
+    body.etrs-dark-theme .etr-shell .attendance-detail-section,
+    body.etrs-dark-theme .etr-shell .attendance-detail-field {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+        color: #1e2939 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .attendance-detail-label,
+    body.etrs-dark-theme .etr-shell .attendance-detail-meta,
+    body.etrs-dark-theme .etr-shell .attendance-detail-eyebrow,
+    body.etrs-dark-theme .etr-shell .attendance-detail-text-action {
+        color: #64748b !important;
     }
 
     .etr-stage {

@@ -936,6 +936,9 @@
 
                 <div class="attendance-detail-body attendance-input-body">
                     <div class="attendance-detail-section attendance-detail-hero">
+                        <div class="attendance-export-icon" aria-hidden="true">
+                            <i class="fa-solid fa-file-export"></i>
+                        </div>
                         <div>
                             <div class="attendance-detail-eyebrow">CSV Export</div>
                             <div class="attendance-detail-person">Select the period range to include in the export.</div>
@@ -1335,6 +1338,29 @@
         background: #9ca3af;
     }
 
+    body.etrs-dark-theme .attendance-view-tabs {
+        border-bottom-color: #2f4058;
+    }
+
+    body.etrs-dark-theme .attendance-view-tab {
+        color: #9fb3d0;
+    }
+
+    body.etrs-dark-theme .attendance-view-tab:hover {
+        color: #dbe7f6;
+    }
+
+    body.etrs-dark-theme .attendance-view-tab.active {
+        color: #f8fafc;
+    }
+
+    body.etrs-dark-theme .attendance-view-tab.active::after {
+        bottom: -1px;
+        height: 3px;
+        background: #d7b252;
+        border-radius: 999px;
+    }
+
     .attendance-table-card {
         padding: 1rem;
         overflow-x: auto;
@@ -1586,6 +1612,75 @@
     .attendance-entries-option:hover,
     .attendance-entries-option.active {
         background: var(--finance-surface-soft);
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-button,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-button {
+        background: var(--finance-surface) !important;
+        border-color: var(--finance-border) !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-button:hover,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-button:focus,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-button:hover,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-button:focus {
+        background: var(--finance-surface-soft) !important;
+        border-color: var(--finance-border) !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-dropdown-caret,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-table-toolbar-label,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-clear {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-menu,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-menu,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-menu {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42) !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-trigger {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-trigger.active {
+        border-color: var(--finance-brand-strong) !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-value,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-option,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-option {
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-option.active,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-option:hover,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-option.active {
+        background: #1b2a3d !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-button-clear {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-apply {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
     }
 
     .attendance-empty-state {
@@ -1888,6 +1983,47 @@
     .attendance-hover-row-menu button:disabled {
         cursor: not-allowed;
         opacity: 0.5;
+    }
+
+    body.etrs-dark-theme .attendance-action-button {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-action-button:hover,
+    body.etrs-dark-theme .attendance-action-button:focus-visible {
+        background: #1b2a3d !important;
+        border-color: #3a506f !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42) !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu-title {
+        border-bottom-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu button {
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu button i {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu button:hover:not(:disabled) {
+        background: #1b2a3d !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu button:hover:not(:disabled) i {
+        color: #ffffff !important;
     }
 
     .attendance-logs-controls {
@@ -2202,6 +2338,21 @@
         margin-top: 0.2rem;
         font-weight: 400;
         color: var(--etrs-gray-700);
+    }
+
+    .attendance-export-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        align-self: flex-start;
+        margin-top: 0.1rem;
+        flex: 0 0 auto;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 999px;
+        background: #eef4ff;
+        color: var(--finance-primary, #2563eb);
+        font-size: 1.1rem;
     }
 
     .attendance-detail-status {
@@ -2576,6 +2727,324 @@
     .attendance-input-upload-link-end {
         margin-left: auto;
         text-align: right;
+    }
+
+    body.etrs-dark-theme .attendance-logs-controls .period-button,
+    body.etrs-dark-theme .attendance-export-modal .period-button {
+        background: var(--finance-surface) !important;
+        border-width: 1px !important;
+        border-color: var(--finance-border) !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-logs-controls .period-button.active,
+    body.etrs-dark-theme .attendance-export-modal .period-button.active {
+        border-color: var(--finance-brand-strong) !important;
+    }
+
+    body.etrs-dark-theme .attendance-logs-controls .period-label,
+    body.etrs-dark-theme .attendance-export-modal .period-label,
+    body.etrs-dark-theme .attendance-logs-controls .period-current-text,
+    body.etrs-dark-theme .attendance-export-modal .period-current-text,
+    body.etrs-dark-theme .attendance-logs-controls .attendance-dropdown-caret,
+    body.etrs-dark-theme .attendance-export-modal .attendance-dropdown-caret,
+    body.etrs-dark-theme .attendance-logs-controls .period-to-label,
+    body.etrs-dark-theme .attendance-export-modal .period-to-label {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-logs-controls .period-selected,
+    body.etrs-dark-theme .attendance-export-modal .period-selected,
+    body.etrs-dark-theme .attendance-logs-controls .period-option-label,
+    body.etrs-dark-theme .attendance-export-modal .period-option-label {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-logs-controls .period-menu,
+    body.etrs-dark-theme .attendance-export-modal .period-menu,
+    body.etrs-dark-theme .attendance-logs-controls .attendance-filter-select-menu,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-menu {
+        background: #111c2d !important;
+        border-width: 1px !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42) !important;
+    }
+
+    body.etrs-dark-theme .attendance-logs-controls .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .attendance-logs-controls .attendance-filter-select-option.active,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-option.active {
+        background: #1b2a3d !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-logs-controls .period-add-button,
+    body.etrs-dark-theme .attendance-export-modal .period-add-button,
+    body.etrs-dark-theme .attendance-logs-controls .period-close-btn,
+    body.etrs-dark-theme .attendance-export-modal .period-close-btn {
+        background: var(--finance-surface) !important;
+        border-color: var(--finance-border) !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-logs-controls .period-add-button:hover,
+    body.etrs-dark-theme .attendance-export-modal .period-add-button:hover {
+        background: var(--finance-surface-soft) !important;
+        border-color: var(--finance-border) !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-overlay {
+        background: rgba(6, 12, 22, 0.68) !important;
+        backdrop-filter: blur(10px) !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-modal {
+        background: #111c2d !important;
+        border: 1px solid #2f4058 !important;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48) !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-header,
+    body.etrs-dark-theme .attendance-detail-footer {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-body {
+        background: #111c2d !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-title,
+    body.etrs-dark-theme .attendance-detail-person,
+    body.etrs-dark-theme .attendance-detail-field strong,
+    body.etrs-dark-theme .attendance-detail-field p,
+    body.etrs-dark-theme .attendance-detail-field a {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-header-button {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-header-button:hover,
+    body.etrs-dark-theme .attendance-detail-header-button:focus-visible {
+        background: #1b2a3d !important;
+        border-color: #3a506f !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-close,
+    body.etrs-dark-theme .attendance-detail-text-action {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-close:hover,
+    body.etrs-dark-theme .attendance-detail-text-action:hover,
+    body.etrs-dark-theme .attendance-detail-text-action:focus-visible {
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-section,
+    body.etrs-dark-theme .attendance-detail-hero {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-eyebrow,
+    body.etrs-dark-theme .attendance-detail-label,
+    body.etrs-dark-theme .attendance-detail-meta {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-status {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal,
+    body.etrs-dark-theme .attendance-detail-modal.attendance-export-modal {
+        background: #111c2d !important;
+        border: 1px solid #2f4058 !important;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48) !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-modal.attendance-export-modal {
+        overflow: visible !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-modal.attendance-export-modal::before {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48) !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-header,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-footer,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-header,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-footer {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-body,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-body {
+        background: #111c2d !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-title,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-title,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-person,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-person,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-field strong,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-field p,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-field a {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-close,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-close,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-text-action,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-text-action {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-close:hover,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-close:hover,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-text-action:hover,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-text-action:hover {
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-section,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-hero,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-section,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-hero {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-eyebrow,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-eyebrow,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-label,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-label,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-meta,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-meta,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-mode-sub,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-search-icon,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-upload-note,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-result-name,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-empty-state {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-pill,
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-status {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-icon {
+        background: rgba(142, 162, 255, 0.16) !important;
+        color: #8ea2ff !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-mode-card,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-result-card,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-file-button {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        color: #dbe7f6 !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-mode-card.selected,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-result-card.selected {
+        background: #1b2a3d !important;
+        border-color: #d7b252 !important;
+        color: #ffffff !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-mode-title,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-result-id {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-control,
+    body.etrs-dark-theme .attendance-input-modal .attendance-filter-select-trigger,
+    body.etrs-dark-theme .attendance-input-modal input,
+    body.etrs-dark-theme .attendance-input-modal textarea,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-trigger {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-control:focus,
+    body.etrs-dark-theme .attendance-input-modal .attendance-filter-select-trigger.active,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-trigger.active {
+        border-color: #d7b252 !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-control::placeholder,
+    body.etrs-dark-theme .attendance-input-modal input::placeholder,
+    body.etrs-dark-theme .attendance-input-modal textarea::placeholder {
+        color: #7f91ad !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-control-readonly,
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-control-readonly[readonly] {
+        background: #162338 !important;
+        border-color: #2f4058 !important;
+        color: #b9c9e7 !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-input-results-overlay,
+    body.etrs-dark-theme .attendance-input-modal .attendance-filter-select-menu,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-menu {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42) !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-filter-select-option,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-option {
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .attendance-input-modal .attendance-filter-select-option.active,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-option.active {
+        background: #1b2a3d !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-done,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-done {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-input-modal .attendance-detail-done:hover,
+    body.etrs-dark-theme .attendance-export-modal .attendance-detail-done:hover {
+        background: #243852 !important;
+        border-color: #3a506f !important;
     }
 
     @@keyframes attendance-detail-enter {

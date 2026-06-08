@@ -14,6 +14,7 @@ namespace Financial.Services
         public string Role { get; private set; } = string.Empty;
         public string Email { get; private set; } = string.Empty;
         public string Username { get; private set; } = string.Empty;
+        public string DisplayName { get; private set; } = string.Empty;
         public HashSet<string> AccessSet { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
         public event Action? OnChanged;
@@ -45,6 +46,7 @@ namespace Financial.Services
                     Role = string.Empty;
                     Email = string.Empty;
                     Username = string.Empty;
+                    DisplayName = string.Empty;
                     IsInitialized = true;
                     OnChanged?.Invoke();
                     return;
@@ -54,6 +56,17 @@ namespace Financial.Services
                 Email = user.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;
                 Username = user.Identity?.Name ?? string.Empty;
 
+                await using var db = _dbFactory.CreateDbContext();
+                var account = await db.UserAccounts
+                    .Where(u => u.Email == Email || (!string.IsNullOrEmpty(Username) && u.Username == Username))
+                    .FirstOrDefaultAsync();
+
+                DisplayName = FormatDisplayName(account?.LastName, account?.FirstName, account?.MiddleName);
+                if (string.IsNullOrWhiteSpace(DisplayName))
+                {
+                    DisplayName = !string.IsNullOrWhiteSpace(Username) ? Username : Email;
+                }
+
                 if (string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase))
                 {
                     // admin: full access
@@ -61,11 +74,6 @@ namespace Financial.Services
                 }
                 else
                 {
-                    await using var db = _dbFactory.CreateDbContext();
-                    var account = await db.UserAccounts
-                        .Where(u => u.Email == Email || (!string.IsNullOrEmpty(Username) && u.Username == Username))
-                        .FirstOrDefaultAsync();
-
                     if (account != null && !string.IsNullOrWhiteSpace(account.AccessLevel))
                     {
                         foreach (var tok in account.AccessLevel.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -90,6 +98,15 @@ namespace Financial.Services
             if (string.IsNullOrWhiteSpace(access)) return false;
             if (string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase)) return true;
             return AccessSet.Contains(access);
+        }
+
+        private static string FormatDisplayName(string? lastName, string? firstName, string? middleName)
+        {
+            var parts = new[] { firstName, middleName, lastName }
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim());
+
+            return string.Join(" ", parts);
         }
     }
 }

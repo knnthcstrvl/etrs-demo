@@ -60,62 +60,15 @@ window.etrsSidebar = {
         requestAnimationFrame(function () {
           // recompute button rect now that layout may have changed (overlay moved to body)
           try { btnRect = btnEl.getBoundingClientRect(); } catch (e) { /* ignore */ }
-          // Try anchoring the menu to the top-right area of the sidebar (so it appears in the highlighted space)
-          var left = null;
-          var top = null;
-          var sbRect = null;
-
-          try {
-            var sidebarEl = btnEl.closest && btnEl.closest('.etrs-sidebar');
-            if (!sidebarEl) sidebarEl = document.querySelector('.etrs-sidebar');
-            if (sidebarEl && sidebarEl.getBoundingClientRect) {
-              sbRect = sidebarEl.getBoundingClientRect();
-            // place overlay to the right of the sidebar
-            left = Math.round(sbRect.right + 12);
-            try {
-              // small horizontal nudge to shift the overlay slightly left
-              var nudge = 12;
-              if (typeof overlayEl.offsetHeight === 'number' && typeof overlayEl.offsetWidth === 'number') {
-                var h = overlayEl.offsetHeight;
-                var w = overlayEl.offsetWidth;
-                // center vertically on the profile button
-                var centeredTop = Math.round(btnRect.top + (btnRect.height - h) / 2);
-                var minTop = Math.round(sbRect.top + 24);
-                var maxTop = Math.round(sbRect.bottom - h - 20);
-                if (maxTop < minTop) maxTop = minTop;
-                top = Math.max(minTop, Math.min(centeredTop, maxTop));
-
-                // if overlay would overflow the right edge, try positioning to the left of the sidebar
-                if (left + w > window.innerWidth) {
-                  left = Math.round(sbRect.left - w - 12 + nudge);
-                }
-                // apply nudge to shift overlay slightly left when on the right side
-                left = Math.round(left - nudge);
-              } else {
-                top = Math.round(sbRect.top + 56);
-              }
-            } catch (e) { /* ignore and fall back */ }
-            }
-          } catch (e) { /* ignore and fall back */ }
-
-          // fallback to anchoring near the button if we couldn't position by sidebar
-          if (left === null || top === null) {
-            // Anchor: align the bottom-left corner of the menu to the 3-dot button
-            // Bottom-left of menu -> (btnRect.right, btnRect.bottom)
-            left = Math.round(btnRect.right);
-            top = Math.round(btnRect.bottom - overlayEl.offsetHeight);
-          }
+          var menuGap = 8;
+          var left = Math.round(btnRect.right + menuGap);
+          var top = Math.round(btnRect.bottom - overlayEl.offsetHeight);
 
           // (kept) do not override the previously computed top so overlay stays aligned with the profile button
 
           // If the menu would overflow the right edge, adjust to fit inside viewport
           if (left + overlayEl.offsetWidth > window.innerWidth) {
-            // prefer moving leftwards so it still sits near the sidebar if possible
-            if (sbRect) {
-              left = Math.max(8, window.innerWidth - overlayEl.offsetWidth - 8);
-            } else {
-              left = Math.round(btnRect.right - overlayEl.offsetWidth);
-            }
+            left = Math.round(btnRect.left - overlayEl.offsetWidth - menuGap);
           }
 
           // Clamp to viewport vertically/horizontally

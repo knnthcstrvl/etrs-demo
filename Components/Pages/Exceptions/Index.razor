@@ -305,7 +305,7 @@
     @if (selectedDetailRow is not null)
     {
         <div class="attendance-detail-overlay" @onclick="CloseDetailsModal">
-            <div class="attendance-detail-modal" @onclick:stopPropagation="true">
+            <div class="attendance-detail-modal exceptions-detail-modal" @onclick:stopPropagation="true">
                 <div class="attendance-detail-header">
                     <div>
                         <h2 class="attendance-detail-title">Exception Details</h2>
@@ -1579,8 +1579,8 @@
         transition: opacity 0.15s ease;
     }
 
-    .exceptions-calendar-cell:hover::before,
-    .exceptions-calendar-cell:focus-within::before {
+    .exceptions-calendar-cell:not(.muted):not(.weekend):not(.past):hover::before,
+    .exceptions-calendar-cell:not(.muted):not(.weekend):not(.past):focus-within::before {
         opacity: 1;
     }
 
@@ -1680,11 +1680,23 @@
         transition: opacity 0.15s ease, transform 0.15s ease;
     }
 
-    .exceptions-calendar-cell:hover .exceptions-calendar-cell-actions,
-    .exceptions-calendar-cell:focus-within .exceptions-calendar-cell-actions {
+    .exceptions-calendar-cell:not(.muted):not(.weekend):not(.past):hover .exceptions-calendar-cell-actions,
+    .exceptions-calendar-cell:not(.muted):not(.weekend):not(.past):focus-within .exceptions-calendar-cell-actions {
         opacity: 1;
         transform: translateY(0);
         pointer-events: auto;
+    }
+
+    .exceptions-calendar-cell.muted::before,
+    .exceptions-calendar-cell.weekend::before,
+    .exceptions-calendar-cell.past::before {
+        display: none;
+    }
+
+    .exceptions-calendar-cell.muted .exceptions-calendar-cell-actions,
+    .exceptions-calendar-cell.weekend .exceptions-calendar-cell-actions,
+    .exceptions-calendar-cell.past .exceptions-calendar-cell-actions {
+        display: none;
     }
 
     .exceptions-calendar-cell-actions .btn {
@@ -1895,6 +1907,441 @@
         padding: 0.9rem 1rem;
         border-top: 1px solid var(--etrs-gray-200, #e5e7eb);
         background: #f9fafb;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-button,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-button {
+        background: var(--finance-surface) !important;
+        border-color: var(--finance-border) !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-button:hover,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-button:focus,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-button:hover,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-button:focus {
+        background: var(--finance-surface-soft) !important;
+        border-color: var(--finance-border) !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-dropdown-caret,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-table-toolbar-label,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-clear {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-menu,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-menu,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-menu,
+    body.etrs-dark-theme .exceptions-setup-select .attendance-filter-select-menu {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42) !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-trigger,
+    body.etrs-dark-theme .exceptions-setup-select .attendance-filter-select-trigger {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-trigger.active,
+    body.etrs-dark-theme .exceptions-setup-select .attendance-filter-select-trigger.active {
+        border-color: var(--finance-brand-strong) !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-value,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-option,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-option,
+    body.etrs-dark-theme .exceptions-setup-select .attendance-filter-select-value,
+    body.etrs-dark-theme .exceptions-setup-select .attendance-filter-select-option {
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-option.active,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-option:hover,
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-option.active,
+    body.etrs-dark-theme .exceptions-setup-select .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .exceptions-setup-select .attendance-filter-select-option.active {
+        background: #1b2a3d !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-button-clear {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-apply {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-action-button {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-action-button:hover,
+    body.etrs-dark-theme .attendance-action-button:focus-visible {
+        background: #1b2a3d !important;
+        border-color: #3a506f !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42) !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu-title {
+        border-bottom-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu button {
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu button i {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu button:hover:not(:disabled) {
+        background: #1b2a3d !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-hover-row-menu button:hover:not(:disabled) i {
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-overlay,
+    body.etrs-dark-theme .exceptions-calendar-overlay {
+        background: rgba(6, 12, 22, 0.68) !important;
+        backdrop-filter: blur(10px) !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-modal,
+    body.etrs-dark-theme .attendance-detail-modal.attendance-export-modal,
+    body.etrs-dark-theme .exceptions-calendar-modal {
+        background: #111c2d !important;
+        border: 1px solid #2f4058 !important;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48) !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-modal.attendance-export-modal::before {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48) !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-header,
+    body.etrs-dark-theme .attendance-detail-footer,
+    body.etrs-dark-theme .exceptions-calendar-topbar {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-body,
+    body.etrs-dark-theme .exceptions-calendar-body {
+        background: #111c2d !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-section,
+    body.etrs-dark-theme .attendance-detail-hero {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-title,
+    body.etrs-dark-theme .attendance-detail-person,
+    body.etrs-dark-theme .attendance-detail-field strong,
+    body.etrs-dark-theme .attendance-detail-field p,
+    body.etrs-dark-theme .attendance-detail-field a,
+    body.etrs-dark-theme .exceptions-calendar-title {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-eyebrow,
+    body.etrs-dark-theme .attendance-detail-label,
+    body.etrs-dark-theme .attendance-detail-meta {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-header-button,
+    body.etrs-dark-theme .exceptions-icon-button,
+    body.etrs-dark-theme .exceptions-today-button {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-header-button:hover,
+    body.etrs-dark-theme .exceptions-icon-button:hover,
+    body.etrs-dark-theme .exceptions-today-button:hover,
+    body.etrs-dark-theme .exceptions-icon-button.active {
+        background: #1b2a3d !important;
+        border-color: #3a506f !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-close,
+    body.etrs-dark-theme .attendance-detail-text-action,
+    body.etrs-dark-theme .exceptions-calendar-close {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-close:hover,
+    body.etrs-dark-theme .attendance-detail-text-action:hover,
+    body.etrs-dark-theme .exceptions-calendar-close:hover {
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .attendance-detail-status {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-weekdays {
+        background: #1c2938 !important;
+        border-bottom: 1px solid #2f4058 !important;
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-grid {
+        background: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-cell {
+        background: #0f1828 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-cell::before {
+        background: rgba(17, 28, 45, 0.74) !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-cell.weekend,
+    body.etrs-dark-theme .exceptions-calendar-cell.past {
+        background-color: #101827 !important;
+        background-image: repeating-linear-gradient(135deg, rgba(159, 179, 208, 0.12) 0, rgba(159, 179, 208, 0.12) 1px, transparent 1px, transparent 6px) !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-date {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-cell.muted .exceptions-calendar-date,
+    body.etrs-dark-theme .exceptions-calendar-cell.weekend .exceptions-calendar-date,
+    body.etrs-dark-theme .exceptions-calendar-cell.past .exceptions-calendar-date {
+        color: #7f91ad !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-cell.today {
+        outline-color: #d7b252 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-cell.today .exceptions-calendar-date {
+        background: #d7b252 !important;
+        color: #101827 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-event {
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-event b {
+        background: #1b2a3d !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-event.wfh i {
+        color: #8ea2ff !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-event.holiday i {
+        color: #f87171 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-event.exception i {
+        color: #f3c96b !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-cell-actions .btn,
+    body.etrs-dark-theme .exceptions-calendar-list-actions .btn,
+    body.etrs-dark-theme .exceptions-table-footer .attendance-detail-done,
+    body.etrs-dark-theme .exceptions-confirm-actions .attendance-detail-done {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-list {
+        background: #111c2d !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-list-row {
+        background: #111c2d !important;
+        border-bottom-color: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-list-row:hover {
+        background: #162338 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-list-date,
+    body.etrs-dark-theme .exceptions-calendar-list-empty strong {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-calendar-list-empty {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-confirm-overlay,
+    body.etrs-dark-theme .exceptions-table-overlay {
+        background: rgba(6, 12, 22, 0.62) !important;
+        backdrop-filter: blur(8px) !important;
+    }
+
+    body.etrs-dark-theme .exceptions-confirm-modal,
+    body.etrs-dark-theme .exceptions-table-modal {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.46) !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-confirm-header,
+    body.etrs-dark-theme .exceptions-confirm-actions,
+    body.etrs-dark-theme .exceptions-table-header,
+    body.etrs-dark-theme .exceptions-table-footer {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-confirm-header h2,
+    body.etrs-dark-theme .exceptions-table-header h2 {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-confirm-body,
+    body.etrs-dark-theme .exceptions-table-header span {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-table-body {
+        background: #0f1828 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal,
+    body.etrs-dark-theme .exceptions-setup-modal {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48) !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-setup-modal::before {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48) !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-header,
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-footer,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-header,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-footer {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-body,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-body {
+        background: #111c2d !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-section,
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-hero,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-section,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-hero {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-title,
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-person,
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-field strong,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-title,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-person,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-filter-select-value {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-eyebrow,
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-label,
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-meta,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-eyebrow,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-label,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-meta {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-header-button,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-filter-select-trigger,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-done {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+        box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-header-button:hover,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-filter-select-trigger.active,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-done:hover {
+        background: #243852 !important;
+        border-color: #3a506f !important;
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-close,
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-text-action,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-close,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-text-action,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-dropdown-caret {
+        color: #9fb3d0 !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-close:hover,
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-text-action:hover,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-close:hover,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-text-action:hover {
+        color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .exceptions-detail-modal .attendance-detail-status,
+    body.etrs-dark-theme .exceptions-setup-modal .attendance-detail-status {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
     }
 
     @@keyframes exceptions-calendar-enter {

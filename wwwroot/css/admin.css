@@ -14,8 +14,16 @@
   max-width: 48px;
   max-height: 48px;
   border-radius: 50%;
-  object-fit: cover;
-  display: block;
+  border: 1px solid var(--avatar-border, rgba(0,0,0,0.04));
+  background: var(--avatar-bg, var(--etrs-gray-200));
+  color: var(--avatar-text, var(--sidebar-title));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
 }
 
 /* When sidebar is expanded, allow slightly larger avatar */
@@ -32,6 +40,7 @@
 .etrs-profile-meta {
   display: flex;
   flex-direction: column;
+  gap: 3px;
   line-height: 1.15;
 }
 
@@ -42,7 +51,7 @@
 
 /* Appended styles to ensure sidebar/nav visuals apply even without Blazor CSS isolation */
 :root {
-  --sidebar-collapsed-width: 64px;
+  --sidebar-collapsed-width: 104px;
   --sidebar-expanded-width: 280px;
   --sidebar-bg: var(--etrs-gray-100);
   --panel-bg: var(--etrs-gray-100);
@@ -80,18 +89,24 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .etrs-sidebar-top {
-  padding: 10px 12px 6px 12px;
+  display: flex;
+  align-items: center;
+  min-height: var(--etrs-top-row-height);
+  padding: 0 12px;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--sidebar-frame-border);
+  position: relative;
 }
 
 .etrs-sidebar-top-actions {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding-right: 22px;
 }
 
 .etrs-sidebar-logo {
@@ -114,19 +129,32 @@
   min-height: 40px;
   max-width: 40px;
   max-height: 40px;
-  border-radius: 10px;
-  object-fit: cover;
-  border: 1px solid rgba(0,0,0,0.04);
-  background: transparent;
+  border-radius: 50%;
+  border: 1px solid var(--avatar-border, rgba(0,0,0,0.04));
+  background: var(--avatar-bg, var(--etrs-gray-200));
+  color: var(--avatar-text, var(--sidebar-title));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 40px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
 }
 
 .etrs-profile-meta {
   display: flex;
   flex-direction: column;
+  gap: 3px;
   color: var(--muted-text);
 }
 
 .etrs-sidebar-toggle {
+  position: absolute;
+  top: calc((var(--etrs-top-row-height) - 34px) / 2);
+  right: -17px;
+  z-index: 40;
   margin-left: auto;
   background: transparent;
   border: none;
@@ -170,8 +198,8 @@
 .etrs-sidebar-bottom { margin-top:auto; padding:12px 8px; border-top: 1px solid var(--sidebar-frame-border); }
 
 .etrs-profile-actions {
-  background: transparent !important;
   border: none !important;
+  background: transparent !important;
   box-shadow: none !important;
   color: var(--muted-text) !important;
 }
@@ -199,16 +227,16 @@ section h5 { margin:0; padding-left:6px; font-weight:700; }
 /* High-specificity overrides to ensure sidebar/nav visuals apply */
 body .etrs-sidebar-shell {
   display: flex !important;
-  position: static !important;
+  position: sticky !important;
   left: auto !important;
-  top: auto !important;
+  top: 0 !important;
   height: 100vh !important;
   width: var(--sidebar-expanded-width) !important;
   padding: 0 !important;
   margin: 0 !important;
   box-sizing: border-box !important;
   background: var(--sidebar-bg) !important;
-  z-index: 1 !important;
+  z-index: 30 !important;
 }
 
 body .etrs-sidebar-shell.is-collapsed {
@@ -228,7 +256,17 @@ body .etrs-profile-avatar {
   min-height: 40px !important;
   max-width: 40px !important;
   max-height: 40px !important;
-  background: transparent !important;
+  border: 1px solid var(--avatar-border, var(--sidebar-frame-border)) !important;
+  border-radius: 50% !important;
+  background: var(--avatar-bg, var(--etrs-gray-200)) !important;
+  color: var(--avatar-text, var(--sidebar-title)) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
 }
 
 body .etrs-nav-link { display:flex !important; }
@@ -243,6 +281,19 @@ body .etrs-profile-actions {
   color: var(--sidebar-title) !important;
 }
 
+body .etrs-sidebar-toggle {
+  background: #fff !important;
+  border: 1px solid var(--sidebar-frame-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+body .etrs-profile-actions,
+body .etrs-profile-actions:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 body .etrs-profile-meta strong,
 body .etrs-nav-link.active .etrs-nav-label {
   color: var(--sidebar-title) !important;
@@ -254,17 +305,24 @@ body .etrs-sidebar-shell.is-open .etrs-sidebar-bottom {
   align-items: center !important;
 }
 
+body .etrs-sidebar-shell.is-open .etrs-sidebar-bottom {
+  display: flex !important;
+  justify-content: center !important;
+}
+
 body .etrs-sidebar-shell.is-open .etrs-nav-link,
-body .etrs-sidebar-shell.is-open .etrs-nav-button,
-body .etrs-sidebar-shell.is-open .etrs-profile-card-bottom {
+body .etrs-sidebar-shell.is-open .etrs-nav-button {
   width: min(100%, 240px) !important;
 }
 
 body .etrs-sidebar-shell.is-open .etrs-profile-card-bottom {
   display: grid !important;
-  grid-template-columns: 40px 1fr auto !important;
+  grid-template-columns: 40px minmax(0, max-content) 34px !important;
   align-items: center !important;
+  justify-content: center !important;
   column-gap: 12px !important;
+  width: fit-content !important;
+  max-width: min(100%, 240px) !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
 }
@@ -275,10 +333,273 @@ body .etrs-sidebar-shell.is-open .etrs-profile-avatar {
 
 body .etrs-sidebar-shell.is-open .etrs-profile-meta {
   min-width: 0 !important;
+  max-width: 140px !important;
 }
 
 body .etrs-sidebar-shell.is-open .etrs-profile-actions-wrap {
-  justify-self: end !important;
+  justify-self: center !important;
+}
+
+body .etrs-sidebar-shell.is-collapsed .etrs-sidebar-bottom {
+  display: flex !important;
+  justify-content: center !important;
+}
+
+body .etrs-sidebar-shell.is-collapsed .etrs-profile-card-bottom {
+  display: grid !important;
+  grid-template-columns: 40px 34px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  column-gap: 8px !important;
+  width: fit-content !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+body .etrs-sidebar-shell.is-collapsed .etrs-profile-actions {
+  margin-left: 0 !important;
+}
+
+body .etrs-sidebar-shell.is-collapsed .etrs-profile-actions-wrap {
+  justify-self: center !important;
 }
 
 /* End overrides */
+
+/* Dark mode */
+body.etrs-dark-theme,
+body.etrs-dark-theme .app-container,
+body.etrs-dark-theme .app-content {
+  background: var(--etrs-bg) !important;
+  color: var(--etrs-text) !important;
+}
+
+body.etrs-dark-theme .finance-header {
+  background: var(--finance-header-bg) !important;
+  border-bottom-color: var(--etrs-frame-border) !important;
+}
+
+body.etrs-dark-theme .finance-theme-toggle {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: #f2d471 !important;
+}
+
+body.etrs-dark-theme .finance-theme-toggle:hover {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+body.etrs-dark-theme .etrs-sidebar-shell,
+body.etrs-dark-theme .etrs-sidebar {
+  background: var(--panel-bg) !important;
+}
+
+body.etrs-dark-theme .etrs-sidebar,
+body.etrs-dark-theme .etrs-sidebar-top,
+body.etrs-dark-theme .etrs-sidebar-bottom {
+  border-color: var(--sidebar-frame-border) !important;
+}
+
+body.etrs-dark-theme .etrs-sidebar-toggle {
+  background: #151f2e !important;
+  border-color: var(--sidebar-frame-border) !important;
+  color: var(--sidebar-title) !important;
+}
+
+body.etrs-dark-theme .etrs-nav-link:hover,
+body.etrs-dark-theme .etrs-nav-link.active {
+  background: #1c2938 !important;
+  color: var(--sidebar-title) !important;
+}
+
+body.etrs-dark-theme .dashboard-hero,
+body.etrs-dark-theme .metric-card,
+body.etrs-dark-theme .panel-card,
+body.etrs-dark-theme .modal-card,
+body.etrs-dark-theme .app-content .table-responsive,
+body.etrs-dark-theme .attendance-table-card,
+body.etrs-dark-theme .profile-dropdown,
+body.etrs-dark-theme .etrs-profile-overlay,
+body.etrs-dark-theme .toast-item {
+  background: var(--finance-surface) !important;
+  border-color: var(--finance-border) !important;
+  color: var(--finance-text) !important;
+  box-shadow: var(--finance-shadow) !important;
+}
+
+body.etrs-dark-theme .modal-card-header,
+body.etrs-dark-theme .modal-card-footer {
+  background: #101827 !important;
+  border-color: var(--finance-border-soft) !important;
+}
+
+body.etrs-dark-theme .hero-chip,
+body.etrs-dark-theme .status-badge,
+body.etrs-dark-theme .access-pill,
+body.etrs-dark-theme .table-page-arrow,
+body.etrs-dark-theme .app-content .btn-outline-secondary,
+body.etrs-dark-theme .app-content .btn-primary {
+  background: var(--finance-surface-soft) !important;
+  border-color: var(--finance-border) !important;
+  color: var(--finance-text) !important;
+}
+
+body.etrs-dark-theme .app-content .table,
+body.etrs-dark-theme .attendance-table {
+  color: var(--finance-text) !important;
+}
+
+body.etrs-dark-theme .app-content .table > :not(caption) > * > *,
+body.etrs-dark-theme .attendance-table th,
+body.etrs-dark-theme .attendance-table td {
+  background: var(--finance-surface) !important;
+  border-bottom-color: var(--finance-border-soft) !important;
+  color: var(--finance-text) !important;
+}
+
+body.etrs-dark-theme .app-content .table > thead > tr > th,
+body.etrs-dark-theme .attendance-table thead {
+  background: #1c2938 !important;
+  border-color: var(--finance-border) !important;
+  color: var(--finance-text-muted) !important;
+}
+
+body.etrs-dark-theme .app-content .table > tbody > tr:hover > *,
+body.etrs-dark-theme .attendance-table tbody tr:hover > * {
+  background: #1a2635 !important;
+}
+
+body.etrs-dark-theme .dropdown-menu,
+body.etrs-dark-theme .access-dropdown {
+  background: var(--finance-surface) !important;
+  border-color: var(--finance-border) !important;
+  color: var(--finance-text) !important;
+}
+
+body.etrs-dark-theme .dropdown-item,
+body.etrs-dark-theme .etrs-profile-overlay .etrs-nav-link {
+  color: var(--finance-text) !important;
+}
+
+body.etrs-dark-theme .dropdown-item:hover,
+body.etrs-dark-theme .dropdown-item:focus,
+body.etrs-dark-theme .etrs-profile-overlay .etrs-nav-link:hover {
+  background: var(--finance-surface-soft) !important;
+  color: var(--finance-text) !important;
+}
+
+body.etrs-dark-theme .dropdown-divider,
+body.etrs-dark-theme .simple-tabs::after,
+body.etrs-dark-theme .panel-card .table-responsive,
+body.etrs-dark-theme .issue-row,
+body.etrs-dark-theme .device-row {
+  border-color: var(--finance-border-soft) !important;
+}
+
+body.etrs-dark-theme input,
+body.etrs-dark-theme select,
+body.etrs-dark-theme textarea,
+body.etrs-dark-theme .form-control,
+body.etrs-dark-theme .form-select,
+body.etrs-dark-theme .access-pills {
+  background-color: #101827 !important;
+  border-color: var(--finance-border) !important;
+  color: var(--finance-text) !important;
+}
+
+body.etrs-dark-theme input::placeholder,
+body.etrs-dark-theme textarea::placeholder,
+body.etrs-dark-theme .text-muted,
+body.etrs-dark-theme .toast-message {
+  color: var(--finance-text-muted) !important;
+}
+
+body.etrs-dark-theme input[type="search"]::-webkit-search-cancel-button,
+body.etrs-dark-theme .attendance-table-search-input::-webkit-search-cancel-button,
+body.etrs-dark-theme .finance-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-left: 0.65rem;
+  background: var(--finance-text-muted) !important;
+  cursor: pointer;
+  filter: none !important;
+  opacity: 1 !important;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2.1 1.2 6 5.1l3.9-3.9 0.9 0.9L6.9 6l3.9 3.9-0.9 0.9L6 6.9l-3.9 3.9-0.9-0.9L5.1 6 1.2 2.1z' fill='%23000'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2.1 1.2 6 5.1l3.9-3.9 0.9 0.9L6.9 6l3.9 3.9-0.9 0.9L6 6.9l-3.9 3.9-0.9-0.9L5.1 6 1.2 2.1z' fill='%23000'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+body.etrs-dark-theme input[type="search"]:placeholder-shown::-webkit-search-cancel-button,
+body.etrs-dark-theme .attendance-table-search-input:placeholder-shown::-webkit-search-cancel-button,
+body.etrs-dark-theme .finance-search-input:placeholder-shown::-webkit-search-cancel-button {
+  display: none;
+}
+
+body.etrs-dark-theme .table-page-btn {
+  color: #dbe7f6 !important;
+}
+
+body.etrs-dark-theme .table-page-btn:hover:not(:disabled) {
+  background: #1c2938 !important;
+  color: #ffffff !important;
+}
+
+body.etrs-dark-theme .table-page-btn.active,
+body.etrs-dark-theme .table-page-btn.active:hover {
+  background: #d7b252 !important;
+  color: #101827 !important;
+  box-shadow: 0 0 0 1px rgba(215, 178, 82, 0.35);
+}
+
+body.etrs-dark-theme .table-page-ellipsis {
+  color: var(--finance-text-muted) !important;
+}
+
+body.etrs-dark-theme .login-page {
+  background:
+    radial-gradient(circle at 18% 16%, rgba(215, 178, 82, 0.12), transparent 28rem),
+    linear-gradient(135deg, #0f172a 0%, #101827 54%, #151f2e 100%) !important;
+}
+
+body.etrs-dark-theme .login-card {
+  width: min(100%, 390px) !important;
+  padding: 1.4rem 1.5rem !important;
+  background: rgba(21, 31, 46, 0.86) !important;
+  border: 1px solid var(--finance-border) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38) !important;
+  backdrop-filter: blur(12px);
+}
+
+body.etrs-dark-theme .login-title,
+body.etrs-dark-theme .login-field label,
+body.etrs-dark-theme .remember-row {
+  color: var(--finance-text) !important;
+}
+
+body.etrs-dark-theme .login-input {
+  background: #101827 !important;
+  border-color: var(--finance-border) !important;
+  color: var(--finance-text) !important;
+}
+
+body.etrs-dark-theme .login-input::placeholder {
+  color: #7f8da1 !important;
+}
+
+body.etrs-dark-theme .login-button {
+  background: #d7b252 !important;
+  color: #111827 !important;
+}
+
+body.etrs-dark-theme .login-button:hover {
+  background: #e3c565 !important;
+}
+
+body.etrs-dark-theme .dashboard-hero {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}

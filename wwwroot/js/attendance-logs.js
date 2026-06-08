@@ -73,10 +73,14 @@ window.attendanceLogs = (function () {
 
         unregisterTableMenuDismiss(element);
 
-        const clickHandler = function (ev) {
+        const dismiss = function () {
+            dotNetRef.invokeMethodAsync("CloseTableMenus").catch(() => { });
+        };
+
+        const outsideHandler = function (ev) {
             try {
                 if (!element.contains(ev.target)) {
-                    dotNetRef.invokeMethodAsync("CloseTableMenus").catch(() => { });
+                    dismiss();
                 }
             }
             catch {
@@ -89,18 +93,24 @@ window.attendanceLogs = (function () {
                     return;
                 }
 
-                dotNetRef.invokeMethodAsync("CloseTableMenus").catch(() => { });
+                dismiss();
             }
             catch {
             }
         };
 
-        document.addEventListener("click", clickHandler, { capture: true });
-        window.addEventListener("scroll", scrollHandler, { capture: true, passive: true });
+        const scrollTargets = getScrollTargets(element);
+
+        document.addEventListener("pointerdown", outsideHandler, { capture: true });
+        document.addEventListener("click", outsideHandler, { capture: true });
+        scrollTargets.forEach(function (target) {
+            target.addEventListener("scroll", scrollHandler, { capture: true, passive: true });
+        });
 
         tableMenuDismissHandlers.set(element, {
-            clickHandler: clickHandler,
-            scrollHandler: scrollHandler
+            outsideHandler: outsideHandler,
+            scrollHandler: scrollHandler,
+            scrollTargets: scrollTargets
         });
     }
 
@@ -114,9 +124,35 @@ window.attendanceLogs = (function () {
             return;
         }
 
-        document.removeEventListener("click", handlers.clickHandler, { capture: true });
-        window.removeEventListener("scroll", handlers.scrollHandler, { capture: true });
+        document.removeEventListener("pointerdown", handlers.outsideHandler, { capture: true });
+        document.removeEventListener("click", handlers.outsideHandler, { capture: true });
+        (handlers.scrollTargets || [window]).forEach(function (target) {
+            target.removeEventListener("scroll", handlers.scrollHandler, { capture: true });
+        });
         tableMenuDismissHandlers.delete(element);
+    }
+
+    function getScrollTargets(element) {
+        const targets = [window, document, document.documentElement, document.body];
+        const appContent = document.querySelector(".app-content");
+
+        if (appContent) {
+            targets.push(appContent);
+        }
+
+        let parent = element ? element.parentElement : null;
+        while (parent) {
+            const style = window.getComputedStyle(parent);
+            const overflow = `${style.overflow}${style.overflowX}${style.overflowY}`;
+
+            if (/(auto|scroll|overlay)/.test(overflow)) {
+                targets.push(parent);
+            }
+
+            parent = parent.parentElement;
+        }
+
+        return Array.from(new Set(targets.filter(Boolean)));
     }
 
     function shouldOpenMenuUpward(element, menuHeight, viewportPadding) {
