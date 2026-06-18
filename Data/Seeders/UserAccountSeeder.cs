@@ -1,4 +1,5 @@
 using Financial.Model;
+using Financial.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Financial.Data.Seeders
@@ -29,6 +30,13 @@ namespace Financial.Data.Seeders
                     changed = true;
                 }
 
+                var adminAccess = string.Join(",", AccessPolicy.AdminAssignableAccess.OrderBy(value => value));
+                if (!string.Equals(existingAdmin.AccessLevel, adminAccess, StringComparison.Ordinal))
+                {
+                    existingAdmin.AccessLevel = adminAccess;
+                    changed = true;
+                }
+
                 if (changed)
                 {
                     existingAdmin.DateUpdated = DateTime.UtcNow;
@@ -47,6 +55,7 @@ namespace Financial.Data.Seeders
                 Username = adminUsername,
                 Password = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
                 Role = "Admin",
+                AccessLevel = string.Join(",", AccessPolicy.AdminAssignableAccess.OrderBy(value => value)),
                 DivisionCenterUnit = "Administration",
                 Designation = "System Administrator",
                 RememberToken = string.Empty,

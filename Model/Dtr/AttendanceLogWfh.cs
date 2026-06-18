@@ -35,6 +35,9 @@ namespace Financial.Model.Dtr
         [MaxLength(500)]
         public string Mov { get; set; } = string.Empty;
 
+        [MaxLength(500)]
+        public string PhotoVerification { get; set; } = string.Empty;
+
         public DateTime? TimeIn { get; set; }
         public DateTime? TimeOut { get; set; }
 

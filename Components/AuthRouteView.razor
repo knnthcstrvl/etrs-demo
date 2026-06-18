@@ -2,8 +2,11 @@
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Authorization
 @using Financial.Components.Pages
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavManager
+@inject IDbContextFactory<Financial.Data.EtrsDbContext> DbFactory
 
 @code {
     [Parameter]
@@ -21,6 +24,23 @@
 
         var user = _authState?.User;
         var pageType = RouteData?.PageType;
+
+        if (user?.Identity?.IsAuthenticated == true && !IsLoginPage(pageType))
+        {
+            var accountIsValid = await CurrentAccountIsValidAsync(user);
+            if (!accountIsValid)
+            {
+                if (AuthStateProvider is Financial.State.CustomAuthenticationStateProvider customAuthStateProvider)
+                {
+                    customAuthStateProvider.UpdateAuthenticationState(string.Empty);
+                }
+
+                _authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                NavManager.NavigateTo("/login?accountDeleted=1");
+                _initialized = true;
+                return;
+            }
+        }
 
         // If user is authenticated and tries to open login page -> redirect to dashboard (client-side)
         if (user?.Identity?.IsAuthenticated == true && IsLoginPage(pageType))
@@ -51,6 +71,26 @@
     }
 
     private bool IsLoginPage(Type? pageType) => string.Equals(pageType?.Name, "LoginPage", StringComparison.Ordinal);
+
+    private async Task<bool> CurrentAccountIsValidAsync(ClaimsPrincipal user)
+    {
+        var email = user.FindFirst(ClaimTypes.Email)?.Value;
+        var userIdText = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var hasUserId = int.TryParse(userIdText, out var userId);
+
+        if (!hasUserId && string.IsNullOrWhiteSpace(email))
+        {
+            return false;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        return await db.UserAccounts
+            .AsNoTracking()
+            .AnyAsync(account =>
+                account.IsActive
+                && ((hasUserId && account.UserAccountId == userId)
+                    || (!string.IsNullOrWhiteSpace(email) && account.Email == email)));
+    }
 }
 
 @if (!_initialized)

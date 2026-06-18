@@ -87,6 +87,7 @@ namespace Financial.State
             return new ClaimsPrincipal(new ClaimsIdentity(
                 new List<Claim>
                 {
+                    new(ClaimTypes.NameIdentifier, claims.Id ?? string.Empty),
                     new("FirstName", claims.FirstName ?? string.Empty),
                     new("LastName", claims.LastName ?? string.Empty),
                     new(ClaimTypes.Email, claims.Email),

@@ -30,9 +30,11 @@ namespace Financial.Repositories.Implement
             return new UserResponse(true, "Success", data);
         }
 
-        private async Task<Model.UserAccount?> GetUser(string email)
+        private async Task<Model.UserAccount?> GetUser(string signInName)
         {
-            return await _context.UserAccounts.FirstOrDefaultAsync(e => e.Email == email);
+            var normalizedSignInName = signInName.Trim();
+            return await _context.UserAccounts.FirstOrDefaultAsync(e =>
+                e.Email == normalizedSignInName || e.Username == normalizedSignInName);
         }
 
         public async Task<CustomResponses.LoginResponse> LoginAsync(LoginDto model)
@@ -95,6 +97,7 @@ namespace Financial.Repositories.Implement
                     Email = model.Email,
                     Username = model.Email,
                     Password = BCrypt.Net.BCrypt.HashPassword(model.Password),
+                    MustChangePassword = true,
                     IsActive = true,
                     DateCreated = DateTime.UtcNow
                 });

@@ -1,10 +1,55 @@
 using Financial.Model.Dtr;
+using Financial.Model;
 using Microsoft.EntityFrameworkCore;
 
 namespace Financial.Data
 {
     public static class DatabaseSchemaUpdater
     {
+        public static async Task EnsureUserAccountColumnsAsync(EtrsDbContext db)
+        {
+            var entityType = db.Model.FindEntityType(typeof(UserAccount));
+            var tableName = entityType?.GetTableName();
+            var schema = entityType?.GetSchema() ?? "dbo";
+
+            if (string.IsNullOrWhiteSpace(tableName))
+            {
+                return;
+            }
+
+            ValidateSqlIdentifier(schema);
+            ValidateSqlIdentifier(tableName);
+
+            var qualifiedTable = $"[{schema}].[{tableName}]";
+
+#pragma warning disable EF1002
+            await db.Database.ExecuteSqlRawAsync($"""
+                IF COL_LENGTH('{schema}.{tableName}', 'MustChangePassword') IS NULL
+                BEGIN
+                    ALTER TABLE {qualifiedTable}
+                    ADD [MustChangePassword] bit NOT NULL
+                    CONSTRAINT [DF_{tableName}_MustChangePassword] DEFAULT 0;
+                END
+
+                IF EXISTS
+                (
+                    SELECT 1
+                    FROM sys.columns c
+                    INNER JOIN sys.objects o ON c.object_id = o.object_id
+                    INNER JOIN sys.schemas s ON o.schema_id = s.schema_id
+                    WHERE s.name = N'{schema}'
+                        AND o.name = N'{tableName}'
+                        AND c.name = N'AccessLevel'
+                        AND c.max_length > 0
+                        AND c.max_length < 2000
+                )
+                BEGIN
+                    ALTER TABLE {qualifiedTable} ALTER COLUMN [AccessLevel] nvarchar(1000) NOT NULL;
+                END
+                """);
+#pragma warning restore EF1002
+        }
+
         public static async Task EnsureAttendanceLogWfhColumnsAsync(EtrsDbContext db)
         {
             var entityType = db.Model.FindEntityType(typeof(AttendanceLogWfh));
@@ -54,6 +99,11 @@ namespace Financial.Data
                 IF COL_LENGTH('{schema}.{tableName}', 'Mov') IS NULL
                 BEGIN
                     ALTER TABLE {qualifiedTable} ADD [Mov] nvarchar(500) NOT NULL CONSTRAINT [DF_{tableName}_Mov] DEFAULT N'';
+                END
+
+                IF COL_LENGTH('{schema}.{tableName}', 'PhotoVerification') IS NULL
+                BEGIN
+                    ALTER TABLE {qualifiedTable} ADD [PhotoVerification] nvarchar(500) NOT NULL CONSTRAINT [DF_{tableName}_PhotoVerification] DEFAULT N'';
                 END
 
                 IF COL_LENGTH('{schema}.{tableName}', 'WorkArrangement') IS NULL

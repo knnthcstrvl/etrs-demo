@@ -160,17 +160,52 @@ window.attendanceLogs = (function () {
             return false;
         }
 
+        return getMenuPlacement(element, menuHeight, viewportPadding).openUpward;
+    }
+
+    function getMenuPlacement(element, menuHeight, viewportPadding) {
+        if (!element) {
+            return { openUpward: false, maxHeight: Number.isFinite(menuHeight) ? menuHeight : 320 };
+        }
+
         const rect = element.getBoundingClientRect();
         const padding = Number.isFinite(viewportPadding) ? viewportPadding : 12;
         const preferredHeight = Number.isFinite(menuHeight) ? menuHeight : 320;
         const spaceBelow = window.innerHeight - rect.bottom - padding;
         const spaceAbove = rect.top - padding;
+        const openUpward = spaceBelow < preferredHeight && spaceAbove > spaceBelow;
+        const availableSpace = Math.max(openUpward ? spaceAbove : spaceBelow, 96);
 
-        if (spaceBelow >= preferredHeight) {
-            return false;
+        return {
+            openUpward: openUpward,
+            maxHeight: Math.min(preferredHeight, availableSpace)
+        };
+    }
+
+    function getAccessChildMenuPlacement(parentKey, menuWidth, menuHeight, viewportPadding) {
+        const parent = document.querySelector(`[data-access-child-key="${CSS.escape(parentKey || "")}"]`);
+        if (!parent) {
+            return { openLeft: false, openUpward: false };
         }
 
-        return spaceAbove > spaceBelow;
+        const rect = parent.getBoundingClientRect();
+        const padding = Number.isFinite(viewportPadding) ? viewportPadding : 12;
+        const width = Number.isFinite(menuWidth) ? menuWidth : 256;
+        const height = Number.isFinite(menuHeight) ? menuHeight : 180;
+        const rem = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+        const horizontalOverlap = 1.1 * rem;
+        const verticalOverlap = 0.75 * rem;
+        const defaultLeft = rect.right - horizontalOverlap;
+        const defaultTop = rect.bottom - verticalOverlap;
+        const openLeft = defaultLeft + width > window.innerWidth - padding
+            && rect.left - width + horizontalOverlap >= padding;
+        const spaceBelow = window.innerHeight - defaultTop - padding;
+        const spaceAbove = rect.top - padding;
+        const openUpward = spaceBelow < height && spaceAbove > spaceBelow;
+        return {
+            openLeft: openLeft,
+            openUpward: openUpward
+        };
     }
 
     function getRowMenuPosition(rowKey, pointerX, pointerY, menuWidth, menuHeight, viewportPadding) {
@@ -260,6 +295,8 @@ window.attendanceLogs = (function () {
         registerTableMenuDismiss: registerTableMenuDismiss,
         unregisterTableMenuDismiss: unregisterTableMenuDismiss,
         shouldOpenMenuUpward: shouldOpenMenuUpward,
+        getMenuPlacement: getMenuPlacement,
+        getAccessChildMenuPlacement: getAccessChildMenuPlacement,
         getRowMenuPosition: getRowMenuPosition,
         downloadCsv: downloadCsv,
         downloadFileFromBase64: downloadFileFromBase64

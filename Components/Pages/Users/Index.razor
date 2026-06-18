@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.JSInterop
+@using System.Security.Cryptography
 @implements IAsyncDisposable
 @inject ProcurementDbContext Db
 @inject Financial.Services.CurrentUserService CurrentUser
@@ -11,13 +12,14 @@
 
 <PageTitle>ETRS | Users</PageTitle>
 
+<RequireAccess RequiredAccess='@(new string[] { AccessPolicy.ManageUsers })'>
 <div class="dashboard-shell">
     <div class="panel-heading attendance-logs-heading">
         <div>
             <h1 class="attendance-logs-title">User</h1>
         </div>
         <div class="attendance-logs-header-actions">
-            <button type="button" class="btn btn-primary" @onclick="OpenAddUserModal" disabled="@(!CurrentUser.HasAccess("Add"))">Add User</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenAddUserModal" disabled="@(!CurrentUser.HasAccess(AccessPolicy.AddUser))">Add User</button>
         </div>
     </div>
 
@@ -238,7 +240,7 @@
                                 <button type="button"
                                         class="attendance-detail-header-button"
                                         @onclick="() => OpenEditUserModal(selectedUser)"
-                                        disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                        disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditUser))">
                                     Edit User
                                 </button>
                                 <button type="button" class="attendance-detail-close" @onclick="CloseUserDetail" aria-label="Close user details">
@@ -247,7 +249,7 @@
                             </div>
                         </div>
 
-                        <div class="attendance-detail-body">
+                        <div class="attendance-detail-body user-detail-body">
                             <div class="attendance-detail-section attendance-detail-hero">
                                 <div>
                                     <div class="attendance-detail-eyebrow">User</div>
@@ -260,20 +262,12 @@
                             <div class="attendance-detail-section attendance-detail-section-primary">
                                 <div class="attendance-detail-grid">
                                     <div class="attendance-detail-field">
-                                        <span class="attendance-detail-label">Name</span>
-                                        <strong>@FormatName(selectedUser.LastName, selectedUser.FirstName, selectedUser.MiddleName)</strong>
-                                    </div>
-                                    <div class="attendance-detail-field">
-                                        <span class="attendance-detail-label">Username</span>
-                                        <strong>@DisplayValue(selectedUser.Username)</strong>
-                                    </div>
-                                    <div class="attendance-detail-field">
                                         <span class="attendance-detail-label">Email</span>
                                         <strong>@DisplayValue(selectedUser.Email)</strong>
                                     </div>
                                     <div class="attendance-detail-field">
-                                        <span class="attendance-detail-label">Role</span>
-                                        <strong>@DisplayValue(selectedUser.Role)</strong>
+                                        <span class="attendance-detail-label">Created</span>
+                                        <strong>@FormatDate(selectedUser.DateCreated)</strong>
                                     </div>
                                     <div class="attendance-detail-field">
                                         <span class="attendance-detail-label">Division / Unit</span>
@@ -283,13 +277,23 @@
                                         <span class="attendance-detail-label">Designation</span>
                                         <strong>@DisplayValue(selectedUser.Designation)</strong>
                                     </div>
+                                </div>
+                            </div>
+
+                            <div class="attendance-detail-section attendance-detail-section-primary">
+                                <div class="attendance-detail-grid user-detail-access-grid">
                                     <div class="attendance-detail-field">
-                                        <span class="attendance-detail-label">Access</span>
-                                        <strong>@DisplayAccess(selectedUser.AccessLevel)</strong>
+                                        <span class="attendance-detail-label">Role</span>
+                                        <strong>@DisplayValue(selectedUser.Role)</strong>
                                     </div>
                                     <div class="attendance-detail-field">
-                                        <span class="attendance-detail-label">Created</span>
-                                        <strong>@FormatDate(selectedUser.DateCreated)</strong>
+                                        <span class="attendance-detail-label">Access Level</span>
+                                        <div class="user-access-pill-list user-detail-access-pill-list" title="@DisplayAccess(selectedUser.AccessLevel)">
+                                            @foreach (var access in GetAccessPills(selectedUser))
+                                            {
+                                                <span class="access-level-badge">@access</span>
+                                            }
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -305,7 +309,7 @@
             @if (showUserModal)
             {
                 <div class="attendance-detail-overlay" @onclick="CloseUserModal">
-                    <div class="attendance-detail-modal attendance-input-modal user-input-modal" @onclick:stopPropagation="true">
+                    <div class="attendance-detail-modal attendance-input-modal user-input-modal @(ShouldScrollUserModalBody ? "user-input-modal-scrollable" : null)" @onclick="CloseUserDropdowns" @onclick:stopPropagation="true">
                         <div class="attendance-detail-header">
                             <div>
                                 <h2 class="attendance-detail-title">@(isEditingUser ? "Edit User" : "Add User")</h2>
@@ -319,93 +323,392 @@
                             <div class="attendance-detail-section attendance-detail-hero user-modal-hero">
                                 <div>
                                     <div class="attendance-detail-eyebrow">User Account</div>
-                                    <div class="attendance-detail-person">@(isEditingUser ? "Update user profile and access." : "Create a new user profile.")</div>
-                                    <div class="attendance-detail-meta">Set the user's identity, sign-in details, assigned office, and account status.</div>
+                                    <div class="attendance-detail-person">@GetUserModalStepTitle()</div>
+                                    <div class="attendance-detail-meta">@GetUserModalStepMeta()</div>
                                 </div>
-                                <div class="attendance-input-pill">@(isEditingUser ? "Edit" : "New")</div>
+                                <div class="attendance-input-pill">Step @((int)userModalStep) of @UserModalStepCount</div>
                             </div>
 
-                            <div class="attendance-detail-section user-modal-section user-modal-identity">
-                                <div class="user-modal-section-heading">
-                                    <div class="attendance-detail-eyebrow">Name</div>
-                                </div>
-                                <div class="attendance-input-grid">
-                                    <div class="attendance-input-field">
-                                        <label class="attendance-table-toolbar-label" for="userLastName">Last Name</label>
-                                        <input id="userLastName" class="form-control attendance-input-control" @bind="userForm.LastName" />
-                                    </div>
-                                    <div class="attendance-input-field">
-                                        <label class="attendance-table-toolbar-label" for="userFirstName">First Name</label>
-                                        <input id="userFirstName" class="form-control attendance-input-control" @bind="userForm.FirstName" />
-                                    </div>
-                                    <div class="attendance-input-field">
-                                        <label class="attendance-table-toolbar-label" for="userMiddleName">Middle Name</label>
-                                        <input id="userMiddleName" class="form-control attendance-input-control" @bind="userForm.MiddleName" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="attendance-detail-section user-modal-section">
-                                <div class="user-modal-section-heading">
-                                    <div class="attendance-detail-eyebrow">Account</div>
-                                </div>
-                                <div class="attendance-input-grid two-columns">
-                                    <div class="attendance-input-field">
-                                        <label class="attendance-table-toolbar-label" for="userUsername">Username</label>
-                                        <input id="userUsername" class="form-control attendance-input-control" @bind="userForm.Username" />
-                                    </div>
-                                    <div class="attendance-input-field">
-                                        <label class="attendance-table-toolbar-label" for="userEmail">Email</label>
-                                        <input id="userEmail" class="form-control attendance-input-control" @bind="userForm.Email" />
-                                    </div>
-                                    <div class="attendance-input-field">
-                                        <label class="attendance-table-toolbar-label" for="userRole">Role</label>
-                                        <input id="userRole" class="form-control attendance-input-control" @bind="userForm.Role" />
-                                    </div>
-                                    <div class="attendance-input-field">
-                                        <label class="attendance-table-toolbar-label" for="userAccess">Access</label>
-                                        <div class="access-select" id="userAccess" @onclick:stopPropagation="true">
-                                            <div class="access-pills attendance-input-control" @onclick="ToggleAccessDropdown">
-                                                @if (selectedAccess.Count == 0)
-                                                {
-                                                    <span class="access-placeholder">Select access</span>
-                                                }
-                                                else
-                                                {
-                                                    @foreach (var access in selectedAccess.OrderBy(value => value))
-                                                    {
-                                                        <span class="access-pill">@access <button type="button" class="access-remove" @onclick="(() => RemoveAccess(access))" @onclick:stopPropagation="true">&times;</button></span>
-                                                    }
-                                                }
-                                                <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                            <div class="user-modal-step-panel @(userModalStepMovingForward ? "step-forward" : "step-backward")" @key="userModalStep">
+                                @if (userModalStep == UserModalStep.PersonalInfo)
+                                {
+                                    <div class="attendance-detail-section user-modal-section user-modal-identity">
+                                        <div class="attendance-input-grid">
+                                            <div class="attendance-input-field">
+                                                <label class="attendance-table-toolbar-label" for="userLastName">Last Name</label>
+                                                <input id="userLastName" class="form-control attendance-input-control" @bind="userForm.LastName" />
                                             </div>
-                                            @if (showAccessDropdown)
-                                            {
-                                                <div class="access-dropdown attendance-filter-select-menu show">
-                                                    @foreach (var option in accessOptions)
-                                                    {
-                                                        <label class="access-option"><input type="checkbox" checked="@selectedAccess.Contains(option)" @onchange="(() => ToggleAccess(option))" /> @option</label>
-                                                    }
-                                                </div>
-                                            }
+                                            <div class="attendance-input-field">
+                                                <label class="attendance-table-toolbar-label" for="userFirstName">First Name</label>
+                                                <input id="userFirstName" class="form-control attendance-input-control" @bind="userForm.FirstName" />
+                                            </div>
+                                            <div class="attendance-input-field">
+                                                <label class="attendance-table-toolbar-label" for="userMiddleName">Middle Name</label>
+                                                <input id="userMiddleName" class="form-control attendance-input-control" @bind="userForm.MiddleName" />
+                                            </div>
+                                            <div class="attendance-input-field">
+                                                <label class="attendance-table-toolbar-label" for="userUsername">Username</label>
+                                                <input id="userUsername" class="form-control attendance-input-control" @bind="userForm.Username" />
+                                            </div>
+                                            <div class="attendance-input-field">
+                                                <label class="attendance-table-toolbar-label" for="userEmail">Email</label>
+                                                <input id="userEmail" class="form-control attendance-input-control" @bind="userForm.Email" />
+                                            </div>
+                                            <div class="attendance-input-field">
+                                                <label class="attendance-table-toolbar-label" for="userDivision">Division / Unit</label>
+                                                <input id="userDivision" class="form-control attendance-input-control" @bind="userForm.DivisionCenterUnit" />
+                                            </div>
+                                            <div class="attendance-input-field">
+                                                <label class="attendance-table-toolbar-label" for="userDesignation">Designation</label>
+                                                <input id="userDesignation" class="form-control attendance-input-control" @bind="userForm.Designation" />
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="attendance-input-field">
-                                        <label class="attendance-table-toolbar-label" for="userDivision">Division / Unit</label>
-                                        <input id="userDivision" class="form-control attendance-input-control" @bind="userForm.DivisionCenterUnit" />
+                                }
+                                else if (userModalStep == UserModalStep.AccountAccess)
+                                {
+                                    <div class="attendance-detail-section user-modal-section">
+                                        <div class="attendance-input-grid user-access-grid">
+                                        <div class="attendance-input-field @(showRoleDropdown ? "user-modal-field-open" : null)">
+                                        <label class="attendance-table-toolbar-label" for="userRole">Role</label>
+                                        <div class="attendance-filter-select-wrap user-modal-dropdown" @onclick:stopPropagation="true">
+                                            <button type="button"
+                                                    id="userRole"
+                                                    @ref="userRoleButtonRef"
+                                                    class="attendance-filter-select-trigger attendance-input-control @(showRoleDropdown ? "active" : null)"
+                                                    @onclick="ToggleRoleDropdown">
+                                                <span class="attendance-filter-select-value">@DisplayValue(userForm.Role, "Select role")</span>
+                                                <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                            </button>
+
+                                            <div class="@GetUserModalDropdownMenuClass(showRoleDropdown, openRoleDropdownUpward)" style="@GetUserModalDropdownMenuStyle(userRoleMenuMaxHeight)">
+                                                @foreach (var option in roleOptions)
+                                                {
+                                                    <button type="button"
+                                                            class="attendance-filter-select-option @(string.Equals(userForm.Role, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)"
+                                                            @onclick="() => SelectRole(option)">
+                                                        @option
+                                                    </button>
+                                                }
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="attendance-input-field">
-                                        <label class="attendance-table-toolbar-label" for="userDesignation">Designation</label>
-                                        <input id="userDesignation" class="form-control attendance-input-control" @bind="userForm.Designation" />
+                                    <div class="attendance-input-field @(showAccessDropdown ? "user-modal-field-open" : null)">
+                                        <label class="attendance-table-toolbar-label" for="userAccess">Access Level</label>
+                                        <div class="attendance-filter-select-wrap user-modal-dropdown access-select" @onclick:stopPropagation="true">
+                                            <button type="button"
+                                                    id="userAccess"
+                                                    @ref="userAccessButtonRef"
+                                                    class="attendance-filter-select-trigger attendance-input-control access-pills @(showAccessDropdown ? "active" : null)"
+                                                    @onclick="ToggleAccessDropdown">
+                                                <span class="access-placeholder">Select access</span>
+                                                @if (selectedAccess.Count > 0)
+                                                {
+                                                    <span class="access-count-pill">
+                                                        <span>@selectedAccess.Count</span>
+                                                        <span class="access-count-clear" role="button" tabindex="0" title="Clear access levels" @onclick="ClearAccess" @onclick:stopPropagation="true">
+                                                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                                        </span>
+                                                    </span>
+                                                }
+                                                <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                            </button>
+
+                                            <div class="access-dropdown @GetUserModalDropdownMenuClass(showAccessDropdown, openAccessDropdownUpward)" style="@GetUserModalDropdownMenuStyle(userAccessMenuMaxHeight)">
+                                                <div class="access-tabs" role="tablist" aria-label="Access level groups">
+                                                    <button type="button"
+                                                            role="tab"
+                                                            class="access-tab @(activeAccessTab == AccessTab.Specific ? "active" : null)"
+                                                            @onclick="() => SetAccessTab(AccessTab.Specific)">
+                                                        Specific
+                                                    </button>
+                                                    <button type="button"
+                                                            role="tab"
+                                                            class="access-tab @(activeAccessTab == AccessTab.General ? "active" : null)"
+                                                            @onclick="() => SetAccessTab(AccessTab.General)">
+                                                        General
+                                                    </button>
+                                                </div>
+                                                <button type="button"
+                                                        class="attendance-filter-select-option access-option access-option-select-all @(CurrentTabAllAccessSelected ? "active" : null)"
+                                                        @onclick="ToggleCurrentTabAccess">
+                                                    <span class="access-option-check">
+                                                        @if (CurrentTabAllAccessSelected)
+                                                        {
+                                                            <i class="fa-solid fa-minus" aria-hidden="true"></i>
+                                                        }
+                                                    </span>
+                                                    <span>Select all</span>
+                                                </button>
+                                                @foreach (var option in CurrentAccessOptions)
+                                                {
+                                                    var selectedChildCount = GetSelectedChildCount(option);
+                                                    <div class="access-option-wrap @(activeAccessParent == option.Name ? "active-parent" : null)"
+                                                         data-access-child-key="@GetAccessChildMenuKey(option)"
+                                                         @onmouseenter="() => ShowAccessChildrenAsync(option)"
+                                                         @onmouseleave="HideAccessChildren">
+                                                        <button type="button"
+                                                                class="attendance-filter-select-option access-option @(IsAccessSelected(option) ? "active" : null) @(IsAccessDisabled(option) ? "disabled" : null)"
+                                                                disabled="@IsAccessDisabled(option)"
+                                                                @onclick="(() => ToggleAccess(option))">
+                                                            <span class="access-option-check">
+                                                                @if (IsAccessSelected(option))
+                                                                {
+                                                                    <i class="fa-solid fa-check" aria-hidden="true"></i>
+                                                                }
+                                                            </span>
+                                                            <span>@option.Name</span>
+                                                            @if (option.Children.Length > 0)
+                                                            {
+                                                                <span class="access-child-count">@selectedChildCount/@option.Children.Length</span>
+                                                                <i class="fa-solid fa-chevron-right access-parent-arrow" aria-hidden="true"></i>
+                                                            }
+                                                        </button>
+                                                        @if (option.Children.Length > 0 && activeAccessParent == option.Name)
+                                                        {
+                                                            <div class="access-child-menu @GetAccessChildMenuClass()">
+                                                                <div class="access-child-menu-title">@option.Name</div>
+                                                                @foreach (var child in option.Children)
+                                                                {
+                                                                    <button type="button"
+                                                                            class="attendance-filter-select-option access-option access-child-option @(selectedAccess.Contains(child) ? "active" : null) @(IsAccessDisabled(child) ? "disabled" : null)"
+                                                                            disabled="@IsAccessDisabled(child)"
+                                                                            @onclick="(() => ToggleChildAccess(child))">
+                                                                        <span class="access-option-check">
+                                                                            @if (selectedAccess.Contains(child))
+                                                                            {
+                                                                                <i class="fa-solid fa-check" aria-hidden="true"></i>
+                                                                            }
+                                                                        </span>
+                                                                        <span>@child</span>
+                                                                    </button>
+                                                                }
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @if (isEditingUser)
+                                    {
+                                        <div class="attendance-input-field user-status-field @(showStatusDropdown ? "user-modal-field-open" : null)">
+                                            <label class="attendance-table-toolbar-label" for="userStatus">Status</label>
+                                            <div class="attendance-filter-select-wrap user-modal-dropdown" @onclick:stopPropagation="true">
+                                                <button type="button"
+                                                        id="userStatus"
+                                                        @ref="userStatusButtonRef"
+                                                        class="attendance-filter-select-trigger attendance-input-control @(showStatusDropdown ? "active" : null)"
+                                                        @onclick="ToggleStatusDropdown">
+                                                    <span class="attendance-filter-select-value">@(userForm.IsActive ? "Active" : "Inactive")</span>
+                                                    <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                                </button>
+
+                                                <div class="@GetUserModalDropdownMenuClass(showStatusDropdown, openStatusDropdownUpward)" style="@GetUserModalDropdownMenuStyle(userStatusMenuMaxHeight)">
+                                                    @foreach (var option in StatusOptions)
+                                                    {
+                                                        var isActiveOption = string.Equals(option, "Active", StringComparison.OrdinalIgnoreCase);
+                                                        <button type="button"
+                                                                class="attendance-filter-select-option @(userForm.IsActive == isActiveOption ? "active" : null)"
+                                                                @onclick="() => SelectStatus(option)">
+                                                            @option
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
                                     </div>
                                 </div>
+                                }
+                                else
+                                {
+                                    <div class="attendance-detail-section user-modal-section user-modal-password-section">
+                                        <div class="attendance-input-grid">
+                                            <div class="attendance-input-field">
+                                                <label class="attendance-table-toolbar-label" for="userPassword">Password</label>
+                                                <div class="user-password-input-row">
+                                                    <input id="userPassword"
+                                                           class="form-control attendance-input-control"
+                                                           type="text"
+                                                           autocomplete="new-password"
+                                                           @bind="userForm.Password" />
+                                                    <button type="button"
+                                                            class="attendance-action-button user-password-random-button"
+                                                            title="Generate password"
+                                                            aria-label="Generate random password"
+                                                            @onclick="GenerateAddUserPassword">
+                                                        <i class="fa-solid fa-shuffle" aria-hidden="true"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="attendance-input-field">
+                                                <label class="attendance-table-toolbar-label" for="userPasswordConfirm">Confirm Password</label>
+                                                <input id="userPasswordConfirm"
+                                                       class="form-control attendance-input-control"
+                                                       type="text"
+                                                       autocomplete="new-password"
+                                                       @bind="addUserPasswordConfirm" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
                             </div>
 
                         </div>
 
                         <div class="attendance-detail-footer">
                             <button type="button" class="attendance-detail-text-action" @onclick="CloseUserModal">Cancel</button>
-                            <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveUserAsync">Save</button>
+                            <div class="user-modal-footer-actions">
+                                @if (userModalStep == UserModalStep.PersonalInfo)
+                                {
+                                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="GoToAccountAccessStep">Next</button>
+                                }
+                                else if (userModalStep == UserModalStep.AccountAccess)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary attendance-detail-done" @onclick="GoToPersonalInfoStep">Back</button>
+                                    @if (isEditingUser)
+                                    {
+                                        <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveUserAsync">Save</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-primary attendance-detail-done" @onclick="GoToPasswordSetupStep">Next</button>
+                                    }
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-outline-secondary attendance-detail-done" @onclick="GoToAccountAccessStepBack">Back</button>
+                                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveUserAsync">Save</button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (showPasswordResetModal && userPendingPasswordReset is not null)
+            {
+                <div class="attendance-detail-overlay" @onclick="ClosePasswordResetModal">
+                    <div class="attendance-detail-modal user-delete-modal" @onclick:stopPropagation="true">
+                        <div class="attendance-detail-header">
+                            <div>
+                                <h2 class="attendance-detail-title">Password Reset</h2>
+                            </div>
+                            <button type="button"
+                                    class="attendance-detail-close"
+                                    @onclick="ClosePasswordResetModal"
+                                    aria-label="Close password reset"
+                                    disabled="@isResettingPassword">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        <div class="attendance-detail-body attendance-input-body">
+                            <div class="attendance-detail-section attendance-detail-hero user-modal-hero">
+                                <div>
+                                    <div class="attendance-detail-eyebrow">Reset Password</div>
+                                    <div class="attendance-detail-person">@FormatName(userPendingPasswordReset.LastName, userPendingPasswordReset.FirstName, userPendingPasswordReset.MiddleName)</div>
+                                    <div class="attendance-detail-meta">@DisplayValue(userPendingPasswordReset.Username)</div>
+                                </div>
+                            </div>
+
+                            <div class="attendance-detail-section user-modal-section user-modal-password-section">
+                                <div class="attendance-input-grid">
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="resetPassword">New Password</label>
+                                        <div class="user-password-input-row">
+                                            <input id="resetPassword"
+                                                   class="form-control attendance-input-control"
+                                                   type="text"
+                                                   autocomplete="new-password"
+                                                   @bind="passwordResetValue" />
+                                            <button type="button"
+                                                    class="attendance-action-button user-password-random-button"
+                                                    title="Generate password"
+                                                    aria-label="Generate random password"
+                                                    @onclick="GeneratePasswordResetValue"
+                                                    disabled="@isResettingPassword">
+                                                <i class="fa-solid fa-shuffle" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="attendance-input-field">
+                                        <label class="attendance-table-toolbar-label" for="resetPasswordConfirm">Confirm Password</label>
+                                        <input id="resetPasswordConfirm"
+                                               class="form-control attendance-input-control"
+                                               type="text"
+                                               autocomplete="new-password"
+                                               @bind="passwordResetConfirm"
+                                               disabled="@isResettingPassword" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-footer">
+                            <button type="button"
+                                    class="attendance-detail-text-action"
+                                    @onclick="ClosePasswordResetModal"
+                                    disabled="@isResettingPassword">
+                                Cancel
+                            </button>
+                            <button type="button"
+                                    class="btn btn-primary attendance-detail-done"
+                                    @onclick="ResetPasswordAsync"
+                                    disabled="@isResettingPassword">
+                                @(isResettingPassword ? "Saving..." : "Save")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (showDeleteUserModal && userPendingDelete is not null)
+            {
+                <div class="attendance-detail-overlay" @onclick="CloseDeleteUserModal">
+                    <div class="attendance-detail-modal user-delete-modal" @onclick:stopPropagation="true">
+                        <div class="attendance-detail-header">
+                            <div>
+                                <h2 class="attendance-detail-title">Delete User</h2>
+                            </div>
+                            <button type="button"
+                                    class="attendance-detail-close"
+                                    @onclick="CloseDeleteUserModal"
+                                    aria-label="Close delete confirmation"
+                                    disabled="@isDeletingUser">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        <div class="attendance-detail-body">
+                            <div class="attendance-detail-section attendance-delete-warning">
+                                <div class="attendance-delete-icon" aria-hidden="true">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </div>
+                                <div>
+                                    <div class="attendance-detail-eyebrow">Confirm Delete</div>
+                                    <div class="attendance-detail-person">@FormatName(userPendingDelete.LastName, userPendingDelete.FirstName, userPendingDelete.MiddleName)</div>
+                                    <div class="attendance-detail-meta">
+                                        This will permanently delete the user account and its access settings.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-footer">
+                            <button type="button"
+                                    class="attendance-detail-text-action"
+                                    @onclick="CloseDeleteUserModal"
+                                    disabled="@isDeletingUser">
+                                Cancel
+                            </button>
+                            <button type="button"
+                                    class="btn btn-danger attendance-detail-done"
+                                    @onclick="DeleteUserAsync"
+                                    disabled="@isDeletingUser">
+                                @(isDeletingUser ? "Deleting..." : "Delete")
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -419,6 +722,7 @@
                         <th>@SortHeader("Username", "username")</th>
                         <th>Email</th>
                         <th>@SortHeader("Role", "role")</th>
+                        <th>Access Level</th>
                         <th>@SortHeader("Division / Unit", "division")</th>
                         <th>@SortHeader("Designation", "designation")</th>
                         <th>@SortHeader("Status", "status")</th>
@@ -447,14 +751,40 @@
                                         aria-label="Edit user"
                                         @onclick="() => OpenEditUserModal(user)"
                                         @onclick:stopPropagation="true"
-                                        disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                        disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditUser))">
                                     <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                                </button>
+                                <button type="button"
+                                        class="attendance-action-button"
+                                        title="Password Reset"
+                                        aria-label="Reset user password"
+                                        @onclick="() => OpenPasswordResetModal(user)"
+                                        @onclick:stopPropagation="true"
+                                        disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditUser))">
+                                    <i class="fa-solid fa-key" aria-hidden="true"></i>
+                                </button>
+                                <button type="button"
+                                        class="attendance-action-button"
+                                        title="Delete"
+                                        aria-label="Delete user"
+                                        @onclick="() => OpenDeleteUserModal(user)"
+                                        @onclick:stopPropagation="true"
+                                        disabled="@(!CanDeleteUser(user))">
+                                    <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
                                 </button>
                             </td>
                             <td><span class="cell-ellipsis" title="@FormatName(user.LastName, user.FirstName, user.MiddleName)">@FormatName(user.LastName, user.FirstName, user.MiddleName)</span></td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(user.Username)">@DisplayValue(user.Username)</span></td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(user.Email)">@DisplayValue(user.Email)</span></td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(user.Role)">@DisplayValue(user.Role)</span></td>
+                            <td>
+                                <div class="user-access-pill-list" title="@DisplayAccess(user.AccessLevel)">
+                                    @foreach (var access in GetAccessPills(user))
+                                    {
+                                        <span class="access-level-badge">@access</span>
+                                    }
+                                </div>
+                            </td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(user.DivisionCenterUnit)">@DisplayValue(user.DivisionCenterUnit)</span></td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(user.Designation)">@DisplayValue(user.Designation)</span></td>
                             <td><span class="status-badge @(user.IsActive ? "status-ok" : "status-danger")">@(user.IsActive ? "Active" : "Inactive")</span></td>
@@ -464,7 +794,7 @@
                     @if (!PagedUsers.Any())
                     {
                         <tr>
-                            <td colspan="9" class="attendance-empty-state">No users match the current search and filters.</td>
+                            <td colspan="10" class="attendance-empty-state">No users match the current search and filters.</td>
                         </tr>
                     }
                 </tbody>
@@ -485,9 +815,17 @@
                     <i class="fa-solid fa-eye" aria-hidden="true"></i>
                     <span>View</span>
                 </button>
-                <button type="button" @onclick="OpenHoveredUserEdit" disabled="@(!CurrentUser.HasAccess("Edit"))">
+            <button type="button" @onclick="OpenHoveredUserEdit" disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditUser))">
                     <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                     <span>Edit</span>
+                </button>
+                <button type="button" @onclick="OpenHoveredPasswordReset" disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditUser))">
+                    <i class="fa-solid fa-key" aria-hidden="true"></i>
+                    <span>Password Reset</span>
+                </button>
+                <button type="button" class="attendance-hover-row-menu-danger" @onclick="OpenHoveredUserDelete" disabled="@(!CanDeleteUser(hoveredUserRowMenuUser))">
+                    <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+                    <span>Delete</span>
                 </button>
             }
         </div>
@@ -512,8 +850,14 @@
         </div>
     </div>
 </div>
+</RequireAccess>
 
 <style>
+    .attendance-logs-export-btn {
+        align-self: center;
+        white-space: nowrap;
+    }
+
     .attendance-table-toolbar {
         display: flex;
         align-items: flex-start;
@@ -619,10 +963,69 @@
         gap: 0.5rem;
     }
 
+    .attendance-input-grid.user-access-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        align-items: end;
+    }
+
+    .user-office-grid {
+        gap: 0.5rem;
+    }
+
     .attendance-input-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: 1fr;
         gap: 0.65rem;
+    }
+
+    .user-modal-identity .attendance-input-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .user-modal-identity .attendance-input-field {
+        grid-column: auto;
+    }
+
+    .user-modal-identity .user-identity-account-field {
+        grid-column: auto;
+    }
+
+    .user-status-toggle {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        min-height: 2.05rem;
+        width: 10.5rem;
+        padding: 0.12rem;
+        border: 1px solid #d8dee8;
+        border-radius: 999px;
+        background: #eceef2;
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+        gap: 0;
+    }
+
+    .user-status-toggle-option {
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: #64748b;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0;
+    }
+
+    .user-status-toggle-option.active {
+        background: #ffffff;
+        color: #166534;
+        box-shadow: 0 1px 5px rgba(15, 23, 42, 0.18);
+    }
+
+    .user-status-toggle-option.inactive {
+        background: #ffffff;
+        color: #991b1b;
+        box-shadow: 0 1px 5px rgba(15, 23, 42, 0.18);
     }
 
     .attendance-filter-actions {
@@ -801,11 +1204,11 @@
 
     .attendance-actions-column,
     .attendance-actions-cell {
-        min-width: 6.5rem;
+        min-width: 13.2rem;
     }
 
     .attendance-table .attendance-actions-cell {
-        vertical-align: middle;
+        vertical-align: top;
         white-space: nowrap;
     }
 
@@ -837,6 +1240,20 @@
     .attendance-action-button:disabled {
         cursor: not-allowed;
         opacity: 0.5;
+    }
+
+    .user-password-input-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 2.85rem;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .user-password-random-button {
+        width: 2.85rem;
+        height: 2.85rem;
+        margin-right: 0;
+        border-radius: 8px;
     }
 
     .attendance-hover-row-menu {
@@ -897,9 +1314,41 @@
         color: var(--finance-primary, var(--finance-text));
     }
 
+    .attendance-hover-row-menu button.attendance-hover-row-menu-danger:hover:not(:disabled) {
+        background: #fef2f2;
+        color: #b91c1c;
+    }
+
     .attendance-hover-row-menu button:disabled {
         cursor: not-allowed;
         opacity: 0.5;
+    }
+
+    .attendance-detail-modal.user-delete-modal {
+        width: min(100%, 520px);
+    }
+
+    .attendance-delete-warning {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: start;
+        gap: 1rem;
+    }
+
+    .user-delete-modal .attendance-detail-footer {
+        justify-content: flex-end;
+    }
+
+    .attendance-delete-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 999px;
+        background: #fef2f2;
+        color: #dc2626;
+        font-size: 1.1rem;
     }
 
     .attendance-detail-overlay {
@@ -929,12 +1378,45 @@
 
     .attendance-input-modal,
     .user-input-modal {
-        width: min(100%, 900px);
+        width: min(100%, 560px);
     }
 
     .user-input-modal {
-        max-height: min(92vh, 900px);
+        max-height: calc(100vh - 2rem);
+        overflow: visible;
+        z-index: 110;
+    }
+
+    .user-input-modal.user-input-modal-scrollable {
         overflow: hidden;
+    }
+
+    .user-input-modal .attendance-input-control,
+    .user-input-modal .attendance-filter-select-trigger {
+        width: 100%;
+    }
+
+    .user-input-modal .attendance-detail-footer {
+        border-bottom-left-radius: inherit;
+        border-bottom-right-radius: inherit;
+        overflow: hidden;
+    }
+
+    .user-input-modal .attendance-detail-body {
+        position: relative;
+        z-index: 20;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .user-input-modal.user-input-modal-scrollable .attendance-detail-body {
+        overflow-y: auto;
+    }
+
+    .user-input-modal .attendance-detail-footer {
+        position: relative;
+        z-index: 10;
+        flex: 0 0 auto;
     }
 
     .attendance-detail-header,
@@ -950,6 +1432,7 @@
         position: sticky;
         top: 0;
         z-index: 2;
+        flex: 0 0 auto;
         padding: 1.15rem 1.5rem 1rem;
         background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
         border-bottom: 1px solid var(--etrs-gray-200);
@@ -984,6 +1467,10 @@
         gap: 0.6rem;
     }
 
+    .user-detail-modal .attendance-detail-header-actions {
+        margin-left: auto;
+    }
+
     .attendance-detail-header-button {
         display: inline-flex;
         align-items: center;
@@ -1013,6 +1500,12 @@
     }
 
     .attendance-input-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .user-detail-body {
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
@@ -1064,10 +1557,73 @@
         white-space: nowrap;
     }
 
+    .user-detail-modal .attendance-detail-hero .status-badge {
+        flex: 0 0 auto;
+        min-height: auto;
+        min-width: auto;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .user-detail-modal .attendance-detail-hero .status-badge.status-ok {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    .user-detail-modal .attendance-detail-hero .status-badge.status-danger {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #fecaca;
+    }
+
     .user-modal-section {
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
+    }
+
+    .user-modal-step-panel {
+        animation-duration: 180ms;
+        animation-timing-function: ease-out;
+        animation-fill-mode: both;
+        will-change: opacity, transform;
+    }
+
+    .user-modal-step-panel.step-forward {
+        animation-name: user-modal-step-forward;
+    }
+
+    .user-modal-step-panel.step-backward {
+        animation-name: user-modal-step-backward;
+    }
+
+    @@keyframes user-modal-step-forward {
+        from {
+            opacity: 0;
+            transform: translateX(18px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes user-modal-step-backward {
+        from {
+            opacity: 0;
+            transform: translateX(-18px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
     }
 
     .user-modal-section-heading {
@@ -1094,11 +1650,20 @@
         overflow-wrap: anywhere;
     }
 
+    .user-detail-access-pill-list {
+        margin-top: 0.35rem;
+        max-width: none;
+    }
+
     .attendance-detail-footer {
         align-items: center;
         padding: 0.85rem 1.5rem 1rem;
         border-top: 1px solid var(--etrs-gray-200);
         background: #fff;
+    }
+
+    .user-detail-modal .attendance-detail-footer {
+        justify-content: flex-end;
     }
 
     .attendance-detail-text-action {
@@ -1117,67 +1682,314 @@
         min-width: 84px;
     }
 
+    .user-modal-footer-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.6rem;
+    }
+
     .access-pills {
         display: flex;
         align-items: center;
-        gap: 0.4rem;
-        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.45rem;
+        flex-wrap: nowrap;
         height: auto;
         min-height: 2.85rem;
-        padding: 0.45rem 0.65rem;
+        padding: 0.45rem 0.55rem 0.45rem 0.65rem;
         border: 1px solid var(--finance-border);
         border-radius: 8px;
         background: #fff;
         cursor: pointer;
     }
 
+    .user-modal-dropdown {
+        z-index: 30;
+    }
+
+    .user-input-modal .attendance-input-field {
+        position: relative;
+    }
+
+    .user-input-modal .attendance-input-field.user-modal-field-open {
+        z-index: 2200;
+    }
+
+    .user-modal-dropdown .attendance-filter-select-trigger {
+        min-height: 2.85rem;
+        padding: 0.45rem 0.65rem;
+        border-color: var(--finance-border);
+        color: var(--finance-text);
+        font-size: 0.9rem;
+    }
+
+    .user-modal-dropdown .attendance-filter-select-trigger.active {
+        border-color: var(--etrs-gray-400);
+        box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
+    }
+
+    .user-modal-dropdown .attendance-filter-select-menu {
+        z-index: 2300;
+        max-height: var(--user-modal-menu-max-height, 16rem);
+    }
+
+    .user-modal-dropdown .attendance-filter-select-menu.open-upward {
+        top: auto;
+        bottom: calc(100% + 0.35rem);
+        transform: translateY(6px);
+    }
+
+    .user-modal-dropdown .attendance-filter-select-menu.open-upward.show {
+        transform: translateY(0);
+    }
+
+    .access-pills .attendance-dropdown-caret {
+        margin-left: auto;
+    }
+
     .access-placeholder {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         color: var(--finance-text-muted);
     }
 
-    .access-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        padding: 0.25rem 0.45rem;
-        border: 1px solid var(--etrs-gray-200);
-        border-radius: 999px;
-        background: var(--finance-surface-soft);
-        color: var(--finance-text);
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-
-    .access-remove {
+    .access-count-pill {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 1rem;
-        height: 1rem;
-        border: 0;
+        gap: 0.45rem;
+        min-width: 3.1rem;
+        height: 1.55rem;
+        padding: 0 0.55rem;
+        border: 1px solid #d7dce5;
         border-radius: 999px;
-        background: transparent;
-        color: var(--finance-text-muted);
+        background: #f1f4f8;
+        color: var(--finance-text);
+        font-size: 0.78rem;
+        font-weight: 700;
         line-height: 1;
     }
 
-    .access-dropdown {
+    .access-count-clear {
+        display: inline-flex;
+        align-items: center;
+        color: var(--finance-text-muted);
+        font-size: 0.74rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .user-modal-dropdown .attendance-filter-select-menu.access-dropdown {
+        left: 0;
         right: auto;
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+        padding: 0.55rem 0.55rem 0.75rem;
+        z-index: 2400;
+    }
+
+    .access-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.45rem;
+        padding: 0 0 0.5rem;
+    }
+
+    .access-tab {
+        min-height: 2.15rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--finance-text-muted);
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .access-tab.active {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .access-option-wrap {
+        position: relative;
+    }
+
+    .access-option-wrap.active-parent {
+        z-index: 2600;
     }
 
     .access-option {
         display: flex;
         align-items: center;
-        gap: 0.45rem;
+        gap: 0.75rem;
         margin: 0;
-        padding: 0.45rem 0.55rem;
+        padding: 0.55rem 0.65rem;
+        border: 0;
         border-radius: 6px;
         color: var(--finance-text);
         font-size: 0.88rem;
+        font-weight: 600;
+        width: 100%;
     }
 
-    .access-option:hover {
+    .access-option.disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    .access-child-count {
+        margin-left: auto;
+        min-width: 2.1rem;
+        padding: 0.12rem 0.35rem;
+        border-radius: 999px;
         background: var(--finance-surface-soft);
+        color: var(--finance-text-muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .access-parent-arrow {
+        flex: 0 0 auto;
+        color: var(--finance-text-muted);
+        font-size: 0.76rem;
+    }
+
+    .access-child-menu {
+        position: absolute;
+        top: calc(100% - 0.75rem);
+        left: calc(100% - 1.1rem);
+        width: 16rem;
+        padding: 0.35rem;
+        border: 1px solid var(--finance-border);
+        border-radius: 6px;
+        background: var(--finance-surface);
+        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+        z-index: 2700;
+    }
+
+    .access-child-menu.open-left {
+        left: auto;
+        right: calc(100% - 1.1rem);
+    }
+
+    .access-child-menu.open-upward {
+        top: auto;
+        bottom: calc(100% - 0.75rem);
+    }
+
+    .access-child-menu-title {
+        margin: 0.05rem 0.2rem 0.35rem;
+        padding: 0.35rem 0.25rem 0.5rem;
+        border-bottom: 1px solid var(--finance-border-soft);
+        color: var(--finance-text);
+        font-size: 0.84rem;
+        font-weight: 700;
+        line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .access-child-option {
+        min-height: 2.25rem;
+    }
+
+    .access-option-select-all {
+        font-weight: 700;
+    }
+
+    .access-option:hover,
+    .access-option.active {
+        background: var(--finance-surface-soft);
+        color: var(--finance-primary, var(--finance-text));
+    }
+
+    .access-option-check {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid #d6d9df;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #ffffff;
+        font-size: 0.58rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .access-option.active .access-option-check {
+        border-color: #4f5eea;
+        background: #4f5eea;
+    }
+
+    .access-option-check i {
+        color: #ffffff;
+        font-size: 0.55rem;
+        line-height: 1;
+    }
+
+    .user-access-pill-list {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        max-width: 24rem;
+        flex-wrap: wrap;
+        white-space: normal;
+    }
+
+    .access-level-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 1.75rem;
+        padding: 0.3rem 0.65rem;
+        border: 1px solid #dbe3ef;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 0.82rem;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .attendance-table tbody td {
+        vertical-align: top;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 1.9rem;
+        min-width: 4.2rem;
+        padding: 0.35rem 0.8rem;
+        border-radius: 999px;
+        font-size: 0.84rem;
+        font-weight: 700;
+        line-height: 1;
+        border: 1px solid transparent;
+    }
+
+    .status-badge.status-ok {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    .status-badge.status-danger {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #fecaca;
     }
 
     body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-button,
@@ -1206,6 +2018,7 @@
     body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-menu,
     body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-menu,
     body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-menu,
+    body.etrs-dark-theme .user-input-modal .attendance-filter-select-menu,
     body.etrs-dark-theme .user-input-modal .access-dropdown {
         background: #111c2d !important;
         border-color: #2f4058 !important;
@@ -1213,6 +2026,7 @@
     }
 
     body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-trigger,
+    body.etrs-dark-theme .user-input-modal .attendance-filter-select-trigger,
     body.etrs-dark-theme .user-input-modal .attendance-input-control,
     body.etrs-dark-theme .user-input-modal input,
     body.etrs-dark-theme .user-input-modal .access-pills {
@@ -1223,14 +2037,22 @@
     }
 
     body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-trigger.active,
+    body.etrs-dark-theme .user-input-modal .attendance-filter-select-trigger.active,
     body.etrs-dark-theme .user-input-modal .attendance-input-control:focus {
         border-color: var(--finance-brand-strong) !important;
         box-shadow: none !important;
     }
 
+    body.etrs-dark-theme .user-status-toggle {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+    }
+
     body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-value,
     body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-option,
     body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-option,
+    body.etrs-dark-theme .user-input-modal .attendance-filter-select-value,
+    body.etrs-dark-theme .user-input-modal .attendance-filter-select-option,
     body.etrs-dark-theme .user-input-modal .access-option,
     body.etrs-dark-theme .user-input-modal .access-placeholder {
         color: #dbe7f6 !important;
@@ -1240,6 +2062,8 @@
     body.etrs-dark-theme .attendance-table-toolbar .attendance-filter-select-option.active,
     body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-option:hover,
     body.etrs-dark-theme .attendance-table-toolbar .attendance-entries-option.active,
+    body.etrs-dark-theme .user-input-modal .attendance-filter-select-option:hover,
+    body.etrs-dark-theme .user-input-modal .attendance-filter-select-option.active,
     body.etrs-dark-theme .user-input-modal .access-option:hover {
         background: #1b2a3d !important;
         color: #ffffff !important;
@@ -1298,6 +2122,16 @@
         color: #ffffff !important;
     }
 
+    body.etrs-dark-theme .attendance-hover-row-menu button.attendance-hover-row-menu-danger:hover:not(:disabled) {
+        background: rgba(248, 113, 113, 0.16) !important;
+        color: #f87171 !important;
+    }
+
+    body.etrs-dark-theme .attendance-delete-icon {
+        background: rgba(248, 113, 113, 0.16) !important;
+        color: #f87171 !important;
+    }
+
     body.etrs-dark-theme .attendance-detail-overlay {
         background: rgba(6, 12, 22, 0.68) !important;
         backdrop-filter: blur(10px) !important;
@@ -1332,8 +2166,7 @@
 
     body.etrs-dark-theme .attendance-detail-title,
     body.etrs-dark-theme .attendance-detail-person,
-    body.etrs-dark-theme .attendance-detail-field strong,
-    body.etrs-dark-theme .access-pill {
+    body.etrs-dark-theme .attendance-detail-field strong {
         color: #f8fafc !important;
     }
 
@@ -1346,24 +2179,56 @@
 
     body.etrs-dark-theme .attendance-detail-close,
     body.etrs-dark-theme .attendance-detail-text-action,
-    body.etrs-dark-theme .access-remove,
     body.etrs-dark-theme .user-input-modal .attendance-dropdown-caret {
         color: #9fb3d0 !important;
     }
 
     body.etrs-dark-theme .attendance-detail-close:hover,
-    body.etrs-dark-theme .attendance-detail-text-action:hover,
-    body.etrs-dark-theme .access-remove:hover {
+    body.etrs-dark-theme .attendance-detail-text-action:hover {
         color: #ffffff !important;
     }
 
     body.etrs-dark-theme .attendance-detail-header-button,
     body.etrs-dark-theme .attendance-detail-done,
     body.etrs-dark-theme .attendance-input-pill,
-    body.etrs-dark-theme .access-pill {
+    body.etrs-dark-theme .access-count-pill {
         background: #1b2a3d !important;
         border-color: #2f4058 !important;
         box-shadow: none !important;
+    }
+
+    body.etrs-dark-theme .access-level-badge {
+        background: #1b2a3d !important;
+        border-color: #2f4058 !important;
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .status-badge.status-ok,
+    body.etrs-dark-theme .user-status-toggle-option.active {
+        background: #e8fff0 !important;
+        border-color: #1f7a4d !important;
+        color: #166534 !important;
+    }
+
+    body.etrs-dark-theme .status-badge.status-danger,
+    body.etrs-dark-theme .user-status-toggle-option.inactive {
+        background: #fff1f1 !important;
+        border-color: #7f1d1d !important;
+        color: #991b1b !important;
+    }
+
+    body.etrs-dark-theme .access-option-check {
+        background: #111c2d !important;
+        border-color: #4a5d78 !important;
+    }
+
+    body.etrs-dark-theme .access-option.active .access-option-check {
+        background: var(--finance-brand-strong) !important;
+        border-color: var(--finance-brand-strong) !important;
+    }
+
+    body.etrs-dark-theme .access-option.active .access-option-check i {
+        color: #172033 !important;
     }
 
     body.etrs-dark-theme .attendance-input-pill {
@@ -1409,9 +2274,19 @@
 
         .attendance-input-grid,
         .attendance-input-grid.two-columns,
+        .user-access-grid,
         .attendance-detail-grid,
         .attendance-filter-grid {
             grid-template-columns: 1fr;
+        }
+
+        .user-modal-identity .attendance-input-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .user-modal-identity .attendance-input-field,
+        .user-modal-identity .user-identity-account-field {
+            grid-column: auto;
         }
 
         .attendance-detail-overlay {
@@ -1469,13 +2344,67 @@
 
     private bool showUserModal;
     private bool isEditingUser;
+    private UserModalStep userModalStep = UserModalStep.PersonalInfo;
+    private bool userModalStepMovingForward = true;
+    private bool showDeleteUserModal;
+    private bool isDeletingUser;
+    private bool showPasswordResetModal;
+    private bool isResettingPassword;
     private UserAccount userForm = new();
-    private readonly List<string> accessOptions = new() { "Add", "Edit", "Delete", "Import", "Export", "View" };
+    private UserAccount? userPendingDelete;
+    private UserAccount? userPendingPasswordReset;
+    private string addUserPasswordConfirm = string.Empty;
+    private string passwordResetValue = string.Empty;
+    private string passwordResetConfirm = string.Empty;
+    private readonly List<string> roleOptions = new() { "User", "Admin" };
+    private readonly List<AccessMenuOption> specificAccessOptions = new()
+    {
+        new(AccessPolicy.ViewLogs),
+        new(AccessPolicy.Add, AccessPolicy.InputLogs, AccessPolicy.AddEmployee, AccessPolicy.AddUser),
+        new(AccessPolicy.Edit, AccessPolicy.EditLogs, AccessPolicy.EditEmployee, AccessPolicy.EditUser),
+        new(AccessPolicy.Delete, AccessPolicy.DeleteEmployee, AccessPolicy.DeleteUser),
+        new(AccessPolicy.ImportEmployees),
+        new(AccessPolicy.Export, AccessPolicy.ExportLogs, AccessPolicy.ExportEmployees)
+    };
+    private readonly List<AccessMenuOption> generalAccessOptions = new()
+    {
+        new(AccessPolicy.ManageAttendanceLogs),
+        new(AccessPolicy.ManageEmployees),
+        new(AccessPolicy.ManageExceptions),
+        new(AccessPolicy.ManageUsers)
+    };
     private HashSet<string> selectedAccess = new(StringComparer.OrdinalIgnoreCase);
+    private AccessTab activeAccessTab = AccessTab.Specific;
+    private string? activeAccessParent;
+    private bool activeAccessChildOpenLeft;
+    private bool activeAccessChildOpenUpward;
+    private bool showRoleDropdown;
     private bool showAccessDropdown;
+    private bool showStatusDropdown;
+    private bool openRoleDropdownUpward;
+    private bool openAccessDropdownUpward;
+    private bool openStatusDropdownUpward;
+    private double userRoleMenuMaxHeight = 120;
+    private double userAccessMenuMaxHeight = 320;
+    private double userStatusMenuMaxHeight = 120;
+    private ElementReference userRoleButtonRef;
+    private ElementReference userAccessButtonRef;
+    private ElementReference userStatusButtonRef;
 
     private bool HasHoveredRowMenu => showRowActionMenu && hoveredUserRowMenuUser is not null;
+    private IEnumerable<AccessMenuOption> CurrentAccessOptions => activeAccessTab == AccessTab.Specific
+        ? specificAccessOptions
+        : generalAccessOptions;
+
+    private bool AllAccessSelected => AccessPolicy.AdminAssignableAccess.All(option => selectedAccess.Contains(option));
+
+    private bool CurrentTabAllAccessSelected
+        => GetCurrentTabSelectableAccess().All(access => selectedAccess.Contains(access));
     private string RowActionMenuStyle => $"left:{rowActionMenuLeft:0}px;top:{rowActionMenuTop:0}px;";
+    private bool CanDeleteUsers => CurrentUser.HasAccess(AccessPolicy.DeleteUser);
+    private bool CanDeleteUser(UserAccount? user) => CanDeleteUsers && !IsCurrentUser(user);
+    private int UserModalStepCount => isEditingUser ? 2 : 3;
+    private bool ShouldScrollUserModalBody => userModalStep == UserModalStep.PersonalInfo;
 
     private IEnumerable<UserAccount> PagedUsers => filteredUsers
         .Skip((userPage - 1) * pageSize)
@@ -2047,6 +2976,26 @@
         OpenEditUserModal(user);
     }
 
+    private void OpenHoveredUserDelete()
+    {
+        if (hoveredUserRowMenuUser is not { } user)
+        {
+            return;
+        }
+
+        OpenDeleteUserModal(user);
+    }
+
+    private void OpenHoveredPasswordReset()
+    {
+        if (hoveredUserRowMenuUser is not { } user)
+        {
+            return;
+        }
+
+        OpenPasswordResetModal(user);
+    }
+
     private void OpenAddUserModal()
     {
         CloseUserDetail();
@@ -2054,10 +3003,24 @@
         isEditingUser = false;
         userForm = new UserAccount
         {
+            Role = "User",
             IsActive = true
         };
+        addUserPasswordConfirm = string.Empty;
         selectedAccess = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        showRoleDropdown = false;
         showAccessDropdown = false;
+        showStatusDropdown = false;
+        openRoleDropdownUpward = false;
+        openAccessDropdownUpward = false;
+        openStatusDropdownUpward = false;
+        activeAccessTab = AccessTab.Specific;
+        activeAccessParent = null;
+        activeAccessChildOpenLeft = false;
+        activeAccessChildOpenUpward = false;
+        userModalStep = UserModalStep.PersonalInfo;
+        userModalStepMovingForward = true;
+        ResetUserModalMenuPlacement();
         showUserModal = true;
     }
 
@@ -2080,28 +3043,122 @@
             IsActive = user.IsActive,
             AccessLevel = user.AccessLevel
         };
+        addUserPasswordConfirm = string.Empty;
 
         var tokens = (user.AccessLevel ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        selectedAccess = new HashSet<string>(tokens, StringComparer.OrdinalIgnoreCase);
+        selectedAccess = new HashSet<string>(NormalizeAccessTokens(tokens), StringComparer.OrdinalIgnoreCase);
+        showRoleDropdown = false;
         showAccessDropdown = false;
+        showStatusDropdown = false;
+        openRoleDropdownUpward = false;
+        openAccessDropdownUpward = false;
+        openStatusDropdownUpward = false;
+        activeAccessTab = AccessTab.Specific;
+        activeAccessParent = null;
+        activeAccessChildOpenLeft = false;
+        activeAccessChildOpenUpward = false;
+        userModalStep = UserModalStep.PersonalInfo;
+        userModalStepMovingForward = true;
+        ResetUserModalMenuPlacement();
         showUserModal = true;
+    }
+
+    private void OpenPasswordResetModal(UserAccount user)
+    {
+        if (!CurrentUser.HasAccess(AccessPolicy.EditUser))
+        {
+            return;
+        }
+
+        CloseUserDetail();
+        CloseUserModal();
+        CloseRowMenu();
+        userPendingPasswordReset = user;
+        passwordResetValue = string.Empty;
+        passwordResetConfirm = string.Empty;
+        showPasswordResetModal = true;
+    }
+
+    private void OpenDeleteUserModal(UserAccount user)
+    {
+        if (!CanDeleteUser(user))
+        {
+            return;
+        }
+
+        CloseUserDetail();
+        CloseUserModal();
+        CloseRowMenu();
+        userPendingDelete = user;
+        showDeleteUserModal = true;
     }
 
     private void CloseUserModal()
     {
         showUserModal = false;
+        showRoleDropdown = false;
         showAccessDropdown = false;
+        showStatusDropdown = false;
+        openRoleDropdownUpward = false;
+        openAccessDropdownUpward = false;
+        openStatusDropdownUpward = false;
+        activeAccessParent = null;
+        activeAccessChildOpenLeft = false;
+        activeAccessChildOpenUpward = false;
+        userModalStep = UserModalStep.PersonalInfo;
+        userModalStepMovingForward = true;
+        addUserPasswordConfirm = string.Empty;
+        ResetUserModalMenuPlacement();
+    }
+
+    private void ClosePasswordResetModal()
+    {
+        if (isResettingPassword)
+        {
+            return;
+        }
+
+        showPasswordResetModal = false;
+        userPendingPasswordReset = null;
+        passwordResetValue = string.Empty;
+        passwordResetConfirm = string.Empty;
+    }
+
+    private void CloseDeleteUserModal()
+    {
+        if (isDeletingUser)
+        {
+            return;
+        }
+
+        showDeleteUserModal = false;
+        userPendingDelete = null;
     }
 
     private async Task SaveUserAsync()
     {
-        userForm.AccessLevel = string.Join(",", selectedAccess.OrderBy(value => value));
-
-        if (isEditingUser)
+        if (!isEditingUser && !PasswordsMatch(userForm.Password, addUserPasswordConfirm, "user"))
         {
-            var existing = await Db.UserAccounts.FindAsync(userForm.UserAccountId);
-            if (existing is not null)
+            return;
+        }
+
+        SyncParentSelections();
+
+        userForm.AccessLevel = string.Join(",", selectedAccess.OrderBy(value => value));
+        var wasEditingUser = isEditingUser;
+        var savedUserName = FormatName(userForm.LastName, userForm.FirstName, userForm.MiddleName);
+
+        try
+        {
+            if (isEditingUser)
             {
+                var existing = await Db.UserAccounts.FindAsync(userForm.UserAccountId);
+                if (existing is null)
+                {
+                    ShowToast(ToastType.Warning, "User not found", "The user account no longer exists.");
+                    return;
+                }
+
                 existing.LastName = userForm.LastName;
                 existing.FirstName = userForm.FirstName;
                 existing.MiddleName = userForm.MiddleName;
@@ -2115,39 +3172,597 @@
                 existing.DateUpdated = DateTime.UtcNow;
                 await Db.SaveChangesAsync();
             }
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(userForm.Password))
+            else
             {
-                userForm.Password = BCrypt.Net.BCrypt.HashPassword("Password@123");
+                userForm.Password = BCrypt.Net.BCrypt.HashPassword(userForm.Password);
+                userForm.MustChangePassword = true;
+                userForm.DateCreated = DateTime.UtcNow;
+                await Db.UserAccounts.AddAsync(userForm);
+                await Db.SaveChangesAsync();
             }
 
-            userForm.DateCreated = DateTime.UtcNow;
-            await Db.UserAccounts.AddAsync(userForm);
-            await Db.SaveChangesAsync();
+            await LoadUsersAsync();
+            showUserModal = false;
+            showRoleDropdown = false;
+            showAccessDropdown = false;
+            showStatusDropdown = false;
+            openRoleDropdownUpward = false;
+            openAccessDropdownUpward = false;
+            openStatusDropdownUpward = false;
+            activeAccessParent = null;
+            activeAccessChildOpenLeft = false;
+            activeAccessChildOpenUpward = false;
+            userModalStep = UserModalStep.PersonalInfo;
+            userModalStepMovingForward = true;
+            addUserPasswordConfirm = string.Empty;
+            ResetUserModalMenuPlacement();
+
+            ShowToast(
+                ToastType.Success,
+                wasEditingUser ? "User updated" : "User added",
+                $"{savedUserName} was {(wasEditingUser ? "updated" : "added")}.");
         }
-
-        await LoadUsersAsync();
-        showUserModal = false;
-    }
-
-    private void ToggleAccessDropdown()
-    {
-        showAccessDropdown = !showAccessDropdown;
-    }
-
-    private void ToggleAccess(string option)
-    {
-        if (!selectedAccess.Add(option))
+        catch (Exception ex)
         {
-            selectedAccess.Remove(option);
+            ShowToast(ToastType.Error, wasEditingUser ? "Update failed" : "Add failed", ex.Message);
         }
     }
 
-    private void RemoveAccess(string option)
+    private void GoToPersonalInfoStep()
     {
-        selectedAccess.Remove(option);
+        userModalStepMovingForward = false;
+        userModalStep = UserModalStep.PersonalInfo;
+        CloseUserDropdowns();
+    }
+
+    private void GoToAccountAccessStep()
+    {
+        userModalStepMovingForward = true;
+        userModalStep = UserModalStep.AccountAccess;
+        CloseUserDropdowns();
+    }
+
+    private void GoToAccountAccessStepBack()
+    {
+        userModalStepMovingForward = false;
+        userModalStep = UserModalStep.AccountAccess;
+        CloseUserDropdowns();
+    }
+
+    private void GoToPasswordSetupStep()
+    {
+        if (isEditingUser)
+        {
+            return;
+        }
+
+        userModalStepMovingForward = true;
+        userModalStep = UserModalStep.PasswordSetup;
+        CloseUserDropdowns();
+    }
+
+    private async Task ResetPasswordAsync()
+    {
+        if (userPendingPasswordReset is null || isResettingPassword)
+        {
+            return;
+        }
+
+        if (!CurrentUser.HasAccess(AccessPolicy.EditUser))
+        {
+            ShowToast(ToastType.Warning, "Password reset unavailable", "You do not have access to edit users.");
+            return;
+        }
+
+        if (!PasswordsMatch(passwordResetValue, passwordResetConfirm, "reset"))
+        {
+            return;
+        }
+
+        isResettingPassword = true;
+
+        try
+        {
+            var existing = await Db.UserAccounts.FindAsync(userPendingPasswordReset.UserAccountId);
+            if (existing is null)
+            {
+                ShowToast(ToastType.Warning, "User not found", "The user account no longer exists.");
+            }
+            else
+            {
+                existing.Password = BCrypt.Net.BCrypt.HashPassword(passwordResetValue);
+                existing.MustChangePassword = true;
+                existing.DateUpdated = DateTime.UtcNow;
+                await Db.SaveChangesAsync();
+                showPasswordResetModal = false;
+                userPendingPasswordReset = null;
+                passwordResetValue = string.Empty;
+                passwordResetConfirm = string.Empty;
+                await LoadUsersAsync();
+                ShowToast(ToastType.Success, "Password reset", "The user's password was updated.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Password reset failed", ex.Message);
+        }
+        finally
+        {
+            isResettingPassword = false;
+        }
+    }
+
+    private async Task DeleteUserAsync()
+    {
+        if (userPendingDelete is null || isDeletingUser)
+        {
+            return;
+        }
+
+        if (!CanDeleteUsers)
+        {
+            ShowToast(ToastType.Warning, "Delete unavailable", "You do not have access to delete users.");
+            return;
+        }
+
+        if (IsCurrentUser(userPendingDelete))
+        {
+            ShowToast(ToastType.Warning, "Delete unavailable", "You cannot delete your own user account.");
+            return;
+        }
+
+        isDeletingUser = true;
+
+        try
+        {
+            var userId = userPendingDelete.UserAccountId;
+            var userName = FormatName(userPendingDelete.LastName, userPendingDelete.FirstName, userPendingDelete.MiddleName);
+            var existing = await Db.UserAccounts.FindAsync(userId);
+
+            if (existing is null)
+            {
+                ShowToast(ToastType.Warning, "User not found", "The user account no longer exists.");
+            }
+            else
+            {
+                Db.UserAccounts.Remove(existing);
+                await Db.SaveChangesAsync();
+
+                if (selectedUser?.UserAccountId == userId)
+                {
+                    selectedUser = null;
+                }
+
+                showDeleteUserModal = false;
+                userPendingDelete = null;
+                await LoadUsersAsync();
+                ShowToast(ToastType.Success, "User deleted", $"{userName} was deleted.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Delete failed", ex.Message);
+        }
+        finally
+        {
+            isDeletingUser = false;
+        }
+    }
+
+    private void ShowToast(ToastType type, string title, string message)
+    {
+        ToastService.Show(new ToastMessage
+        {
+            Type = type,
+            Title = title,
+            Message = message
+        });
+    }
+
+    private string GetUserModalStepTitle() => userModalStep switch
+    {
+        UserModalStep.PersonalInfo => "Personal Info",
+        UserModalStep.AccountAccess => "Account Access",
+        UserModalStep.PasswordSetup => "Password Setup",
+        _ => "User Account"
+    };
+
+    private string GetUserModalStepMeta() => userModalStep switch
+    {
+        UserModalStep.PersonalInfo => "Set the user's identity and sign-in details.",
+        UserModalStep.AccountAccess => "Set the user's role, access level, and account status.",
+        UserModalStep.PasswordSetup => "Set and confirm the user's initial password.",
+        _ => string.Empty
+    };
+
+    private void GenerateAddUserPassword()
+    {
+        var generated = GenerateRandomPassword();
+        userForm.Password = generated;
+        addUserPasswordConfirm = generated;
+    }
+
+    private void GeneratePasswordResetValue()
+    {
+        var generated = GenerateRandomPassword();
+        passwordResetValue = generated;
+        passwordResetConfirm = generated;
+    }
+
+    private bool PasswordsMatch(string password, string confirmation, string context)
+    {
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            ShowToast(ToastType.Warning, "Password required", context == "reset" ? "Enter a new password." : "Enter a password for the new user.");
+            return false;
+        }
+
+        if (!string.Equals(password, confirmation, StringComparison.Ordinal))
+        {
+            ShowToast(ToastType.Warning, "Passwords do not match", "Enter the same password in both fields.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string GenerateRandomPassword()
+    {
+        const string lower = "abcdefghijkmnopqrstuvwxyz";
+        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string digits = "23456789";
+        const string symbols = "!@#$%&*?";
+        const string all = lower + upper + digits + symbols;
+
+        var chars = new List<char>
+        {
+            GetRandomCharacter(lower),
+            GetRandomCharacter(upper),
+            GetRandomCharacter(digits),
+            GetRandomCharacter(symbols)
+        };
+
+        while (chars.Count < 12)
+        {
+            chars.Add(GetRandomCharacter(all));
+        }
+
+        for (var index = chars.Count - 1; index > 0; index--)
+        {
+            var swapIndex = RandomNumberGenerator.GetInt32(index + 1);
+            (chars[index], chars[swapIndex]) = (chars[swapIndex], chars[index]);
+        }
+
+        return new string(chars.ToArray());
+    }
+
+    private static char GetRandomCharacter(string characters)
+        => characters[RandomNumberGenerator.GetInt32(characters.Length)];
+
+    private bool IsCurrentUser(UserAccount? user)
+    {
+        if (user is null)
+        {
+            return false;
+        }
+
+        return (!string.IsNullOrWhiteSpace(user.Username)
+                && string.Equals(user.Username, CurrentUser.Username, StringComparison.OrdinalIgnoreCase))
+            || (!string.IsNullOrWhiteSpace(user.Email)
+                && string.Equals(user.Email, CurrentUser.Email, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void CloseUserDropdowns()
+    {
+        showRoleDropdown = false;
+        showAccessDropdown = false;
+        showStatusDropdown = false;
+        openRoleDropdownUpward = false;
+        openAccessDropdownUpward = false;
+        openStatusDropdownUpward = false;
+    }
+
+    private async Task ToggleRoleDropdown()
+    {
+        if (showRoleDropdown)
+        {
+            showRoleDropdown = false;
+            openRoleDropdownUpward = false;
+            return;
+        }
+
+        var placement = await GetUserModalMenuPlacementAsync(userRoleButtonRef, 120);
+        openRoleDropdownUpward = placement.OpenUpward;
+        userRoleMenuMaxHeight = placement.MaxHeight;
+        openAccessDropdownUpward = false;
+        openStatusDropdownUpward = false;
+        showRoleDropdown = true;
+        showAccessDropdown = false;
+        showStatusDropdown = false;
+    }
+
+    private void SelectRole(string option)
+    {
+        userForm.Role = option;
+        if (string.Equals(option, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            selectedAccess = new HashSet<string>(AccessPolicy.AdminAssignableAccess, StringComparer.OrdinalIgnoreCase);
+        }
+        showRoleDropdown = false;
+        openRoleDropdownUpward = false;
+    }
+
+    private async Task ToggleStatusDropdown()
+    {
+        if (showStatusDropdown)
+        {
+            showStatusDropdown = false;
+            openStatusDropdownUpward = false;
+            return;
+        }
+
+        var placement = await GetUserModalMenuPlacementAsync(userStatusButtonRef, 120);
+        openStatusDropdownUpward = placement.OpenUpward;
+        userStatusMenuMaxHeight = placement.MaxHeight;
+        openRoleDropdownUpward = false;
+        openAccessDropdownUpward = false;
+        showStatusDropdown = true;
+        showRoleDropdown = false;
+        showAccessDropdown = false;
+    }
+
+    private void SelectStatus(string option)
+    {
+        userForm.IsActive = string.Equals(option, "Active", StringComparison.OrdinalIgnoreCase);
+        showStatusDropdown = false;
+        openStatusDropdownUpward = false;
+    }
+
+    private async Task ToggleAccessDropdown()
+    {
+        if (showAccessDropdown)
+        {
+            showAccessDropdown = false;
+            openAccessDropdownUpward = false;
+            return;
+        }
+
+        var placement = await GetUserModalMenuPlacementAsync(userAccessButtonRef, GetAccessMenuEstimatedHeight());
+        openAccessDropdownUpward = placement.OpenUpward;
+        userAccessMenuMaxHeight = placement.MaxHeight;
+        openRoleDropdownUpward = false;
+        openStatusDropdownUpward = false;
+        showAccessDropdown = true;
+        showRoleDropdown = false;
+        showStatusDropdown = false;
+    }
+
+    private void ToggleAccess(AccessMenuOption option)
+    {
+        if (IsAccessDisabled(option))
+        {
+            return;
+        }
+
+        if (option.Children.Length == 0)
+        {
+            ToggleChildAccess(option.Name);
+            return;
+        }
+
+        var selectableChildren = option.Children.Where(child => !IsAccessDisabled(child)).ToArray();
+        var allChildrenSelected = selectableChildren.All(child => selectedAccess.Contains(child));
+        if (allChildrenSelected)
+        {
+            foreach (var child in selectableChildren)
+            {
+                selectedAccess.Remove(child);
+            }
+
+            selectedAccess.Remove(option.Name);
+            return;
+        }
+
+        selectedAccess.Add(option.Name);
+        foreach (var child in selectableChildren)
+        {
+            selectedAccess.Add(child);
+        }
+    }
+
+    private void ToggleAllAccess()
+    {
+        if (AllAccessSelected)
+        {
+            selectedAccess.Clear();
+            return;
+        }
+
+        selectedAccess = new HashSet<string>(AccessPolicy.AdminAssignableAccess, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void ToggleCurrentTabAccess()
+    {
+        var tabAccess = GetCurrentTabSelectableAccess().ToArray();
+        if (tabAccess.Length == 0)
+        {
+            return;
+        }
+
+        if (tabAccess.All(access => selectedAccess.Contains(access)))
+        {
+            foreach (var access in tabAccess)
+            {
+                selectedAccess.Remove(access);
+            }
+
+            SyncParentSelections();
+            return;
+        }
+
+        foreach (var access in tabAccess)
+        {
+            selectedAccess.Add(access);
+        }
+
+        SyncParentSelections();
+    }
+
+    private void ClearAccess(MouseEventArgs _)
+    {
+        selectedAccess.Clear();
+    }
+
+    private void ToggleChildAccess(string child)
+    {
+        if (IsAccessDisabled(child))
+        {
+            return;
+        }
+
+        if (!selectedAccess.Add(child))
+        {
+            selectedAccess.Remove(child);
+        }
+
+        SyncParentSelections();
+    }
+
+    private void SetAccessTab(AccessTab tab)
+    {
+        activeAccessTab = tab;
+        activeAccessParent = null;
+        activeAccessChildOpenLeft = false;
+        activeAccessChildOpenUpward = false;
+    }
+
+    private async Task ShowAccessChildrenAsync(AccessMenuOption option)
+    {
+        activeAccessChildOpenLeft = false;
+        activeAccessChildOpenUpward = false;
+
+        if (option.Children.Length > 0)
+        {
+            var placement = await GetAccessChildMenuPlacementAsync(option);
+            activeAccessChildOpenLeft = placement.OpenLeft;
+            activeAccessChildOpenUpward = placement.OpenUpward;
+        }
+
+        activeAccessParent = option.Children.Length > 0 ? option.Name : null;
+    }
+
+    private void HideAccessChildren()
+    {
+        activeAccessParent = null;
+        activeAccessChildOpenLeft = false;
+        activeAccessChildOpenUpward = false;
+    }
+
+    private int GetSelectedChildCount(AccessMenuOption option)
+        => option.Children.Count(child => selectedAccess.Contains(child));
+
+    private bool IsAccessSelected(AccessMenuOption option)
+        => option.Children.Length == 0
+            ? selectedAccess.Contains(option.Name)
+            : option.Children.Where(child => !IsAccessDisabled(child)).All(child => selectedAccess.Contains(child));
+
+    private bool IsAccessDisabled(AccessMenuOption option)
+        => IsAccessDisabled(option.Name);
+
+    private static bool IsAccessDisabled(string access)
+        => false;
+
+    private void SyncParentSelections()
+    {
+        foreach (var option in specificAccessOptions.Concat(generalAccessOptions))
+        {
+            if (option.Children.Length == 0)
+            {
+                continue;
+            }
+
+            var selectableChildren = option.Children.Where(child => !IsAccessDisabled(child)).ToArray();
+            if (selectableChildren.Length > 0 && selectableChildren.All(child => selectedAccess.Contains(child)))
+            {
+                selectedAccess.Add(option.Name);
+            }
+            else
+            {
+                selectedAccess.Remove(option.Name);
+            }
+        }
+    }
+
+    private IEnumerable<string> GetCurrentTabSelectableAccess()
+    {
+        foreach (var option in CurrentAccessOptions)
+        {
+            if (!IsAccessDisabled(option.Name))
+            {
+                yield return option.Name;
+            }
+
+            foreach (var child in option.Children)
+            {
+                if (!IsAccessDisabled(child))
+                {
+                    yield return child;
+                }
+            }
+        }
+    }
+
+    private async Task<UserModalMenuPlacement> GetUserModalMenuPlacementAsync(ElementReference triggerRef, double menuHeight)
+    {
+        try
+        {
+            return await JS.InvokeAsync<UserModalMenuPlacement>("attendanceLogs.getMenuPlacement", triggerRef, menuHeight, 16);
+        }
+        catch
+        {
+            return new UserModalMenuPlacement
+            {
+                OpenUpward = false,
+                MaxHeight = menuHeight
+            };
+        }
+    }
+
+    private async Task<AccessChildMenuPlacement> GetAccessChildMenuPlacementAsync(AccessMenuOption option)
+    {
+        try
+        {
+            return await JS.InvokeAsync<AccessChildMenuPlacement>("attendanceLogs.getAccessChildMenuPlacement", GetAccessChildMenuKey(option), 256, GetAccessChildMenuEstimatedHeight(option), 16);
+        }
+        catch
+        {
+            return new AccessChildMenuPlacement();
+        }
+    }
+
+    private static string GetUserModalDropdownMenuClass(bool isVisible, bool openUpward)
+        => $"attendance-filter-select-menu{(isVisible ? " show" : string.Empty)}{(openUpward ? " open-upward" : string.Empty)}";
+
+    private static string GetUserModalDropdownMenuStyle(double maxHeight)
+        => $"--user-modal-menu-max-height:{Math.Max(96, maxHeight):0}px;";
+
+    private string GetAccessChildMenuClass()
+        => $"{(activeAccessChildOpenLeft ? "open-left" : string.Empty)} {(activeAccessChildOpenUpward ? "open-upward" : string.Empty)}";
+
+    private static string GetAccessChildMenuKey(AccessMenuOption option)
+        => $"access-child-{option.Name}";
+
+    private static double GetAccessChildMenuEstimatedHeight(AccessMenuOption option)
+        => Math.Max(56, option.Children.Length * 36 + 14);
+
+    private double GetAccessMenuEstimatedHeight()
+        => Math.Max(220, CurrentAccessOptions.Count() * 40 + 76);
+
+    private void ResetUserModalMenuPlacement()
+    {
+        userRoleMenuMaxHeight = 120;
+        userAccessMenuMaxHeight = 320;
+        userStatusMenuMaxHeight = 120;
     }
 
     private static string FormatName(string? lastName, string? firstName, string? middleName)
@@ -2170,6 +3785,107 @@
         => string.IsNullOrWhiteSpace(value)
             ? "-"
             : string.Join(", ", value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+    private static IEnumerable<string> GetAccessPills(UserAccount user)
+    {
+        if (string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "All Access Levels";
+            yield break;
+        }
+
+        var access = user.AccessLevel?
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToArray() ?? Array.Empty<string>();
+
+        if (access.Length == 0)
+        {
+            yield return "None";
+            yield break;
+        }
+
+        foreach (var item in access)
+        {
+            yield return item;
+        }
+    }
+
+    private static IEnumerable<string> NormalizeAccessTokens(IEnumerable<string> tokens)
+    {
+        var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var token in tokens)
+        {
+            switch (token)
+            {
+                case "View":
+                    normalized.Add(AccessPolicy.ViewLogs);
+                    break;
+                case "Import":
+                    normalized.Add(AccessPolicy.ImportEmployees);
+                    break;
+                default:
+                    normalized.Add(token);
+                    break;
+            }
+        }
+
+        if (normalized.Contains("Add"))
+        {
+            normalized.Add(AccessPolicy.InputLogs);
+            normalized.Add(AccessPolicy.AddEmployee);
+            normalized.Add(AccessPolicy.AddUser);
+        }
+
+        if (normalized.Contains("Edit"))
+        {
+            normalized.Add(AccessPolicy.EditLogs);
+            normalized.Add(AccessPolicy.EditEmployee);
+            normalized.Add(AccessPolicy.EditUser);
+        }
+
+        if (normalized.Contains("Delete"))
+        {
+            normalized.Add(AccessPolicy.DeleteUser);
+        }
+
+        if (normalized.Contains("Export"))
+        {
+            normalized.Add(AccessPolicy.ExportLogs);
+            normalized.Add(AccessPolicy.ExportEmployees);
+        }
+
+        normalized.Remove("View");
+        normalized.Remove("Import");
+        return normalized;
+    }
+
+    private sealed record AccessMenuOption(string Name, params string[] Children);
+
+    private enum AccessTab
+    {
+        Specific,
+        General
+    }
+
+    private enum UserModalStep
+    {
+        PersonalInfo = 1,
+        AccountAccess = 2,
+        PasswordSetup = 3
+    }
+
+    private sealed class UserModalMenuPlacement
+    {
+        public bool OpenUpward { get; set; }
+        public double MaxHeight { get; set; }
+    }
+
+    private sealed class AccessChildMenuPlacement
+    {
+        public bool OpenLeft { get; set; }
+        public bool OpenUpward { get; set; }
+    }
 
     private sealed class RowMenuPosition
     {

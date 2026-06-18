@@ -235,22 +235,22 @@
             return AllItems;
         }
 
-        if (CurrentUser.HasAccess("Export") || CurrentUser.HasAccess("View") || CurrentUser.HasAccess("Edit") || CurrentUser.HasAccess("Import"))
+        if (CurrentUser.HasAccess(AccessPolicy.ManageAttendanceLogs))
         {
             list.Add(AllItems.First(i => i.Label == "Attendance Logs"));
         }
 
-        if (CurrentUser.HasAccess("View") || CurrentUser.HasAccess("Edit") || CurrentUser.HasAccess("Import") || CurrentUser.HasAccess("Export"))
+        if (CurrentUser.HasAccess(AccessPolicy.ManageEmployees))
         {
             list.Add(AllItems.First(i => i.Label == "Employees"));
         }
 
-        if (CurrentUser.HasAccess("Edit"))
+        if (CurrentUser.HasAccess(AccessPolicy.ManageExceptions))
         {
             list.Add(AllItems.First(i => i.Label == "Exceptions"));
         }
 
-        if (CurrentUser.HasAccess("Add") || CurrentUser.HasAccess("Edit") || CurrentUser.HasAccess("Delete"))
+        if (CurrentUser.HasAccess(AccessPolicy.ManageUsers))
         {
             list.Add(AllItems.First(i => i.Label == "Users"));
         }

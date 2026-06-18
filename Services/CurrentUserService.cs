@@ -69,8 +69,7 @@ namespace Financial.Services
 
                 if (string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase))
                 {
-                    // admin: full access
-                    AccessSet = new HashSet<string>(new[] { "Add", "Edit", "Delete", "Import", "Export", "View" }, StringComparer.OrdinalIgnoreCase);
+                    AccessSet = new HashSet<string>(AccessPolicy.AdminAssignableAccess, StringComparer.OrdinalIgnoreCase);
                 }
                 else
                 {
@@ -97,7 +96,13 @@ namespace Financial.Services
         {
             if (string.IsNullOrWhiteSpace(access)) return false;
             if (string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase)) return true;
-            return AccessSet.Contains(access);
+            return AccessPolicy.HasAccess(AccessSet, access);
+        }
+
+        public bool HasAnyAccess()
+        {
+            if (string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase)) return true;
+            return AccessPolicy.HasAnyAccess(AccessSet);
         }
 
         private static string FormatDisplayName(string? lastName, string? firstName, string? middleName)

@@ -39,9 +39,6 @@ namespace Financial.Services
             }
             lock (_lock)
             {
-                // prevent duplicate messages with same type/title/text already queued
-                var exists = _messages.Exists(m => m.Type == message.Type && m.Title == message.Title && m.Message == message.Message);
-                if (exists) return;
                 _messages.Add(message);
             }
             _logger.LogDebug("ToastService.Show: {Title} - {Message}", message.Title, message.Message);

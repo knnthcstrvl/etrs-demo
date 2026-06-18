@@ -11,17 +11,17 @@
 
 <PageTitle>ETRS | Employees</PageTitle>
 
-<RequireAccess RequiredAccess='@(new string[] { "View", "Edit", "Import", "Export" })'>
+<RequireAccess RequiredAccess='@(new string[] { AccessPolicy.ManageEmployees })'>
 <div class="dashboard-shell">
     <div class="panel-heading attendance-logs-heading">
         <div>
             <h1 class="attendance-logs-title">Employees</h1>
         </div>
         <div class="attendance-logs-header-actions">
-            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenAddEmployeeModal" disabled="@(!CurrentUser.HasAccess("Edit"))">Add Employee</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenAddEmployeeModal" disabled="@(!CurrentUser.HasAccess(AccessPolicy.AddEmployee))">Add Employee</button>
             <span class="employees-header-sep" aria-hidden="true"></span>
-            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenImportEmployeesModal" disabled="@(!CurrentUser.HasAccess("Import"))">Import</button>
-            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenExportEmployeesModal" disabled="@(!CurrentUser.HasAccess("Export"))">Export</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenImportEmployeesModal" disabled="@(!CurrentUser.HasAccess(AccessPolicy.ImportEmployees))">Import</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenExportEmployeesModal" disabled="@(!CurrentUser.HasAccess(AccessPolicy.ExportEmployees))">Export</button>
         </div>
     </div>
 
@@ -222,7 +222,7 @@
                             <button type="button"
                                     class="attendance-detail-header-button"
                                     @onclick="() => OpenEditEmployeeModal(selectedEmployee)"
-                                    disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                    disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditEmployee))">
                                 Edit Employee
                             </button>
                             <button type="button" class="attendance-detail-close" @onclick="CloseEmployeeDetail" aria-label="Close employee details">
@@ -430,7 +430,7 @@
                                 <div class="attendance-detail-eyebrow">Confirm Delete</div>
                                 <div class="attendance-detail-person">@FormatName(employeePendingDelete.LastName, employeePendingDelete.FirstName, employeePendingDelete.MiddleName)</div>
                                 <div class="attendance-detail-meta">
-                                    This will permanently delete the employee record and related attendance logs.
+                                    This will permanently delete the employee record. Attendance logs will remain available.
                                 </div>
                             </div>
                         </div>
@@ -598,7 +598,7 @@
                                     aria-label="Edit employee"
                                     @onclick="() => OpenEditEmployeeModal(employee)"
                                     @onclick:stopPropagation="true"
-                                    disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                    disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditEmployee))">
                                 <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                             </button>
                             <button type="button"
@@ -656,7 +656,7 @@
                 <i class="fa-solid fa-eye" aria-hidden="true"></i>
                 <span>View</span>
             </button>
-            <button type="button" @onclick="OpenHoveredEmployeeEdit" disabled="@(!CurrentUser.HasAccess("Edit"))">
+            <button type="button" @onclick="OpenHoveredEmployeeEdit" disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditEmployee))">
                 <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                 <span>Edit</span>
             </button>

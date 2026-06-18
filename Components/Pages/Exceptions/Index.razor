@@ -7,11 +7,13 @@
 @inject ProcurementDbContext Db
 @inject IToastService ToastService
 @inject IJSRuntime JS
+@inject Financial.Services.CurrentUserService CurrentUser
 
 @implements IAsyncDisposable
 
 <PageTitle>ETRS | Exceptions</PageTitle>
 
+<RequireAccess RequiredAccess='@(new string[] { AccessPolicy.ManageExceptions })'>
 <div class="dashboard-shell">
     <div class="panel-heading attendance-logs-heading exceptions-heading">
         <div>
@@ -237,7 +239,7 @@
                                         aria-label="Open exception setup"
                                         @onclick="() => OpenExceptionSetupModal(row)"
                                         @onclick:stopPropagation="true"
-                                        disabled="@(isBusy || isSelectedDateHoliday)">
+                                        disabled="@(isBusy || isSelectedDateHoliday || !CurrentUser.HasAccess(AccessPolicy.ManageExceptions))">
                                     <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                                 </button>
                             </td>
@@ -275,7 +277,7 @@
                 <i class="fa-solid fa-eye" aria-hidden="true"></i>
                 <span>View</span>
             </button>
-            <button type="button" @onclick="OpenHoveredExceptionSetup" disabled="@(isBusy || isSelectedDateHoliday)">
+            <button type="button" @onclick="OpenHoveredExceptionSetup" disabled="@(isBusy || isSelectedDateHoliday || !CurrentUser.HasAccess(AccessPolicy.ManageExceptions))">
                 <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                 <span>Exception Setup</span>
             </button>
@@ -314,7 +316,7 @@
                         <button type="button"
                                 class="attendance-detail-header-button"
                                 @onclick="() => OpenExceptionSetupModal(selectedDetailRow)"
-                                disabled="@(isBusy || isSelectedDateHoliday)">
+                                disabled="@(isBusy || isSelectedDateHoliday || !CurrentUser.HasAccess(AccessPolicy.ManageExceptions))">
                             Exception Setup
                         </button>
                         <button type="button" class="attendance-detail-close" @onclick="CloseDetailsModal" aria-label="Close details">
@@ -412,6 +414,10 @@
                                 </button>
 
                                 <div class="attendance-filter-select-menu @(showSetupOptionMenu ? "show" : null)">
+                                    @if (string.Equals(setupSelectedOption, NotTaggedOptionValue, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <button type="button" class="attendance-filter-select-option active" @onclick="() => SelectSetupOption(NotTaggedOptionValue)">Not Tagged</button>
+                                    }
                                     <button type="button" class="attendance-filter-select-option @(string.Equals(setupSelectedOption, WfhOptionValue, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick="() => SelectSetupOption(WfhOptionValue)">WFH</button>
                                     @foreach (var condition in ManualExceptionConditions)
                                     {
@@ -636,6 +642,10 @@
                                                     {
                                                         <td>
                                                             <select class="form-select form-select-sm" value="@row.SelectedOption" @onchange="e => row.SelectedOption = e.Value?.ToString() ?? WfhOptionValue" disabled="@isBusy">
+                                                                @if (string.Equals(row.SelectedOption, NotTaggedOptionValue, StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                    <option value="@NotTaggedOptionValue">Not Tagged</option>
+                                                                }
                                                                 <option value="@WfhOptionValue">WFH</option>
                                                                 @foreach (var condition in ManualExceptionConditions)
                                                                 {
@@ -664,6 +674,7 @@
         </div>
     }
 </div>
+</RequireAccess>
 
 <style>
     .exceptions-heading {
@@ -2422,6 +2433,7 @@
 @code {
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 100;
+    private const string NotTaggedOptionValue = "Not Tagged";
     private const string WfhOptionValue = "WFH";
     private const string AbsentOptionValue = "Absent";
     private const string HolidayConditionName = "Holiday";
@@ -2937,6 +2949,12 @@
         }
 
         setupRow.SelectedOption = setupSelectedOption;
+        if (string.Equals(setupSelectedOption, NotTaggedOptionValue, StringComparison.OrdinalIgnoreCase))
+        {
+            CloseExceptionSetupModal();
+            return;
+        }
+
         await SaveRowAsync(setupRow);
         CloseExceptionSetupModal();
     }
@@ -3195,6 +3213,11 @@
             if (await IsHolidayDateAsync(attendanceDate.Date))
             {
                 ShowToast(ToastType.Warning, "Holiday date locked", "Cancel the Holiday setup before changing employee arrangements for this date.");
+                return;
+            }
+
+            if (string.Equals(row.SelectedOption, NotTaggedOptionValue, StringComparison.OrdinalIgnoreCase))
+            {
                 return;
             }
 
@@ -3541,6 +3564,11 @@
 
     private string GetSetupOptionLabel(string? optionValue)
     {
+        if (string.Equals(optionValue, NotTaggedOptionValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return NotTaggedOptionValue;
+        }
+
         if (string.Equals(optionValue, WfhOptionValue, StringComparison.OrdinalIgnoreCase))
         {
             return WfhOptionValue;
@@ -3626,6 +3654,11 @@
 
     private static string GetSelectedOptionValue(AttendanceLogWfh? log, string arrangement)
     {
+        if (log is null)
+        {
+            return NotTaggedOptionValue;
+        }
+
         if (log?.ExceptionConditionId is int exceptionConditionId
             && !string.Equals(arrangement, HolidayConditionName, StringComparison.OrdinalIgnoreCase))
         {

@@ -20,7 +20,7 @@
     <title>ETRS | Attendance Logs</title>
 </HeadContent>
 
-<RequireAccess RequiredAccess=@(new string[] { "View", "Export", "Edit", "Import" })>
+<RequireAccess RequiredAccess=@(new string[] { AccessPolicy.ManageAttendanceLogs })>
     <div class="dashboard-shell">
     <div class="panel-heading attendance-logs-heading">
         <div>
@@ -97,8 +97,8 @@
             }
 
             <span class="period-sep" aria-hidden="true"></span>
-            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenInputLogsModal" disabled="@(!CurrentUser.HasAccess("Edit"))">Input Logs</button>
-            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenExportLogsModal" disabled=@(!CurrentUser.HasAccess("Export"))>Export</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenInputLogsModal" disabled="@(!CurrentUser.HasAccess(AccessPolicy.InputLogs))">Input Logs</button>
+            <button type="button" class="btn btn-outline-secondary attendance-logs-export-btn" @onclick="OpenExportLogsModal" disabled=@(!CurrentUser.HasAccess(AccessPolicy.ExportLogs))>Export</button>
         </div>
     </div>
 
@@ -375,6 +375,7 @@
                             <th>@SortHeader("Employee", "employee", false)</th>
                             <th>@SortHeader("Division / Unit", "division", false)</th>
                             <th>@SortHeader("Designation", "designation", false)</th>
+                            <th>@SortHeader("Status", "status", false)</th>
                             <th>Attendance Date</th>
                             <th>@SortHeader("AM", "am", false)</th>
                             <th>@SortHeader("PM", "pm", false)</th>
@@ -403,7 +404,7 @@
                                             aria-label="Edit attendance log"
                                             @onclick="() => OpenOnsiteEdit(log)"
                                             @onclick:stopPropagation="true"
-                                            disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                            disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditLogs))">
                                         <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                                     </button>
                                 </td>
@@ -411,6 +412,7 @@
                                 <td><span class="cell-ellipsis" title="@FormatName(log.LastName, log.FirstName, log.MiddleName)">@FormatName(log.LastName, log.FirstName, log.MiddleName)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.DivisionCenterUnit)">@DisplayValue(log.DivisionCenterUnit)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.Designation)">@DisplayValue(log.Designation)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayEmployeeType(log)">@DisplayEmployeeType(log)</span></td>
                                 <td><span class="cell-ellipsis" title="@FormatDate(log.AttendanceDate)">@FormatDate(log.AttendanceDate)</span></td>
                                 <td class="time-cell @(IsTardinessOverride(log) ? "attendance-time-overridden" : null)"><span class="cell-ellipsis" title="@FormatTimeRange(log.TimeInAm, log.TimeOutAm)">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</span></td>
                                 <td class="time-cell @(IsTardinessOverride(log) ? "attendance-time-overridden" : null)"><span class="cell-ellipsis" title="@FormatTimeRange(GetCreditedOnsiteTimeInPm(log), log.TimeOutPm)">@FormatTimeRange(GetCreditedOnsiteTimeInPm(log), log.TimeOutPm)</span></td>
@@ -427,7 +429,7 @@
                         @if (!PagedOnsiteLogs.Any())
                         {
                             <tr>
-                                <td colspan="9" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
+                                <td colspan="10" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
                             </tr>
                         }
                     </tbody>
@@ -443,12 +445,13 @@
                             <th>@SortHeader("Employee", "employee", true)</th>
                             <th>@SortHeader("Division / Unit", "division", true)</th>
                             <th>@SortHeader("Designation", "designation", true)</th>
+                            <th>@SortHeader("Status", "status", true)</th>
                             <th>Attendance Date</th>
                             <th>Target</th>
                             <th>Accomplishment</th>
                             <th>MOV</th>
+                            <th>Photo Verification</th>
                             <th>Arrangement</th>
-                            <th>Status</th>
                             <th>@SortHeader("Time In", "timein", true)</th>
                             <th>@SortHeader("Time Out", "timeout", true)</th>
                             <th>Late/Undertime</th>
@@ -476,7 +479,7 @@
                                             aria-label="Edit attendance log"
                                             @onclick="() => OpenWfhEdit(log)"
                                             @onclick:stopPropagation="true"
-                                            disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                            disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditLogs))">
                                         <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                                     </button>
                                 </td>
@@ -484,6 +487,7 @@
                                 <td><span class="cell-ellipsis" title="@FormatName(log.LastName, log.FirstName, log.MiddleName)">@FormatName(log.LastName, log.FirstName, log.MiddleName)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.DivisionCenterUnit)">@DisplayValue(log.DivisionCenterUnit)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.Designation)">@DisplayValue(log.Designation)</span></td>
+                                <td><span class="cell-ellipsis" title="@DisplayEmployeeType(log)">@DisplayEmployeeType(log)</span></td>
                                 <td><span class="cell-ellipsis" title="@FormatDate(log.AttendanceDate)">@FormatDate(log.AttendanceDate)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.Target)">@DisplayValue(log.Target)</span></td>
                                 <td><span class="cell-ellipsis" title="@DisplayValue(log.Accomplishment)">@DisplayValue(log.Accomplishment)</span></td>
@@ -494,11 +498,28 @@
                                     }
                                     else
                                     {
-                                        <a class="cell-ellipsis" href="@log.Mov" target="_blank" title="@log.Mov">View File</a>
+                                        <button type="button"
+                                                class="attendance-table-link-button cell-ellipsis"
+                                                title="@log.Mov"
+                                                @onclick="() => OpenWfhDetailWithMovAsync(log)"
+                                                @onclick:stopPropagation="true">Open File</button>
+                                    }
+                                </td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(log.PhotoVerification))
+                                    {
+                                        <span class="cell-ellipsis" title="-">-</span>
+                                    }
+                                    else
+                                    {
+                                        <button type="button"
+                                                class="attendance-table-link-button cell-ellipsis"
+                                                title="@log.PhotoVerification"
+                                                @onclick="() => OpenWfhDetailWithPhotoVerificationAsync(log)"
+                                                @onclick:stopPropagation="true">Open File</button>
                                     }
                                 </td>
                                 <td><span class="cell-ellipsis" title="@GetWorkArrangement(log)">@GetWorkArrangement(log)</span></td>
-                                <td><span class="cell-ellipsis" title="@GetWfhAttendanceStatus(log)">@GetWfhAttendanceStatus(log)</span></td>
                                 <td class="time-cell @(IsTardinessOverride(log) ? "attendance-time-overridden" : null)"><span class="cell-ellipsis" title="@FormatClockTime(log.TimeIn)">@FormatClockTime(log.TimeIn)</span></td>
                                 <td class="time-cell @(IsTardinessOverride(log) ? "attendance-time-overridden" : null)"><span class="cell-ellipsis" title="@FormatClockTime(log.TimeOut)">@FormatClockTime(log.TimeOut)</span></td>
                                 <td>
@@ -514,7 +535,7 @@
                         @if (!PagedWfhLogs.Any())
                         {
                             <tr>
-                                <td colspan="14" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
+                                <td colspan="15" class="attendance-empty-state">No attendance logs match the current search and filters.</td>
                             </tr>
                         }
                     </tbody>
@@ -535,7 +556,7 @@
                     <i class="fa-solid fa-eye" aria-hidden="true"></i>
                     <span>View</span>
                 </button>
-                <button type="button" @onclick="OpenHoveredOnsiteEdit" disabled="@(!CurrentUser.HasAccess("Edit"))">
+                <button type="button" @onclick="OpenHoveredOnsiteEdit" disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditLogs))">
                     <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                     <span>Edit</span>
                 </button>
@@ -549,7 +570,7 @@
                     <i class="fa-solid fa-eye" aria-hidden="true"></i>
                     <span>View</span>
                 </button>
-                <button type="button" @onclick="OpenHoveredWfhEdit" disabled="@(!CurrentUser.HasAccess("Edit"))">
+                <button type="button" @onclick="OpenHoveredWfhEdit" disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditLogs))">
                     <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                     <span>Edit</span>
                 </button>
@@ -601,8 +622,63 @@
 
     @if (selectedOnsiteLog is not null || selectedWfhLog is not null)
     {
-        <div class="attendance-detail-overlay" @onclick="CloseAttendanceDetail">
-            <div class="attendance-detail-modal" @onclick:stopPropagation="true">
+        <div class="attendance-detail-overlay @(showMovPreviewWithAttendanceDetail ? "attendance-detail-overlay-with-mov" : null) @(IsPhotoVerificationSidecar ? "attendance-detail-overlay-with-photo" : null) @(isRestoringAttendanceDetail ? "attendance-detail-overlay-restoring" : null) @(suppressAttendanceDetailEnterAnimation ? "attendance-detail-overlay-no-enter" : null)" @onclick="CloseAttendanceDetail">
+            <div class="attendance-detail-modal-pair">
+                @if ((showMovPreviewModal || isClosingMovPreview) && showMovPreviewWithAttendanceDetail)
+                {
+                    <div class="attendance-detail-modal attendance-mov-preview-modal attendance-mov-preview-sidecar @(IsPhotoVerificationSidecar ? "attendance-photo-preview-sidecar" : null) @(isClosingMovPreview ? "closing" : null)" @onclick:stopPropagation="true">
+                        <div class="attendance-detail-header">
+                            <div>
+                                <h2 class="attendance-detail-title">@SidecarPreviewTitle</h2>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-body attendance-mov-preview-body">
+                            @if (sidecarPreviewMode == SidecarPreviewMode.PhotoVerification)
+                            {
+                                <div class="attendance-photo-preview-stack">
+                                    <div class="attendance-photo-preview-card">
+                                        <span class="attendance-detail-label">Time In Capture Image</span>
+                                        <div class="attendance-photo-preview-frame">
+                                            @if (string.IsNullOrWhiteSpace(photoVerificationTimeInUrl))
+                                            {
+                                                <span>No Image</span>
+                                            }
+                                            else
+                                            {
+                                                <img src="@photoVerificationTimeInUrl" alt="Time in photo verification" />
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <div class="attendance-photo-preview-card">
+                                        <span class="attendance-detail-label">Time Out Capture Image</span>
+                                        <div class="attendance-photo-preview-frame">
+                                            @if (string.IsNullOrWhiteSpace(photoVerificationTimeOutUrl))
+                                            {
+                                                <span>No Image</span>
+                                            }
+                                            else
+                                            {
+                                                <img src="@photoVerificationTimeOutUrl" alt="Time out photo verification" />
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="attendance-mov-preview-card">
+                                    <iframe class="attendance-mov-preview-frame"
+                                            src="@MovPreviewFrameUrl"
+                                            title="Means of verification PDF preview"></iframe>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <div class="attendance-detail-modal attendance-detail-modal-front" @onclick:stopPropagation="true">
                 <div class="attendance-detail-header">
                     <div>
                         <h2 class="attendance-detail-title">Attendance Details</h2>
@@ -613,7 +689,7 @@
                             <button type="button"
                                     class="attendance-detail-header-button"
                                     @onclick="() => OpenOnsiteEdit(selectedOnsiteLog)"
-                                    disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                    disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditLogs))">
                                 Edit Logs
                             </button>
                         }
@@ -622,7 +698,7 @@
                             <button type="button"
                                     class="attendance-detail-header-button"
                                     @onclick="() => OpenWfhEdit(selectedWfhLog)"
-                                    disabled="@(!CurrentUser.HasAccess("Edit"))">
+                                    disabled="@(!CurrentUser.HasAccess(AccessPolicy.EditLogs))">
                                 Edit Logs
                             </button>
                         }
@@ -697,7 +773,12 @@
                                 <div class="attendance-detail-eyebrow">WFH ETRS Log</div>
                                 <div class="attendance-detail-person">@FormatName(selectedWfhLog.LastName, selectedWfhLog.FirstName, selectedWfhLog.MiddleName)</div>
                             </div>
-                            <div class="attendance-detail-status">@GetWfhAttendanceStatus(selectedWfhLog)</div>
+                            <div class="attendance-tardiness-pills attendance-tardiness-pills-detail attendance-tardiness-pills-hero" title="@FormatTardinessTags(GetResolvedTardiness(selectedWfhLog))">
+                                @foreach (var tag in GetTardinessTags(GetResolvedTardiness(selectedWfhLog)))
+                                {
+                                    <span class="@GetTardinessPillClass(tag)">@tag</span>
+                                }
+                            </div>
                         </div>
 
                         <div class="attendance-detail-section attendance-detail-section-primary">
@@ -732,15 +813,6 @@
                                     <strong>@FormatClockTime(selectedWfhLog.TimeOut)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
-                                    <span class="attendance-detail-label">Late/Undertime</span>
-                                    <div class="attendance-tardiness-pills attendance-tardiness-pills-field" title="@FormatTardinessTags(GetResolvedTardiness(selectedWfhLog))">
-                                        @foreach (var tag in GetTardinessTags(GetResolvedTardiness(selectedWfhLog)))
-                                        {
-                                            <span class="@GetTardinessPillClass(tag)">@tag</span>
-                                        }
-                                    </div>
-                                </div>
-                                <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">MOV</span>
                                     @if (string.IsNullOrWhiteSpace(selectedWfhLog.Mov))
                                     {
@@ -748,7 +820,18 @@
                                     }
                                     else
                                     {
-                                        <a class="attendance-detail-text-action" href="@selectedWfhLog.Mov" target="_blank">Open file</a>
+                                        <button type="button" class="attendance-detail-text-action attendance-detail-action-button" @onclick="() => ToggleMovPreviewWithDetailAsync(selectedWfhLog.Mov, FormatName(selectedWfhLog.LastName, selectedWfhLog.FirstName, selectedWfhLog.MiddleName))">@(showMovPreviewWithAttendanceDetail && sidecarPreviewMode == SidecarPreviewMode.Mov ? "Close file" : "Open file")</button>
+                                    }
+                                </div>
+                                <div class="attendance-detail-field">
+                                    <span class="attendance-detail-label">Photo Verification</span>
+                                    @if (string.IsNullOrWhiteSpace(selectedWfhLog.PhotoVerification))
+                                    {
+                                        <strong>-</strong>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="attendance-detail-text-action attendance-detail-action-button" @onclick="() => TogglePhotoVerificationWithDetailAsync(selectedWfhLog)">@(showMovPreviewWithAttendanceDetail && IsPhotoVerificationSidecar ? "Close file" : "Open file")</button>
                                     }
                                 </div>
                             </div>
@@ -773,6 +856,7 @@
                 <div class="attendance-detail-footer">
                     <button type="button" class="attendance-detail-text-action" @onclick="CloseAttendanceDetail">Close</button>
                 </div>
+            </div>
             </div>
         </div>
     }
@@ -1034,17 +1118,70 @@
         </div>
     }
 
+    @if (showMovPreviewModal && !showMovPreviewWithAttendanceDetail && !showMovPreviewWithEditLog)
+    {
+        <div class="attendance-detail-overlay attendance-mov-preview-overlay" @onclick="CloseMovPreview">
+            <div class="attendance-detail-modal attendance-mov-preview-modal" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Means of Verification</h2>
+                        <div class="attendance-detail-meta">@movPreviewTitle</div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-body attendance-mov-preview-body">
+                    <div class="attendance-mov-preview-card">
+                        <iframe class="attendance-mov-preview-frame"
+                                src="@MovPreviewFrameUrl"
+                                title="Means of verification PDF preview"></iframe>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    }
+
     @if (showEditLogsModal)
     {
-        <div class="attendance-detail-overlay" @onclick="CloseEditLogsModal">
-            <div class="attendance-detail-modal attendance-input-modal" @onclick="CloseModalTransientUiAsync" @onclick:stopPropagation="true">
+        <div class="attendance-detail-overlay @(showMovPreviewWithEditLog ? "attendance-detail-overlay-with-mov" : null) @(isRestoringAttendanceDetail ? "attendance-detail-overlay-restoring" : null) @(suppressAttendanceDetailEnterAnimation ? "attendance-detail-overlay-no-enter" : null)" @onclick="CloseEditLogsModal">
+            <div class="attendance-detail-modal-pair">
+                @if ((showMovPreviewModal || isClosingMovPreview) && showMovPreviewWithEditLog)
+                {
+                    <div class="attendance-detail-modal attendance-mov-preview-modal attendance-mov-preview-sidecar @(isClosingMovPreview ? "closing" : null)" @onclick:stopPropagation="true">
+                        <div class="attendance-detail-header">
+                            <div>
+                                <h2 class="attendance-detail-title">Means of Verification</h2>
+                            </div>
+                        </div>
+
+                        <div class="attendance-detail-body attendance-mov-preview-body">
+                            <div class="attendance-mov-preview-card">
+                                <iframe class="attendance-mov-preview-frame"
+                                        src="@MovPreviewFrameUrl"
+                                        title="Means of verification PDF preview"></iframe>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+            <div class="attendance-detail-modal attendance-input-modal attendance-edit-modal attendance-detail-modal-front" @onclick="CloseModalTransientUiAsync" @onclick:stopPropagation="true">
                 <div class="attendance-detail-header">
                     <div>
                         <h2 class="attendance-detail-title">Edit Logs</h2>
                     </div>
-                    <button type="button" class="attendance-detail-close" @onclick="CloseEditLogsModal" aria-label="Close edit logs">
-                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                    </button>
+                    <div class="attendance-detail-header-actions">
+                        @if (CanReturnToAttendanceDetail)
+                        {
+                            <button type="button"
+                                    class="attendance-detail-header-button"
+                                    @onclick="ReturnToAttendanceDetailFromEdit">
+                                Back
+                            </button>
+                        }
+                        <button type="button" class="attendance-detail-close" @onclick="CloseEditLogsModal" aria-label="Close edit logs">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="attendance-detail-body attendance-input-body">
@@ -1134,7 +1271,7 @@
                                                 <span class="attendance-input-upload-note">@(string.IsNullOrWhiteSpace(editLogForm.MovFileName) ? "Keep current file." : editLogForm.MovFileName)</span>
                                                 @if (!string.IsNullOrWhiteSpace(editLogForm.ExistingMov))
                                                 {
-                                                    <a class="attendance-detail-text-action attendance-input-upload-link-end" href="@editLogForm.ExistingMov" target="_blank">Open current file</a>
+                                                    <button type="button" class="attendance-detail-text-action attendance-detail-action-button attendance-input-upload-link-end" @onclick="() => ToggleMovPreviewWithEditLogAsync(editLogForm.ExistingMov, editLogForm.EmployeeName)">@(showMovPreviewWithEditLog ? "Close current file" : "Open current file")</button>
                                                 }
                                             </div>
                                         </div>
@@ -1149,6 +1286,7 @@
                     <button type="button" class="attendance-detail-text-action" @onclick="CloseEditLogsModal" disabled="@isSavingEditLog">Cancel</button>
                     <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveEditLogAsync" disabled="@isSavingEditLog">@(isSavingEditLog ? "Saving..." : "Save Changes")</button>
                 </div>
+            </div>
             </div>
         </div>
     }
@@ -2216,6 +2354,35 @@
         backdrop-filter: blur(8px);
     }
 
+    .attendance-detail-overlay-with-mov {
+        justify-content: center;
+        padding-inline: clamp(1rem, 3vw, 3rem);
+        --attendance-detail-width: 650px;
+        --attendance-mov-width: min(58vw, 780px);
+        --attendance-mov-overlap: min(5.8vw, 78px);
+        --attendance-mov-content-gap: 0.75rem;
+        --attendance-mov-content-pad: 0.85rem;
+    }
+
+    .attendance-detail-overlay-with-photo {
+        --attendance-mov-width: min(34vw, 460px);
+        --attendance-mov-overlap: min(3.4vw, 46px);
+    }
+
+    .attendance-detail-modal-pair {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: min(100%, 1100px);
+        max-height: min(92vh, 900px);
+    }
+
+    .attendance-detail-overlay-with-mov .attendance-detail-modal-pair {
+        width: calc(var(--attendance-detail-width) + var(--attendance-mov-width) - var(--attendance-mov-overlap));
+        height: min(92vh, 900px);
+    }
+
     .attendance-detail-modal {
         width: min(100%, 760px);
         max-height: min(92vh, 900px);
@@ -2227,6 +2394,31 @@
         border-radius: 10px;
         box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
         animation: attendance-detail-enter 180ms ease-out;
+    }
+
+    .attendance-detail-modal-front {
+        position: relative;
+        z-index: 2;
+        flex: 0 0 min(100%, 760px);
+    }
+
+    .attendance-detail-overlay-no-enter .attendance-detail-modal-front {
+        animation: none;
+    }
+
+    .attendance-detail-overlay-with-mov .attendance-detail-modal-front {
+        position: absolute;
+        left: 0;
+        width: var(--attendance-detail-width);
+        height: 100%;
+        max-height: 100%;
+        transform-origin: left center;
+        will-change: width, transform;
+        animation: attendance-detail-pair-shift 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    .attendance-detail-overlay-restoring .attendance-detail-modal-front {
+        animation: attendance-detail-pair-restore 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
     }
 
     .attendance-detail-header,
@@ -2389,10 +2581,15 @@
 
     .attendance-detail-field strong,
     .attendance-detail-field p,
-    .attendance-detail-field a {
+    .attendance-detail-field a,
+    .attendance-detail-field button {
         margin: 0;
         color: var(--etrs-black);
         overflow-wrap: anywhere;
+    }
+
+    .attendance-detail-field .attendance-detail-text-action {
+        color: var(--etrs-gray-700);
     }
 
     .attendance-detail-field-wide {
@@ -2453,8 +2650,170 @@
         text-decoration: none;
     }
 
+    .attendance-table-link-button,
+    .attendance-detail-action-button {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .attendance-table-link-button {
+        color: var(--finance-primary, #2563eb);
+        font-weight: 500;
+        max-width: 100%;
+    }
+
+    .attendance-table-link-button:hover,
+    .attendance-table-link-button:focus-visible {
+        color: var(--finance-primary-hover, #1d4ed8);
+        text-decoration: underline;
+    }
+
+    .attendance-mov-preview-overlay {
+        z-index: 1250;
+    }
+
+    .attendance-mov-preview-modal {
+        width: min(100%, 980px);
+        height: min(92vh, 820px);
+    }
+
+    .attendance-mov-preview-sidecar {
+        position: absolute;
+        z-index: 1;
+        top: 0;
+        left: calc(var(--attendance-detail-width) - var(--attendance-mov-overlap));
+        width: var(--attendance-mov-width);
+        height: 100%;
+        max-height: 100%;
+        transform: none;
+        box-shadow: 0 18px 44px rgba(30, 41, 57, 0.14);
+        transform-origin: left center;
+        animation: attendance-mov-sidecar-reveal 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    .attendance-mov-preview-sidecar.closing {
+        animation: attendance-mov-sidecar-hide 220ms cubic-bezier(0.4, 0, 0.8, 0.2) both;
+    }
+
+    .attendance-mov-preview-sidecar .attendance-detail-header {
+        position: static;
+        padding: 0.85rem 1rem 0.85rem calc(var(--attendance-mov-overlap) + var(--attendance-mov-content-gap));
+    }
+
+    .attendance-mov-preview-sidecar .attendance-detail-title {
+        font-size: 1rem;
+    }
+
+    .attendance-photo-preview-sidecar {
+        top: 0;
+        height: auto;
+        max-height: min(92vh, 720px);
+    }
+
+    .attendance-photo-preview-sidecar .attendance-mov-preview-body {
+        flex: 0 0 auto;
+        overflow-y: auto;
+    }
+
+    .attendance-mov-preview-body {
+        padding: 0;
+        overflow: hidden;
+        background: var(--etrs-gray-100);
+    }
+
+    .attendance-mov-preview-sidecar .attendance-mov-preview-body {
+        padding: var(--attendance-mov-content-pad) var(--attendance-mov-content-pad) var(--attendance-mov-content-pad) calc(var(--attendance-mov-overlap) + var(--attendance-mov-content-gap));
+        box-sizing: border-box;
+    }
+
+    .attendance-mov-preview-card {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(30, 41, 57, 0.05);
+    }
+
+    .attendance-photo-preview-stack {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        gap: 0.85rem;
+        width: 100%;
+        height: clamp(27rem, 54vw, 36rem);
+        min-height: 0;
+    }
+
+    .attendance-photo-preview-card {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        gap: 0.65rem;
+        padding: 0.65rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(30, 41, 57, 0.05);
+    }
+
+    .attendance-photo-preview-frame {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+        border-radius: 6px;
+        background: var(--etrs-gray-100);
+        color: var(--etrs-gray-700);
+        font-weight: 600;
+    }
+
+    .attendance-photo-preview-frame img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .attendance-mov-preview-frame {
+        display: block;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        border: 0;
+        background: #ffffff;
+    }
+
     .attendance-input-modal {
         width: min(100%, 900px);
+    }
+
+    .attendance-edit-modal {
+        overflow: visible;
+    }
+
+    .attendance-edit-modal .attendance-detail-header {
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+
+    .attendance-edit-modal .attendance-detail-body {
+        overflow: visible;
+        position: relative;
+        z-index: 3;
+    }
+
+    .attendance-edit-modal .attendance-detail-footer {
+        z-index: 1;
+        border-bottom-left-radius: 10px;
+        border-bottom-right-radius: 10px;
     }
 
     .attendance-input-body {
@@ -2669,7 +3028,7 @@
     }
 
     .attendance-input-select-wrap .attendance-filter-select-menu {
-        z-index: 20;
+        z-index: 1302;
     }
 
     .attendance-input-field .attendance-detail-label {
@@ -2822,8 +3181,43 @@
     body.etrs-dark-theme .attendance-detail-person,
     body.etrs-dark-theme .attendance-detail-field strong,
     body.etrs-dark-theme .attendance-detail-field p,
-    body.etrs-dark-theme .attendance-detail-field a {
+    body.etrs-dark-theme .attendance-detail-field a,
+    body.etrs-dark-theme .attendance-detail-field button:not(.attendance-detail-text-action) {
         color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-link-button {
+        color: #93c5fd !important;
+    }
+
+    body.etrs-dark-theme .attendance-table-link-button:hover,
+    body.etrs-dark-theme .attendance-table-link-button:focus-visible {
+        color: #bfdbfe !important;
+    }
+
+    body.etrs-dark-theme .attendance-mov-preview-body {
+        background: #0f1828 !important;
+    }
+
+    body.etrs-dark-theme .attendance-mov-preview-card {
+        background: #ffffff !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28) !important;
+    }
+
+    body.etrs-dark-theme .attendance-photo-preview-card {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28) !important;
+    }
+
+    body.etrs-dark-theme .attendance-photo-preview-frame {
+        background: #0f1828 !important;
+        color: #9fb0c9 !important;
+    }
+
+    body.etrs-dark-theme .attendance-mov-preview-frame {
+        background: #ffffff !important;
     }
 
     body.etrs-dark-theme .attendance-detail-header-button {
@@ -3059,6 +3453,58 @@
         }
     }
 
+    @@keyframes attendance-detail-pair-shift {
+        from {
+            width: 760px;
+            transform: translateX(300px);
+        }
+
+        to {
+            width: var(--attendance-detail-width);
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes attendance-detail-pair-restore {
+        from {
+            width: var(--attendance-detail-width);
+            transform: translateX(0);
+        }
+
+        to {
+            width: 760px;
+            transform: translateX(300px);
+        }
+    }
+
+    @@keyframes attendance-mov-sidecar-reveal {
+        from {
+            opacity: 0;
+            clip-path: inset(0 100% 0 0 round 10px);
+            transform: translateX(calc(-1 * (var(--attendance-mov-width) - var(--attendance-mov-overlap)))) scaleX(0.98);
+        }
+
+        to {
+            opacity: 1;
+            clip-path: inset(0 0 0 0 round 10px);
+            transform: translateX(0) scaleX(1);
+        }
+    }
+
+    @@keyframes attendance-mov-sidecar-hide {
+        from {
+            opacity: 1;
+            clip-path: inset(0 0 0 0 round 10px);
+            transform: translateX(0) scaleX(1);
+        }
+
+        to {
+            opacity: 0;
+            clip-path: inset(0 100% 0 0 round 10px);
+            transform: translateX(calc(-1 * (var(--attendance-mov-width) - var(--attendance-mov-overlap)))) scaleX(0.98);
+        }
+    }
+
     @@keyframes attendance-input-mode-swap {
         from {
             opacity: 0;
@@ -3080,6 +3526,13 @@
         to {
             opacity: 1;
             transform: translateY(0);
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .attendance-detail-overlay-with-mov .attendance-detail-modal-front,
+        .attendance-mov-preview-sidecar {
+            animation: none;
         }
     }
 
@@ -3108,6 +3561,33 @@
             border-radius: 10px;
         }
 
+        .attendance-detail-overlay-with-mov {
+            --attendance-detail-width: 100%;
+            --attendance-mov-width: 100%;
+            --attendance-mov-overlap: 0px;
+            --attendance-mov-content-gap: 0px;
+            --attendance-mov-content-pad: 0.75rem;
+        }
+
+        .attendance-detail-modal-pair {
+            flex-direction: column-reverse;
+            justify-content: flex-start;
+            gap: 0.75rem;
+            width: 100%;
+            height: auto;
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+        }
+
+        .attendance-detail-modal-front {
+            position: relative;
+            left: auto;
+            flex-basis: auto;
+            width: 100%;
+            height: auto;
+            max-height: min(92vh, 900px);
+        }
+
         .attendance-detail-header,
         .attendance-detail-hero {
             flex-direction: column;
@@ -3124,6 +3604,38 @@
         .attendance-detail-grid,
         .attendance-detail-grid-compact {
             grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attendance-mov-preview-modal {
+            height: min(90vh, 760px);
+        }
+
+        .attendance-mov-preview-sidecar {
+            position: relative;
+            top: auto;
+            left: auto;
+            width: 100%;
+            height: min(48vh, 520px);
+            max-height: none;
+            transform: none;
+            animation: none;
+        }
+
+        .attendance-photo-preview-sidecar {
+            height: auto;
+            max-height: none;
+        }
+
+        .attendance-photo-preview-stack {
+            height: clamp(22rem, 110vw, 32rem);
+        }
+
+        .attendance-photo-preview-frame {
+            min-height: 0;
+        }
+
+        .attendance-mov-preview-frame {
+            min-height: 24rem;
         }
 
         .attendance-input-mode-panel-grid,
@@ -3175,6 +3687,12 @@
     {
         Onsite,
         Wfh
+    }
+
+    private enum SidecarPreviewMode
+    {
+        Mov,
+        PhotoVerification
     }
 
     private sealed class ManualInputForm
@@ -3253,6 +3771,14 @@
     private DateTime filterEnd;
     private AttendanceLog? selectedOnsiteLog;
     private AttendanceLogWfh? selectedWfhLog;
+    private AttendanceLog? editReturnOnsiteLog;
+    private AttendanceLogWfh? editReturnWfhLog;
+    private bool editReturnSidecarOpen;
+    private SidecarPreviewMode editReturnSidecarMode = SidecarPreviewMode.Mov;
+    private string editReturnMovPreviewUrl = string.Empty;
+    private string editReturnMovPreviewTitle = string.Empty;
+    private string editReturnPhotoTimeInUrl = string.Empty;
+    private string editReturnPhotoTimeOutUrl = string.Empty;
     private AttendanceLog? hoveredOnsiteRowMenuLog;
     private AttendanceLogWfh? hoveredWfhRowMenuLog;
     private double rowActionMenuLeft;
@@ -3270,6 +3796,24 @@
     private bool showEditLogsModal;
     private bool isSavingEditLog;
     private EditLogForm editLogForm = new();
+    private bool showMovPreviewModal;
+    private bool showMovPreviewWithAttendanceDetail;
+    private bool showMovPreviewWithEditLog;
+    private bool isClosingMovPreview;
+    private bool isRestoringAttendanceDetail;
+    private bool suppressAttendanceDetailEnterAnimation;
+    private string movPreviewUrl = string.Empty;
+    private string movPreviewTitle = string.Empty;
+    private string MovPreviewFrameUrl => BuildPdfPreviewUrl(movPreviewUrl);
+    private int movPreviewOpenVersion;
+    private SidecarPreviewMode sidecarPreviewMode = SidecarPreviewMode.Mov;
+    private string photoVerificationTimeInUrl = string.Empty;
+    private string photoVerificationTimeOutUrl = string.Empty;
+    private bool IsPhotoVerificationSidecar => sidecarPreviewMode == SidecarPreviewMode.PhotoVerification;
+    private string SidecarPreviewTitle => sidecarPreviewMode == SidecarPreviewMode.PhotoVerification
+        ? "Photo Verification"
+        : "Means of Verification";
+    private bool CanReturnToAttendanceDetail => editReturnOnsiteLog is not null || editReturnWfhLog is not null;
     private bool showEditTardinessMenu;
     private ElementReference inputEmployeeSearchWrapRef;
     private DotNetObjectReference<AttendanceLogs>? inputEmployeeSearchDotNetRef;
@@ -3353,8 +3897,8 @@
         "Without MOV"
     };
     private IEnumerable<string> CurrentStatusOptions => viewMode == "onsite"
-        ? GetDistinctOptions(onsiteLogs.Select(GetOnsiteAttendanceStatus))
-        : GetDistinctOptions(wfhLogs.Select(GetWfhAttendanceStatus));
+        ? GetDistinctOptions(onsiteLogs.Select(GetEmployeeType))
+        : GetDistinctOptions(wfhLogs.Select(GetEmployeeType));
     private string tableSearchText
     {
         get => CurrentTableState.SearchText;
@@ -4047,7 +4591,7 @@
             return false;
         }
 
-        if (!MatchesSelectedValue(GetOnsiteAttendanceStatus(log), filterStatus))
+        if (!MatchesSelectedValue(GetEmployeeType(log), filterStatus))
         {
             return false;
         }
@@ -4082,7 +4626,7 @@
             return false;
         }
 
-        if (!MatchesSelectedValue(GetWfhAttendanceStatus(log), filterStatus))
+        if (!MatchesSelectedValue(GetEmployeeType(log), filterStatus))
         {
             return false;
         }
@@ -4422,6 +4966,356 @@
         openExportPeriod2MenuUpward = false;
     }
 
+    private void OpenMovPreview(string? movUrl, string? employeeName = null, bool withAttendanceDetail = false)
+    {
+        if (string.IsNullOrWhiteSpace(movUrl))
+        {
+            return;
+        }
+
+        sidecarPreviewMode = SidecarPreviewMode.Mov;
+        ClearPhotoVerificationPreview();
+        movPreviewUrl = movUrl;
+        movPreviewTitle = string.IsNullOrWhiteSpace(employeeName)
+            ? "Means of Verification"
+            : $"Means of Verification - {employeeName}";
+        showMovPreviewWithAttendanceDetail = withAttendanceDetail;
+        showMovPreviewWithEditLog = false;
+        showMovPreviewModal = true;
+    }
+
+    private async Task OpenMovPreviewWithDetailAsync(string? movUrl, string? employeeName = null)
+    {
+        if (string.IsNullOrWhiteSpace(movUrl))
+        {
+            return;
+        }
+
+        sidecarPreviewMode = SidecarPreviewMode.Mov;
+        ClearPhotoVerificationPreview();
+        var openVersion = ++movPreviewOpenVersion;
+        movPreviewUrl = movUrl;
+        movPreviewTitle = string.IsNullOrWhiteSpace(employeeName)
+            ? "Means of Verification"
+            : $"Means of Verification - {employeeName}";
+        isClosingMovPreview = false;
+        isRestoringAttendanceDetail = false;
+        suppressAttendanceDetailEnterAnimation = false;
+        showMovPreviewWithAttendanceDetail = true;
+        showMovPreviewWithEditLog = false;
+        showMovPreviewModal = false;
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(260);
+
+        if (openVersion != movPreviewOpenVersion || !showMovPreviewWithAttendanceDetail)
+        {
+            return;
+        }
+
+        showMovPreviewModal = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OpenMovPreviewWithEditLogAsync(string? movUrl, string? employeeName = null)
+    {
+        if (string.IsNullOrWhiteSpace(movUrl))
+        {
+            return;
+        }
+
+        sidecarPreviewMode = SidecarPreviewMode.Mov;
+        ClearPhotoVerificationPreview();
+        var openVersion = ++movPreviewOpenVersion;
+        movPreviewUrl = movUrl;
+        movPreviewTitle = string.IsNullOrWhiteSpace(employeeName)
+            ? "Means of Verification"
+            : $"Means of Verification - {employeeName}";
+        isClosingMovPreview = false;
+        isRestoringAttendanceDetail = false;
+        suppressAttendanceDetailEnterAnimation = false;
+        showMovPreviewWithAttendanceDetail = false;
+        showMovPreviewWithEditLog = true;
+        showMovPreviewModal = false;
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(260);
+
+        if (openVersion != movPreviewOpenVersion || !showMovPreviewWithEditLog)
+        {
+            return;
+        }
+
+        showMovPreviewModal = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OpenPhotoVerificationWithDetailAsync(AttendanceLogWfh log)
+    {
+        if (string.IsNullOrWhiteSpace(log.PhotoVerification))
+        {
+            return;
+        }
+
+        sidecarPreviewMode = SidecarPreviewMode.PhotoVerification;
+        movPreviewUrl = string.Empty;
+        movPreviewTitle = "Photo Verification";
+        SetPhotoVerificationPreview(log);
+
+        var openVersion = ++movPreviewOpenVersion;
+        isClosingMovPreview = false;
+        isRestoringAttendanceDetail = false;
+        suppressAttendanceDetailEnterAnimation = false;
+        showMovPreviewWithAttendanceDetail = true;
+        showMovPreviewWithEditLog = false;
+        showMovPreviewModal = false;
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(260);
+
+        if (openVersion != movPreviewOpenVersion || !showMovPreviewWithAttendanceDetail)
+        {
+            return;
+        }
+
+        showMovPreviewModal = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleMovPreviewWithDetailAsync(string? movUrl, string? employeeName = null)
+    {
+        if (showMovPreviewWithAttendanceDetail)
+        {
+            var wasMovOpen = sidecarPreviewMode == SidecarPreviewMode.Mov;
+            await CloseMovPreviewWithDetailAsync();
+            if (wasMovOpen)
+            {
+                return;
+            }
+        }
+
+        await OpenMovPreviewWithDetailAsync(movUrl, employeeName);
+    }
+
+    private async Task TogglePhotoVerificationWithDetailAsync(AttendanceLogWfh log)
+    {
+        if (showMovPreviewWithAttendanceDetail)
+        {
+            var wasPhotoVerificationOpen = IsPhotoVerificationSidecar;
+            await CloseMovPreviewWithDetailAsync();
+            if (wasPhotoVerificationOpen)
+            {
+                return;
+            }
+        }
+
+        await OpenPhotoVerificationWithDetailAsync(log);
+    }
+
+    private async Task ToggleMovPreviewWithEditLogAsync(string? movUrl, string? employeeName = null)
+    {
+        if (showMovPreviewWithEditLog)
+        {
+            await CloseMovPreviewWithDetailAsync();
+            return;
+        }
+
+        await OpenMovPreviewWithEditLogAsync(movUrl, employeeName);
+    }
+
+    private async Task CloseMovPreviewWithDetailAsync()
+    {
+        if (!showMovPreviewWithAttendanceDetail && !showMovPreviewWithEditLog)
+        {
+            CloseMovPreview();
+            return;
+        }
+
+        var closeVersion = ++movPreviewOpenVersion;
+        isClosingMovPreview = showMovPreviewModal;
+        showMovPreviewModal = false;
+
+        await InvokeAsync(StateHasChanged);
+
+        if (isClosingMovPreview)
+        {
+            await Task.Delay(220);
+        }
+
+        if (closeVersion != movPreviewOpenVersion)
+        {
+            return;
+        }
+
+        isClosingMovPreview = false;
+        isRestoringAttendanceDetail = true;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(260);
+
+        if (closeVersion != movPreviewOpenVersion)
+        {
+            return;
+        }
+
+        isRestoringAttendanceDetail = false;
+        suppressAttendanceDetailEnterAnimation = true;
+        showMovPreviewWithAttendanceDetail = false;
+        showMovPreviewWithEditLog = false;
+        movPreviewUrl = string.Empty;
+        movPreviewTitle = string.Empty;
+        ClearPhotoVerificationPreview();
+        sidecarPreviewMode = SidecarPreviewMode.Mov;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(50);
+
+        if (closeVersion != movPreviewOpenVersion)
+        {
+            return;
+        }
+
+        suppressAttendanceDetailEnterAnimation = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void CloseMovPreview()
+    {
+        movPreviewOpenVersion++;
+        showMovPreviewModal = false;
+        showMovPreviewWithAttendanceDetail = false;
+        showMovPreviewWithEditLog = false;
+        isClosingMovPreview = false;
+        isRestoringAttendanceDetail = false;
+        suppressAttendanceDetailEnterAnimation = false;
+        movPreviewUrl = string.Empty;
+        movPreviewTitle = string.Empty;
+        ClearPhotoVerificationPreview();
+        sidecarPreviewMode = SidecarPreviewMode.Mov;
+    }
+
+    private void SetPhotoVerificationPreview(AttendanceLogWfh log)
+    {
+        var (timeInPhoto, timeOutPhoto) = GetPhotoVerificationImages(log);
+        photoVerificationTimeInUrl = timeInPhoto;
+        photoVerificationTimeOutUrl = timeOutPhoto;
+    }
+
+    private void ClearPhotoVerificationPreview()
+    {
+        photoVerificationTimeInUrl = string.Empty;
+        photoVerificationTimeOutUrl = string.Empty;
+    }
+
+    private void CaptureEditReturnSidecarState(bool openedFromDetails)
+    {
+        if (!openedFromDetails || !showMovPreviewWithAttendanceDetail || !showMovPreviewModal)
+        {
+            ClearEditReturnSidecarState();
+            return;
+        }
+
+        editReturnSidecarOpen = true;
+        editReturnSidecarMode = sidecarPreviewMode;
+        editReturnMovPreviewUrl = movPreviewUrl;
+        editReturnMovPreviewTitle = movPreviewTitle;
+        editReturnPhotoTimeInUrl = photoVerificationTimeInUrl;
+        editReturnPhotoTimeOutUrl = photoVerificationTimeOutUrl;
+    }
+
+    private void ClearEditReturnSidecarState()
+    {
+        editReturnSidecarOpen = false;
+        editReturnSidecarMode = SidecarPreviewMode.Mov;
+        editReturnMovPreviewUrl = string.Empty;
+        editReturnMovPreviewTitle = string.Empty;
+        editReturnPhotoTimeInUrl = string.Empty;
+        editReturnPhotoTimeOutUrl = string.Empty;
+    }
+
+    private void RestoreEditReturnSidecarState()
+    {
+        if (!editReturnSidecarOpen)
+        {
+            return;
+        }
+
+        sidecarPreviewMode = editReturnSidecarMode;
+        movPreviewUrl = editReturnMovPreviewUrl;
+        movPreviewTitle = editReturnMovPreviewTitle;
+        photoVerificationTimeInUrl = editReturnPhotoTimeInUrl;
+        photoVerificationTimeOutUrl = editReturnPhotoTimeOutUrl;
+        isClosingMovPreview = false;
+        isRestoringAttendanceDetail = false;
+        suppressAttendanceDetailEnterAnimation = false;
+        showMovPreviewWithAttendanceDetail = true;
+        showMovPreviewWithEditLog = false;
+        showMovPreviewModal = true;
+    }
+
+    private static string BuildPdfPreviewUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return string.Empty;
+        }
+
+        var baseUrl = url;
+        var existingFragment = string.Empty;
+        var fragmentIndex = url.IndexOf('#');
+        if (fragmentIndex >= 0)
+        {
+            baseUrl = url[..fragmentIndex];
+            existingFragment = url[(fragmentIndex + 1)..];
+        }
+
+        var viewerOptions = "toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&view=FitH";
+        var fragment = string.IsNullOrWhiteSpace(existingFragment)
+            ? viewerOptions
+            : $"{existingFragment}&{viewerOptions}";
+
+        return $"{baseUrl}#{fragment}";
+    }
+
+    private static (string TimeInPhoto, string TimeOutPhoto) GetPhotoVerificationImages(AttendanceLogWfh log)
+    {
+        var values = SplitPhotoVerificationValue(log.PhotoVerification);
+        if (values.Count >= 2)
+        {
+            return (values[0], values[1]);
+        }
+
+        if (values.Count == 1)
+        {
+            return log.TimeOut.HasValue
+                ? (string.Empty, values[0])
+                : (values[0], string.Empty);
+        }
+
+        return (string.Empty, string.Empty);
+    }
+
+    private static List<string> SplitPhotoVerificationValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return new();
+        }
+
+        var trimmed = value.Trim();
+        var separators = new[] { "||", "|", ";", "\n" };
+        foreach (var separator in separators)
+        {
+            if (trimmed.Contains(separator, StringComparison.Ordinal))
+            {
+                return trimmed
+                    .Split(separator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .ToList();
+            }
+        }
+
+        return new List<string> { trimmed };
+    }
+
     private void ClearSorting(bool isWfh)
     {
         var state = isWfh ? wfhTableState : onsiteTableState;
@@ -4440,7 +5334,7 @@
         RefreshFilteredLogs();
     }
 
-    private static IEnumerable<AttendanceLog> ApplyOnsiteSort(IEnumerable<AttendanceLog> logs, AttendanceTableState state)
+    private IEnumerable<AttendanceLog> ApplyOnsiteSort(IEnumerable<AttendanceLog> logs, AttendanceTableState state)
     {
         var column = state.SortColumn?.Trim().ToLowerInvariant();
         var descending = state.SortDescending;
@@ -4454,6 +5348,9 @@
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
             "designation" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.Designation))
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "status" => OrderByDirection(logs, descending, log => NormalizeSortValue(GetEmployeeType(log)))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
             "am" => OrderByDirection(logs, descending, log => log.TimeInAm ?? DateTime.MinValue)
@@ -4469,7 +5366,7 @@
         };
     }
 
-    private static IEnumerable<AttendanceLogWfh> ApplyWfhSort(IEnumerable<AttendanceLogWfh> logs, AttendanceTableState state)
+    private IEnumerable<AttendanceLogWfh> ApplyWfhSort(IEnumerable<AttendanceLogWfh> logs, AttendanceTableState state)
     {
         var column = state.SortColumn?.Trim().ToLowerInvariant();
         var descending = state.SortDescending;
@@ -4483,6 +5380,9 @@
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
             "designation" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.Designation))
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName)),
+            "status" => OrderByDirection(logs, descending, log => NormalizeSortValue(GetEmployeeType(log)))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
             "timein" => OrderByDirection(logs, descending, log => log.TimeIn ?? DateTime.MinValue)
@@ -4692,18 +5592,58 @@
 
     private void OpenOnsiteDetail(AttendanceLog log)
     {
+        CloseMovPreview();
         selectedOnsiteLog = log;
         selectedWfhLog = null;
     }
 
     private void OpenWfhDetail(AttendanceLogWfh log)
     {
+        CloseMovPreview();
         selectedWfhLog = log;
         selectedOnsiteLog = null;
     }
 
+    private async Task OpenWfhDetailWithMovAsync(AttendanceLogWfh log)
+    {
+        selectedWfhLog = log;
+        selectedOnsiteLog = null;
+        CloseMovPreview();
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(180);
+
+        if (selectedWfhLog != log)
+        {
+            return;
+        }
+
+        await OpenMovPreviewWithDetailAsync(log.Mov, FormatName(log.LastName, log.FirstName, log.MiddleName));
+    }
+
+    private async Task OpenWfhDetailWithPhotoVerificationAsync(AttendanceLogWfh log)
+    {
+        selectedWfhLog = log;
+        selectedOnsiteLog = null;
+        CloseMovPreview();
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(180);
+
+        if (selectedWfhLog != log)
+        {
+            return;
+        }
+
+        await OpenPhotoVerificationWithDetailAsync(log);
+    }
+
     private void OpenOnsiteEdit(AttendanceLog log)
     {
+        var openedFromDetails = ReferenceEquals(selectedOnsiteLog, log);
+        editReturnOnsiteLog = openedFromDetails ? log : null;
+        editReturnWfhLog = null;
+        CaptureEditReturnSidecarState(openedFromDetails);
         CloseAttendanceDetail();
 
         editLogForm = new EditLogForm
@@ -4726,6 +5666,10 @@
 
     private void OpenWfhEdit(AttendanceLogWfh log)
     {
+        var openedFromDetails = ReferenceEquals(selectedWfhLog, log);
+        editReturnWfhLog = openedFromDetails ? log : null;
+        editReturnOnsiteLog = null;
+        CaptureEditReturnSidecarState(openedFromDetails);
         CloseAttendanceDetail();
 
         editLogForm = new EditLogForm
@@ -4758,6 +5702,7 @@
         showInputLogsModal = false;
         isSavingInputLog = false;
         showInputEmployeeResults = false;
+        CloseMovPreview();
         _ = UnregisterInputEmployeeOutsideClickAsync();
     }
 
@@ -4767,6 +5712,35 @@
         isSavingEditLog = false;
         showEditTardinessMenu = false;
         editLogForm = new EditLogForm();
+        editReturnOnsiteLog = null;
+        editReturnWfhLog = null;
+        ClearEditReturnSidecarState();
+        CloseMovPreview();
+    }
+
+    private void ReturnToAttendanceDetailFromEdit()
+    {
+        var onsiteLog = editReturnOnsiteLog;
+        var wfhLog = editReturnWfhLog;
+        var shouldRestoreSidecar = editReturnSidecarOpen;
+
+        showEditLogsModal = false;
+        isSavingEditLog = false;
+        showEditTardinessMenu = false;
+        editLogForm = new EditLogForm();
+        editReturnOnsiteLog = null;
+        editReturnWfhLog = null;
+        CloseMovPreview();
+
+        selectedOnsiteLog = onsiteLog;
+        selectedWfhLog = wfhLog;
+
+        if (shouldRestoreSidecar)
+        {
+            RestoreEditReturnSidecarState();
+        }
+
+        ClearEditReturnSidecarState();
     }
 
     private void SelectInputLogMode(InputLogMode mode)
@@ -4801,6 +5775,7 @@
     {
         selectedOnsiteLog = null;
         selectedWfhLog = null;
+        CloseMovPreview();
     }
 
     private async Task SaveEditLogAsync()
@@ -5748,6 +6723,56 @@
 
         return "Present";
     }
+
+    private string DisplayEmployeeType(AttendanceLog log) => DisplayValue(GetEmployeeType(log));
+
+    private string DisplayEmployeeType(AttendanceLogWfh log) => DisplayValue(GetEmployeeType(log));
+
+    private string GetEmployeeType(AttendanceLog log)
+        => GetEmployeeType(ResolveEmployeeStatus(log));
+
+    private string GetEmployeeType(AttendanceLogWfh log)
+        => GetEmployeeType(ResolveEmployeeStatus(log));
+
+    private static string GetEmployeeType(string? employeeStatus)
+    {
+        if (string.IsNullOrWhiteSpace(employeeStatus))
+        {
+            return string.Empty;
+        }
+
+        var normalizedStatus = employeeStatus.Trim();
+        var separatorIndex = normalizedStatus.IndexOf(',');
+        if (separatorIndex < 0)
+        {
+            separatorIndex = normalizedStatus.IndexOf(' ');
+        }
+
+        var employeeType = separatorIndex < 0
+            ? normalizedStatus
+            : normalizedStatus[(separatorIndex + 1)..].Trim();
+
+        if (string.Equals(employeeType, "Active", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(employeeType, "Inactive", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return FormatEmployeeStatusLabel(employeeType);
+    }
+
+    private static string FormatEmployeeStatusLabel(string value)
+        => value.ToUpperInvariant() switch
+        {
+            "ACTIVE" => "Active",
+            "INACTIVE" => "Inactive",
+            "REGULAR" => "Regular",
+            "COS" => "COS",
+            "JO" => "JO",
+            "CASUAL" => "Casual",
+            "INTERN" => "Intern",
+            _ => value
+        };
 
     // --- Late/undertime calculation helpers ---
     private static string ComputeTardinessForWfh(AttendanceLogWfh log, string? employeeStatus)

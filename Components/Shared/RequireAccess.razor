@@ -2,7 +2,7 @@
 @using Microsoft.EntityFrameworkCore
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
-@inject Financial.Data.EtrsDbContext Db
+@inject IDbContextFactory<Financial.Data.EtrsDbContext> DbFactory
 @code {
     [Parameter] public string[] RequiredAccess { get; set; } = Array.Empty<string>();
     [Parameter] public RenderFragment? ChildContent { get; set; }
@@ -33,7 +33,8 @@
                 return;
             }
 
-            var account = await Db.UserAccounts.FirstOrDefaultAsync(u => u.Email == email);
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var account = await db.UserAccounts.FirstOrDefaultAsync(u => u.Email == email);
             if (account is null)
             {
                 authorized = false;
@@ -51,7 +52,7 @@
             }
             else
             {
-                authorized = RequiredAccess.Any(r => accessSet.Contains(r));
+                authorized = RequiredAccess.Any(r => Financial.Services.AccessPolicy.HasAccess(accessSet, r));
             }
 
             if (!authorized)

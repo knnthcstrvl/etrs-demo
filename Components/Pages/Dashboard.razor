@@ -4,11 +4,11 @@
 @using Financial.Model.Dtr
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
-@using System.IO.Compression
 @using System.Globalization
 @using System.Text
 @inject ProcurementDbContext Db
 @inject IJSRuntime JS
+@inject Financial.Services.CurrentUserService CurrentUser
 
 @implements IAsyncDisposable
 
@@ -158,11 +158,11 @@
                         <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
                     </button>
                     <div class="dashboard-table-action-menu @(openTableMenu == DashboardTableMenu.Onsite ? "show" : null)">
-                        <button type="button" @onclick="() => OpenViewMoreLogsAsync(DashboardTableMenu.Onsite)">
+                        <button type="button" @onclick="() => OpenViewMoreLogsAsync(DashboardTableMenu.Onsite)" disabled="@(!CurrentUser.HasAccess(AccessPolicy.ViewLogs))">
                             <i class="fa-solid fa-eye" aria-hidden="true"></i>
                             <span>View More</span>
                         </button>
-                        <button type="button" @onclick="OpenExportLogsModal">
+                        <button type="button" @onclick="() => OpenExportLogsModal(DashboardTableMenu.Onsite)" disabled="@(!CurrentUser.HasAccess(AccessPolicy.ExportLogs))">
                             <i class="fa-solid fa-file-export" aria-hidden="true"></i>
                             <span>Export</span>
                         </button>
@@ -175,6 +175,7 @@
                         <tr>
                             <th>ID Number</th>
                             <th>Employee</th>
+                            <th>Attendance Date</th>
                             <th>AM</th>
                             <th>PM</th>
                         </tr>
@@ -188,6 +189,7 @@
                                     <div>@FormatName(log.LastName, log.FirstName, log.MiddleName)</div>
                                     <div class="dashboard-employee-meta">@FormatEmployeeMeta(log.DivisionCenterUnit, log.Designation)</div>
                                 </td>
+                                <td>@log.AttendanceDate.ToString("MMM dd, yyyy")</td>
                                 <td style="white-space:pre-line;">@FormatTimeRange(log.TimeInAm, log.TimeOutAm)</td>
                                 <td style="white-space:pre-line;">@FormatTimeRange(log.TimeInPm, log.TimeOutPm)</td>
                             </tr>
@@ -205,11 +207,11 @@
                         <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
                     </button>
                     <div class="dashboard-table-action-menu @(openTableMenu == DashboardTableMenu.Wfh ? "show" : null)">
-                        <button type="button" @onclick="() => OpenViewMoreLogsAsync(DashboardTableMenu.Wfh)">
+                        <button type="button" @onclick="() => OpenViewMoreLogsAsync(DashboardTableMenu.Wfh)" disabled="@(!CurrentUser.HasAccess(AccessPolicy.ViewLogs))">
                             <i class="fa-solid fa-eye" aria-hidden="true"></i>
                             <span>View More</span>
                         </button>
-                        <button type="button" @onclick="OpenExportLogsModal">
+                        <button type="button" @onclick="() => OpenExportLogsModal(DashboardTableMenu.Wfh)" disabled="@(!CurrentUser.HasAccess(AccessPolicy.ExportLogs))">
                             <i class="fa-solid fa-file-export" aria-hidden="true"></i>
                             <span>Export</span>
                         </button>
@@ -225,6 +227,7 @@
                             <th>Target</th>
                             <th>Accomplishment</th>
                             <th>MOV</th>
+                            <th>Attendance Date</th>
                             <th>Time In</th>
                             <th>Time Out</th>
                         </tr>
@@ -250,8 +253,9 @@
                                         <a class="dashboard-text-cell" href="@log.Mov" target="_blank" title="@log.Mov">View File</a>
                                     }
                                 </td>
-                                <td style="white-space:pre-line;">@FormatTime(log.TimeIn)</td>
-                                <td style="white-space:pre-line;">@FormatTime(log.TimeOut)</td>
+                                <td>@log.AttendanceDate.ToString("MMM dd, yyyy")</td>
+                                <td>@FormatClockTime(log.TimeIn)</td>
+                                <td>@FormatClockTime(log.TimeOut)</td>
                             </tr>
                         }
                     </tbody>
@@ -590,8 +594,8 @@
                         </div>
                         <div>
                             <div class="attendance-detail-eyebrow">CSV Export</div>
-                            <div class="attendance-detail-person">Select the period range to include in the export.</div>
-                            <div class="attendance-detail-meta">This export downloads a ZIP file with separate onsite and WFH CSV files.</div>
+                            <div class="attendance-detail-person">Select the period range to include in the @ExportLogTypeLabel export.</div>
+                            <div class="attendance-detail-meta">This export downloads a single @ExportLogTypeLabel CSV file.</div>
                         </div>
                     </div>
 
@@ -1329,6 +1333,18 @@
         color: var(--finance-primary, var(--finance-text));
     }
 
+    .dashboard-table-action-menu button:disabled,
+    .dashboard-table-action-menu button:disabled:hover {
+        background: transparent;
+        color: var(--finance-text-muted);
+        cursor: not-allowed;
+        opacity: 0.48;
+    }
+
+    .dashboard-table-action-menu button:disabled i {
+        color: var(--finance-text-muted);
+    }
+
     body.etrs-dark-theme .dashboard-table-action-menu {
         background: #111c2d !important;
         border-color: #2f4058 !important;
@@ -1346,6 +1362,17 @@
     body.etrs-dark-theme .dashboard-table-action-menu button:hover {
         background: #1b2a3d !important;
         color: #ffffff !important;
+    }
+
+    body.etrs-dark-theme .dashboard-table-action-menu button:disabled,
+    body.etrs-dark-theme .dashboard-table-action-menu button:disabled:hover {
+        background: transparent !important;
+        color: #6f829d !important;
+        opacity: 0.5;
+    }
+
+    body.etrs-dark-theme .dashboard-table-action-menu button:disabled i {
+        color: #5f728d !important;
     }
 
     .dashboard-log-table {
@@ -3056,6 +3083,7 @@
     private List<AttendanceLogWfh> viewMoreWfhLogs = new();
     private bool showExportLogsModal;
     private bool isExportingLogs;
+    private DashboardTableMenu exportLogType = DashboardTableMenu.Onsite;
     private Period? exportSelectedPeriod;
     private bool showExportPeriodMenu;
     private bool openExportPeriodMenuUpward;
@@ -3125,6 +3153,7 @@
     private string WfhPercentLabel => FormatPercent(wfhLogsToday, employeeCount);
     private string ExportSelectedPeriodLabel => exportSelectedPeriod?.Label ?? "No periods available";
     private string ExportSelectedPeriod2Label => exportSecondSelectedPeriod?.Label ?? "Select a period";
+    private string ExportLogTypeLabel => exportLogType == DashboardTableMenu.Wfh ? "WFH logs" : "onsite logs";
     private int LateUndertimeChartMax => lateUndertimeChart.Count == 0
         ? 1
         : Math.Max(1, lateUndertimeChart.Max(p => Math.Max(p.LateCount, p.UndertimeCount)));
@@ -3549,9 +3578,10 @@
     private static string DisplayValue(string? value, string fallback)
         => string.IsNullOrWhiteSpace(value) ? fallback : value;
 
-    private void OpenExportLogsModal()
+    private void OpenExportLogsModal(DashboardTableMenu logType)
     {
         openTableMenu = DashboardTableMenu.None;
+        exportLogType = logType == DashboardTableMenu.Wfh ? DashboardTableMenu.Wfh : DashboardTableMenu.Onsite;
         exportSelectedPeriod = selectedPeriod;
         exportSecondSelectedPeriod = secondSelectedPeriod;
         showExportAddPeriod = exportSecondSelectedPeriod is not null;
@@ -3668,25 +3698,8 @@
                 log.AttendanceDate.ToString("yyyy-MM-dd")
             }));
 
-    private static string BuildAttendanceLogsZip(string onsiteCsv, string wfhCsv, string timestamp)
-    {
-        using var stream = new MemoryStream();
-        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
-        {
-            AddZipEntry(archive, $"onsite_logs_{timestamp}.csv", onsiteCsv);
-            AddZipEntry(archive, $"wfh_logs_{timestamp}.csv", wfhCsv);
-        }
-
-        return Convert.ToBase64String(stream.ToArray());
-    }
-
-    private static void AddZipEntry(ZipArchive archive, string fileName, string content)
-    {
-        var entry = archive.CreateEntry(fileName, CompressionLevel.Fastest);
-        using var entryStream = entry.Open();
-        using var writer = new StreamWriter(entryStream, Encoding.UTF8);
-        writer.Write(content);
-    }
+    private static string BuildCsvBase64(string csv)
+        => Convert.ToBase64String(Encoding.UTF8.GetBytes(csv));
 
     private sealed record FilterOption(string Value, string Label);
 
@@ -3977,34 +3990,43 @@
 
         try
         {
-            var exportOnsiteLogs = await Db.AttendanceLogs
-                .AsNoTracking()
-                .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
-                .OrderByDescending(l => l.AttendanceDate)
-                .ThenBy(l => l.LastName)
-                .ThenBy(l => l.FirstName)
-                .ToListAsync();
-
-            var exportWfhLogs = await Db.AttendanceLogsWfh
-                .AsNoTracking()
-                .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
-                .Where(l => l.TimeIn.HasValue
-                    || l.TimeOut.HasValue
-                    || !string.IsNullOrWhiteSpace(l.Target)
-                    || !string.IsNullOrWhiteSpace(l.Accomplishment)
-                    || !string.IsNullOrWhiteSpace(l.Mov))
-                .OrderByDescending(l => l.AttendanceDate)
-                .ThenBy(l => l.LastName)
-                .ThenBy(l => l.FirstName)
-                .ToListAsync();
-
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var zipContent = BuildAttendanceLogsZip(
-                BuildOnsiteCsv(exportOnsiteLogs),
-                BuildWfhCsv(exportWfhLogs),
-                timestamp);
+            string fileName;
+            string csvContent;
 
-            await JS.InvokeVoidAsync("attendanceLogs.downloadFileFromBase64", $"attendance_logs_{timestamp}.zip", zipContent, "application/zip");
+            if (exportLogType == DashboardTableMenu.Wfh)
+            {
+                var exportWfhLogs = await Db.AttendanceLogsWfh
+                    .AsNoTracking()
+                    .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
+                    .Where(l => l.TimeIn.HasValue
+                        || l.TimeOut.HasValue
+                        || !string.IsNullOrWhiteSpace(l.Target)
+                        || !string.IsNullOrWhiteSpace(l.Accomplishment)
+                        || !string.IsNullOrWhiteSpace(l.Mov))
+                    .OrderByDescending(l => l.AttendanceDate)
+                    .ThenBy(l => l.LastName)
+                    .ThenBy(l => l.FirstName)
+                    .ToListAsync();
+
+                fileName = $"wfh_logs_{timestamp}.csv";
+                csvContent = BuildWfhCsv(exportWfhLogs);
+            }
+            else
+            {
+                var exportOnsiteLogs = await Db.AttendanceLogs
+                    .AsNoTracking()
+                    .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
+                    .OrderByDescending(l => l.AttendanceDate)
+                    .ThenBy(l => l.LastName)
+                    .ThenBy(l => l.FirstName)
+                    .ToListAsync();
+
+                fileName = $"onsite_logs_{timestamp}.csv";
+                csvContent = BuildOnsiteCsv(exportOnsiteLogs);
+            }
+
+            await JS.InvokeVoidAsync("attendanceLogs.downloadFileFromBase64", fileName, BuildCsvBase64(csvContent), "text/csv;charset=utf-8");
 
             showExportLogsModal = false;
             showExportPeriodMenu = false;
@@ -5013,6 +5035,8 @@
     }
 
     private static string FormatTime(DateTime? value) => value?.ToString("MMM dd, yyyy\nhh:mm tt") ?? "-";
+
+    private static string FormatClockTime(DateTime? value) => value?.ToString("hh:mm tt") ?? "-";
 
     private static string FormatTimeRange(DateTime? start, DateTime? end)
         => $"{(start?.ToString("hh:mm tt") ?? "-")} / {(end?.ToString("hh:mm tt") ?? "-")}";

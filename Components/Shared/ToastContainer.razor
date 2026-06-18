@@ -54,8 +54,9 @@
             {
                 var oldest = _toasts[0];
                 _toasts.RemoveAt(0);
-                // ensure any pending timers for that toast are effectively cancelled by removing it
-                try { Hide(oldest.Id); } catch { }
+                _visible.Remove(oldest.Id);
+                _leaving.Remove(oldest.Id);
+                try { ToastService.Hide(oldest.Id); } catch { }
             }
 
             _toasts.Add(message);
@@ -63,8 +64,15 @@
             _ = Task.Run(async () => {
                 // small delay to allow element to be added to DOM and painted
                 await Task.Delay(50);
-                _visible.Add(message.Id);
-                try { await InvokeAsync(StateHasChanged); } catch { }
+                try
+                {
+                    await InvokeAsync(() =>
+                    {
+                        _visible.Add(message.Id);
+                        StateHasChanged();
+                    });
+                }
+                catch { }
             });
             // write a debug message to the browser console to help troubleshooting
             try { _ = JS.InvokeVoidAsync("console.log", "ToastContainer: show", message.Title, message.Message); } catch { }
@@ -80,37 +88,43 @@
     private async Task RemoveAfterDelay(string id, int ms)
     {
         await Task.Delay(ms);
-        Hide(id);
+        try { ToastService.Hide(id); } catch { }
     }
 
     private void Hide(string id)
     {
-        // if already leaving or not present, ignore
-        if (_leaving.Contains(id)) return;
+        _ = InvokeAsync(() =>
+        {
+            // if already leaving or not present, ignore
+            if (_leaving.Contains(id)) return;
 
-        var existing = _toasts.Find(t => t.Id == id);
-        if (existing is null) return;
+            var existing = _toasts.Find(t => t.Id == id);
+            if (existing is null) return;
 
-        // start leave transition by removing visible flag and adding leaving flag
-        _visible.Remove(id);
-        _leaving.Add(id);
-        _ = InvokeAsync(StateHasChanged);
+            // start leave transition by removing visible flag and adding leaving flag
+            _visible.Remove(id);
+            _leaving.Add(id);
+            StateHasChanged();
 
-        // after CSS transition completes, remove from list
-        _ = Task.Run(async () => {
-            await Task.Delay(300); // match CSS animation duration
-            try
-            {
-                _toasts.RemoveAll(t => t.Id == id);
-                _leaving.Remove(id);
-                _visible.Remove(id);
-                await InvokeAsync(StateHasChanged);
-            }
-            catch { }
+            // after CSS transition completes, remove from list
+            _ = Task.Run(async () => {
+                await Task.Delay(300); // match CSS animation duration
+                try
+                {
+                    await InvokeAsync(() =>
+                    {
+                        _toasts.RemoveAll(t => t.Id == id);
+                        _leaving.Remove(id);
+                        _visible.Remove(id);
+                        StateHasChanged();
+                    });
+                }
+                catch { }
+            });
         });
     }
 
-    private void Close(string id) => Hide(id);
+    private void Close(string id) => ToastService.Hide(id);
 
     public void Dispose()
     {

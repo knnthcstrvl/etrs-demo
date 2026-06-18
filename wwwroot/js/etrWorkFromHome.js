@@ -25,9 +25,60 @@ window.etrWorkFromHome = (function () {
         }
     }
 
+    async function startCamera(videoElement) {
+        if (!videoElement) return;
+
+        stopCamera(videoElement);
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('Camera API is not available.');
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'user'
+            },
+            audio: false
+        });
+
+        videoElement.srcObject = stream;
+        await videoElement.play();
+    }
+
+    function stopCamera(videoElement) {
+        if (!videoElement || !videoElement.srcObject) return;
+
+        const stream = videoElement.srcObject;
+        if (stream && typeof stream.getTracks === 'function') {
+            stream.getTracks().forEach(track => track.stop());
+        }
+
+        videoElement.srcObject = null;
+    }
+
+    function capturePhoto(videoElement) {
+        if (!videoElement || !videoElement.videoWidth || !videoElement.videoHeight) {
+            throw new Error('Camera preview is not ready.');
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = videoElement.videoWidth;
+        canvas.height = videoElement.videoHeight;
+
+        const context = canvas.getContext('2d');
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+        return canvas.toDataURL('image/jpeg', 0.95);
+    }
+
     return {
         registerOutsideClick: registerOutsideClick,
-        unregisterOutsideClick: unregisterOutsideClick
+        unregisterOutsideClick: unregisterOutsideClick,
+        startCamera: startCamera,
+        stopCamera: stopCamera,
+        capturePhoto: capturePhoto
     };
 })();
 

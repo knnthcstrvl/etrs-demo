@@ -50,6 +50,10 @@ builder.Services.AddCors();
 builder.Services.AddLocalization();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
+{
+    options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
+});
 builder.Services.AddControllers();
 builder.Services.AddSyncfusionBlazor();
 SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjHTQxAR8/V1JGaF5cXGpCf1FpRmJGdld5fUVHYVZUTXxaS00DNHVRdkdmWH1ceXRdQ2VeUUJ3WEdWYEs=");
@@ -129,6 +133,7 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = scope.ServiceProvider.GetRequiredService<EtrsDbContext>();
+        await Financial.Data.DatabaseSchemaUpdater.EnsureUserAccountColumnsAsync(db);
         // Ensure EF migrations are applied
         await db.Database.MigrateAsync();
 
@@ -141,7 +146,7 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        Console.WriteLine("Error while preparing database: " + ex.Message);
+        Console.WriteLine("Error while preparing database: " + ex);
     }
 }
 

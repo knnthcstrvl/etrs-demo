@@ -63,41 +63,58 @@
 
                 <div class="form-row">
                     <label class="required-star">ID Number</label>
-                    <div class="employee-search-wrap" @ref="employeeSearchWrapRef">
-                        <div class="employee-search-input-wrap">
-                            <input
-                                value="@employeeSearchText"
-                                @oninput="HandleIdInputChanged"
-                                @onfocus="HandleIdInputFocus"
-                                class="etr-input employee-search-input field-control"
-                                disabled="@isSubmitting"
-                                autocomplete="off" />
-                            <span class="employee-search-icon" aria-hidden="true">Search</span>
+                    <div class="id-photo-row">
+                        <div class="employee-search-wrap" @ref="employeeSearchWrapRef">
+                            <div class="employee-search-input-wrap">
+                                <input
+                                    value="@employeeSearchText"
+                                    @oninput="HandleIdInputChanged"
+                                    @onfocus="HandleIdInputFocus"
+                                    class="etr-input employee-search-input field-control"
+                                    disabled="@isSubmitting"
+                                    autocomplete="off" />
+                                <span class="employee-search-icon" aria-hidden="true">Search</span>
+                            </div>
+
+                            <div class="@GetEmployeeOverlayClass()">
+                                @if (showEmployeeResults)
+                                {
+                                    @if (employeeSearchResults.Count == 0)
+                                    {
+                                        <div class="employee-empty-state">No Employee Found</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="employee-results-grid">
+                                            @foreach (var employee in employeeSearchResults)
+                                            {
+                                                <button type="button" class="@GetEmployeeResultClass(employee)" @onclick="() => SelectEmployee(employee)">
+                                                    <span class="employee-result-id">@employee.IdNumber</span>
+                                                    <span class="employee-result-name">@FormatEmployeeName(employee)</span>
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                }
+                            </div>
                         </div>
 
-                        <div class="@GetEmployeeOverlayClass()">
-                            @if (showEmployeeResults)
-                            {
-                                @if (employeeSearchResults.Count == 0)
+                        <div class="@GetPhotoVerificationFieldClass()">
+                            <button type="button"
+                                    class="photo-verification-icon-button"
+                                    @onclick="OpenPhotoVerificationModal"
+                                    disabled="@isSubmitting"
+                                    aria-label="Open photo verification">
+                                <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                            </button>
+                            <span class="photo-verification-status" aria-label="@PhotoVerificationStatusLabel">
+                                @if (!string.IsNullOrWhiteSpace(photoVerificationImage))
                                 {
-                                    <div class="employee-empty-state">No Employee Found</div>
+                                    <i class="fa-solid fa-check" aria-hidden="true"></i>
                                 }
-                                else
-                                {
-                                    <div class="employee-results-grid">
-                                        @foreach (var employee in employeeSearchResults)
-                                        {
-                                            <button type="button" class="@GetEmployeeResultClass(employee)" @onclick="() => SelectEmployee(employee)">
-                                                <span class="employee-result-id">@employee.IdNumber</span>
-                                                <span class="employee-result-name">@FormatEmployeeName(employee)</span>
-                                            </button>
-                                        }
-                                    </div>
-                                }
-                            }
+                            </span>
                         </div>
                     </div>
-
                 </div>
 
                 <div class="@GetSectionClass("IN")" aria-hidden="@(entryModel.LogType != "IN")">
@@ -168,9 +185,15 @@
                         <div>
                             <div class="attendance-detail-eyebrow">Employee Verification</div>
                             <div class="attendance-detail-person">@FormatEmployeeName(selectedEmployee)</div>
-                            <div class="attendance-detail-meta">Confirm this is the correct employee before recording time @entryModel.LogType.</div>
                         </div>
-                        <div class="attendance-detail-status">WFH @entryModel.LogType</div>
+                        @if (!string.IsNullOrWhiteSpace(photoVerificationImage))
+                        {
+                            <img class="confirmation-photo-thumb" src="@photoVerificationImage" alt="Photo verification" />
+                        }
+                        else
+                        {
+                            <div class="confirmation-photo-thumb confirmation-photo-placeholder">No Image</div>
+                        }
                     </div>
 
                     <div class="attendance-detail-section attendance-detail-section-primary">
@@ -208,6 +231,72 @@
                     <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ConfirmSubmitAsync" disabled="@isSubmitting">
                         @(isSubmitting ? "Submitting..." : $"Confirm {entryModel.LogType}")
                     </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (showPhotoVerificationModal)
+    {
+        <div class="attendance-detail-overlay" @onclick="ClosePhotoVerificationModalAsync">
+            <div class="@GetPhotoModalClass()" @onclick:stopPropagation="true">
+                @if (isPhotoCaptureClosing)
+                {
+                    <div class="etr-photo-spotlight" aria-hidden="true"></div>
+                }
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Photo Verification</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="ClosePhotoVerificationModalAsync" aria-label="Close photo verification">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body">
+                    <div class="attendance-detail-section attendance-detail-hero">
+                        <div>
+                            <div class="attendance-detail-eyebrow">Camera Check</div>
+                            <div class="attendance-detail-person">@PhotoVerificationStatusText</div>
+                            <div class="attendance-detail-meta">Take a clear photo before submitting the WFH log.</div>
+                        </div>
+                        <div class="attendance-detail-status">WFH @entryModel.LogType</div>
+                    </div>
+
+                    <div class="@GetPhotoCameraSectionClass()">
+                        <div class="@GetPhotoCameraFrameClass()">
+                            @if (!string.IsNullOrWhiteSpace(photoVerificationImage))
+                            {
+                                <img src="@photoVerificationImage" alt="Captured verification" />
+                            }
+                            else
+                            {
+                                <video @ref="photoVideoRef" autoplay playsinline muted></video>
+                                <div class="etr-camera-guide" aria-hidden="true">
+                                    <span class="etr-face-oval"></span>
+                                    <span class="etr-face-center"></span>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(photoCameraMessage))
+                                {
+                                    <div class="etr-camera-message">@photoCameraMessage</div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer etr-photo-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="ClosePhotoVerificationModalAsync">Close</button>
+                    <div class="etr-photo-actions">
+                        @if (!string.IsNullOrWhiteSpace(photoVerificationImage))
+                        {
+                            <button type="button" class="btn btn-outline-secondary attendance-detail-done etr-photo-action-button etr-photo-secondary" @onclick="RetakePhotoAsync" disabled="@isPhotoCaptureClosing">Retake</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-primary attendance-detail-done etr-photo-action-button" @onclick="CapturePhotoAsync" disabled="@isPhotoCaptureClosing">Capture</button>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
@@ -266,6 +355,20 @@
         background-image: linear-gradient(rgba(0,0,0,0.44), rgba(0,0,0,0.44)), url('/images/etr-bg.jpg') !important;
     }
 
+    body.etrs-dark-theme:has(.etr-shell) .toast-item {
+        background: #ffffff !important;
+        color: #1e2939 !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.06) !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-message {
+        color: #64748b !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-close {
+        color: #64748b !important;
+    }
+
     body.etrs-dark-theme .etr-shell .etr-copy-panel,
     body.etrs-dark-theme .etr-shell .etr-title,
     body.etrs-dark-theme .etr-shell .etr-sub,
@@ -308,6 +411,26 @@
     body.etrs-dark-theme .etr-shell .etr-input::placeholder,
     body.etrs-dark-theme .etr-shell .etr-textarea::placeholder {
         color: #4b5563 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .photo-verification-field {
+        background: #ffffff !important;
+        border-color: transparent !important;
+        color: #111827 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .photo-verification-field.disabled {
+        background: #ffffff !important;
+        color: #6b7280 !important;
+        opacity: 1 !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .photo-verification-status {
+        background: #d1d5db !important;
+    }
+
+    body.etrs-dark-theme .etr-shell .photo-verification-field.verified .photo-verification-status {
+        background: #10b981 !important;
     }
 
     body.etrs-dark-theme .etr-shell .option-card {
@@ -554,6 +677,7 @@
     }
 
     .employee-search-input {
+        height: 2.625rem;
         padding-right: 5.5rem;
     }
 
@@ -574,7 +698,7 @@
         left: 0;
         right: 0;
         z-index: 20;
-        padding: 0.8rem;
+        padding: 0.55rem;
         border-radius: 10px;
         background: rgba(255,255,255,0.96);
         border: 1px solid rgba(209,213,219,0.9);
@@ -596,15 +720,15 @@
     .employee-results-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.7rem;
+        gap: 0.45rem;
     }
 
     .employee-result-card {
         display: flex;
         flex-direction: column;
-        gap: 0.2rem;
+        gap: 0.12rem;
         width: 100%;
-        padding: 0.8rem 0.85rem;
+        padding: 0.55rem 0.65rem;
         border: 1px solid #d1d5db;
         border-radius: 10px;
         background: #ffffff;
@@ -621,21 +745,97 @@
     }
 
     .employee-result-id {
-        font-size: 1rem;
+        font-size: 0.9rem;
         font-weight: 700;
         line-height: 1.2;
     }
 
     .employee-result-name {
-        font-size: 0.78rem;
+        font-size: 0.68rem;
         color: #6b7280;
-        line-height: 1.35;
+        line-height: 1.25;
     }
 
     .employee-empty-state {
         padding: 0.5rem 0.15rem;
         color: #6b7280;
         font-size: 0.9rem;
+    }
+
+    .id-photo-row {
+        display: grid;
+        grid-template-columns: minmax(0, 17fr) minmax(92px, 3fr);
+        gap: 0.55rem;
+        align-items: stretch;
+    }
+
+    .photo-verification-field {
+        width: 100%;
+        height: 2.625rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.35rem;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        padding: 0.35rem 0.55rem;
+        background: #ffffff;
+        color: #1f2937;
+        font-size: 0.82rem;
+        font-weight: 500;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    }
+
+    .photo-verification-field.disabled {
+        background: #ffffff;
+        color: #6b7280;
+        opacity: 1;
+    }
+
+    .photo-verification-icon-button {
+        flex: 0 0 auto;
+        width: 1.9rem;
+        height: 1.9rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: #111827;
+        font-size: 1rem;
+    }
+
+    .photo-verification-status {
+        flex: 0 0 auto;
+        width: 0.95rem;
+        height: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: #d1d5db;
+        color: #ffffff;
+        font-size: 0.55rem;
+        line-height: 1;
+    }
+
+    .photo-verification-field.verified .photo-verification-status {
+        background: #10b981;
+    }
+
+    .photo-verification-icon-button:not(:disabled):hover,
+    .photo-verification-icon-button:not(:disabled):focus-visible {
+        background: #f5f7fa;
+        color: #0f172a;
+        outline: none;
+    }
+
+    .photo-verification-icon-button:disabled {
+        background: transparent;
+        color: #111827;
+        cursor: not-allowed;
+        opacity: 1;
     }
 
     .transition-panel {
@@ -792,6 +992,23 @@
         width: min(100%, 680px);
     }
 
+    .etr-photo-modal {
+        width: min(100%, 720px);
+    }
+
+    .etr-photo-modal.photo-capture-success {
+        position: relative;
+    }
+
+    .etr-photo-spotlight {
+        position: fixed;
+        inset: 0;
+        z-index: 3;
+        pointer-events: none;
+        background: rgba(15, 23, 42, 0.68);
+        animation: etr-photo-spotlight-in 180ms ease-out;
+    }
+
     .attendance-detail-header,
     .attendance-detail-hero,
     .attendance-detail-footer {
@@ -889,6 +1106,27 @@
         white-space: nowrap;
     }
 
+    .confirmation-photo-thumb {
+        flex: 0 0 auto;
+        width: 9rem;
+        height: 6.25rem;
+        border: 0;
+        border-radius: 8px;
+        object-fit: cover;
+        display: block;
+    }
+
+    .confirmation-photo-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--etrs-gray-100);
+        color: var(--etrs-gray-700);
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-align: center;
+    }
+
     .attendance-detail-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -974,6 +1212,129 @@
         text-decoration: none;
     }
 
+    .etr-camera-section {
+        padding: 0.75rem;
+    }
+
+    .etr-camera-section.capture-highlight {
+        position: relative;
+        z-index: 5;
+        background: rgba(255, 255, 255, 0.98);
+        border-color: var(--etrs-gray-200);
+        box-shadow: 0 18px 52px rgba(0, 0, 0, 0.36);
+        animation: etr-photo-confirm 360ms ease-out;
+    }
+
+    .etr-camera-frame {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        overflow: hidden;
+        border-radius: 8px;
+        background: #111827;
+        border: 1px solid var(--etrs-gray-200);
+    }
+
+    .etr-camera-frame video,
+    .etr-camera-frame img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+    }
+
+    .etr-camera-frame.has-photo {
+        background: #ffffff;
+    }
+
+    .etr-camera-frame.capture-highlight {
+        border-color: var(--etrs-gray-200);
+    }
+
+    .etr-camera-guide {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+            linear-gradient(to right, transparent 33.2%, rgba(255,255,255,0.45) 33.2%, rgba(255,255,255,0.45) 33.7%, transparent 33.7%, transparent 66.2%, rgba(255,255,255,0.45) 66.2%, rgba(255,255,255,0.45) 66.7%, transparent 66.7%),
+            linear-gradient(to bottom, transparent 33.2%, rgba(255,255,255,0.45) 33.2%, rgba(255,255,255,0.45) 33.7%, transparent 33.7%, transparent 66.2%, rgba(255,255,255,0.45) 66.2%, rgba(255,255,255,0.45) 66.7%, transparent 66.7%);
+    }
+
+    .etr-face-oval {
+        position: absolute;
+        top: 11%;
+        left: 50%;
+        width: 38%;
+        height: 56%;
+        border: 2px solid rgba(255, 255, 255, 0.78);
+        border-radius: 50%;
+        transform: translateX(-50%);
+        box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.08);
+    }
+
+    .etr-face-center {
+        position: absolute;
+        top: 39%;
+        left: 50%;
+        width: 0.75rem;
+        height: 0.75rem;
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        border-radius: 999px;
+        transform: translate(-50%, -50%);
+    }
+
+    .etr-camera-message {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        color: #ffffff;
+        text-align: center;
+        background: rgba(17, 24, 39, 0.78);
+        font-weight: 500;
+    }
+
+    .etr-photo-footer {
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    .etr-photo-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.55rem;
+    }
+
+    .etr-photo-action-button {
+        width: auto;
+        min-width: 7rem;
+        border-radius: 12px;
+        padding-inline: 1.25rem;
+    }
+
+    .etr-photo-modal .attendance-detail-done,
+    .etr-photo-modal .attendance-detail-done:disabled,
+    .etr-photo-secondary {
+        background: #ffffff;
+        border-color: var(--etrs-gray-300);
+        color: var(--etrs-black);
+    }
+
+    .etr-photo-modal .attendance-detail-done:hover,
+    .etr-photo-modal .attendance-detail-done:focus-visible {
+        background: var(--etrs-gray-100);
+        border-color: var(--etrs-gray-300);
+        color: var(--etrs-black);
+    }
+
+    .etr-photo-modal .attendance-detail-done:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+    }
+
     .spinner {
         width: 16px;
         height: 16px;
@@ -1013,19 +1374,41 @@
         }
     }
 
+    @@keyframes etr-photo-confirm {
+        0% {
+            transform: scale(0.985);
+            box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+        }
+        100% {
+            transform: scale(1);
+            box-shadow: 0 18px 52px rgba(0, 0, 0, 0.36);
+        }
+    }
+
+    @@keyframes etr-photo-spotlight-in {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
     @@media (max-width: 640px) {
         .attendance-detail-modal {
             border-radius: 10px;
         }
 
-        .etr-confirmation-modal .attendance-detail-header {
+        .etr-confirmation-modal .attendance-detail-header,
+        .etr-photo-modal .attendance-detail-header {
             position: relative;
             flex-direction: row;
             align-items: flex-start;
             padding-right: 3rem;
         }
 
-        .etr-confirmation-modal .attendance-detail-close {
+        .etr-confirmation-modal .attendance-detail-close,
+        .etr-photo-modal .attendance-detail-close {
             position: absolute;
             top: 1rem;
             right: 1rem;
@@ -1054,7 +1437,29 @@
             text-align: center;
         }
 
-        .etr-confirmation-modal .attendance-detail-footer {
+        .confirmation-photo-thumb {
+            width: 9rem;
+            height: 6.25rem;
+            align-self: center;
+        }
+
+        .etr-confirmation-modal .attendance-detail-hero {
+            align-items: center;
+            text-align: center;
+        }
+
+        .etr-confirmation-modal .attendance-detail-hero > div:first-child {
+            width: 100%;
+        }
+
+        .etr-confirmation-modal .attendance-detail-section-primary,
+        .etr-confirmation-modal .attendance-detail-field {
+            align-items: center;
+            text-align: center;
+        }
+
+        .etr-confirmation-modal .attendance-detail-footer,
+        .etr-photo-modal .attendance-detail-footer {
             justify-content: space-between;
             gap: 1rem;
         }
@@ -1062,6 +1467,16 @@
         .etr-confirmation-modal .attendance-detail-done {
             width: auto;
             min-width: 8.5rem;
+        }
+
+        .etr-photo-modal .attendance-detail-done {
+            width: auto;
+            min-width: 7rem;
+        }
+
+        .etr-photo-actions {
+            flex: 0 0 auto;
+            width: auto;
         }
     }
 </style>
@@ -1082,6 +1497,12 @@
     private DateTime? pendingSubmissionTime;
     private DateTime? confirmationTimeIn;
     private DateTime? confirmationTimeOut;
+    private bool showPhotoVerificationModal;
+    private bool pendingStartPhotoCamera;
+    private bool isPhotoCaptureClosing;
+    private ElementReference photoVideoRef;
+    private string photoVerificationImage = string.Empty;
+    private string photoCameraMessage = string.Empty;
 
     private class EtrEntryModel
         : IValidatableObject
@@ -1122,6 +1543,14 @@
     }
 
     private bool IsSubmitDisabled => isSubmitting;
+    private string PhotoVerificationStatusLabel
+        => string.IsNullOrWhiteSpace(photoVerificationImage)
+            ? "No photo"
+            : "Captured";
+    private string PhotoVerificationStatusText
+        => string.IsNullOrWhiteSpace(photoVerificationImage)
+            ? "Ready for photo"
+            : "Photo captured";
 
     private async Task HandleSubmit(EditContext editContext)
     {
@@ -1254,8 +1683,26 @@
                 return;
             }
 
+            if (string.IsNullOrWhiteSpace(photoVerificationImage))
+            {
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = "Photo required",
+                    Message = "Capture a photo verification before submitting your WFH log.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             var today = DateTime.Today;
             var now = submissionTime ?? DateTime.Now;
+            var photoVerificationPath = await SavePhotoVerificationAsync(photoVerificationImage, employee);
+            if (string.IsNullOrWhiteSpace(photoVerificationPath))
+            {
+                return;
+            }
+
             var log = await Db.AttendanceLogsWfh
                 .Include(l => l.ExceptionCondition)
                 .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == today);
@@ -1345,6 +1792,9 @@
             }
 
             log.Tardiness = CalculateWfhTardiness(log.TimeIn);
+            log.PhotoVerification = string.IsNullOrWhiteSpace(photoVerificationPath)
+                ? log.PhotoVerification
+                : photoVerificationPath;
 
             await Db.SaveChangesAsync();
 
@@ -1362,6 +1812,7 @@
             employeeSearchResults.Clear();
             employeeSearchText = string.Empty;
             showEmployeeResults = false;
+            ResetPhotoVerification();
             pendingSubmissionTime = null;
             confirmationTimeIn = null;
             confirmationTimeOut = null;
@@ -1375,12 +1826,19 @@
     private async Task HandleIdInputChanged(ChangeEventArgs e)
     {
         employeeSearchText = e.Value?.ToString() ?? string.Empty;
+        entryModel.IdNumber = employeeSearchText;
 
-        if (!string.Equals(selectedEmployee?.IdNumber, employeeSearchText.Trim(), StringComparison.OrdinalIgnoreCase))
+        if (selectedEmployee is not null
+            && !string.Equals(selectedEmployee.IdNumber, employeeSearchText.Trim(), StringComparison.OrdinalIgnoreCase))
         {
+            var shouldStopPhotoCamera = showPhotoVerificationModal;
             selectedEmployee = null;
-            entryModel.IdNumber = employeeSearchText;
             showSubmitConfirmation = false;
+            ResetPhotoVerification();
+            if (shouldStopPhotoCamera)
+            {
+                await StopPhotoCameraAsync();
+            }
             pendingSubmissionTime = null;
             confirmationTimeIn = null;
             confirmationTimeOut = null;
@@ -1431,6 +1889,7 @@
     {
         try
         {
+            await StopPhotoCameraAsync();
             await UnregisterOutsideClickAsync();
         }
         catch { }
@@ -1464,6 +1923,50 @@
 
     private string GetSectionClass(string type) => entryModel.LogType == type ? "transition-panel active" : "transition-panel";
 
+    private string GetPhotoVerificationFieldClass()
+    {
+        var classes = new List<string> { "photo-verification-field" };
+
+        if (!string.IsNullOrWhiteSpace(photoVerificationImage))
+        {
+            classes.Add("verified");
+        }
+
+        if (isSubmitting)
+        {
+            classes.Add("disabled");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetPhotoModalClass()
+        => isPhotoCaptureClosing
+            ? "attendance-detail-modal etr-photo-modal photo-capture-success"
+            : "attendance-detail-modal etr-photo-modal";
+
+    private string GetPhotoCameraSectionClass()
+        => isPhotoCaptureClosing
+            ? "attendance-detail-section etr-camera-section capture-highlight"
+            : "attendance-detail-section etr-camera-section";
+
+    private string GetPhotoCameraFrameClass()
+    {
+        var classes = new List<string> { "etr-camera-frame" };
+
+        if (!string.IsNullOrWhiteSpace(photoVerificationImage))
+        {
+            classes.Add("has-photo");
+        }
+
+        if (isPhotoCaptureClosing)
+        {
+            classes.Add("capture-highlight");
+        }
+
+        return string.Join(" ", classes);
+    }
+
     private void SelectLogType(string type)
     {
         entryModel.LogType = type;
@@ -1496,17 +1999,28 @@
     }
     private async Task SelectEmployee(Employee employee)
     {
+        var shouldResetPhoto = selectedEmployee is not null
+            && selectedEmployee.EmployeeId != employee.EmployeeId;
+
         selectedEmployee = employee;
         entryModel.IdNumber = employee.IdNumber;
         employeeSearchText = $"{employee.IdNumber} - {FormatEmployeeName(employee)}";
         showEmployeeResults = false;
         showSubmitConfirmation = false;
+        if (shouldResetPhoto)
+        {
+            ResetPhotoVerification();
+        }
         pendingSubmissionTime = null;
         confirmationTimeIn = null;
         confirmationTimeOut = null;
         ClearFieldValidation(nameof(EtrEntryModel.IdNumber));
         editContext.NotifyFieldChanged(new FieldIdentifier(entryModel, nameof(EtrEntryModel.IdNumber)));
         await UnregisterOutsideClickAsync();
+        if (string.IsNullOrWhiteSpace(photoVerificationImage))
+        {
+            await OpenPhotoVerificationModal();
+        }
     }
 
     [JSInvokable]
@@ -1525,6 +2039,102 @@
             pendingRegisterOutsideClick = false;
             await RegisterOutsideClickAsync();
         }
+
+        if (pendingStartPhotoCamera && showPhotoVerificationModal)
+        {
+            pendingStartPhotoCamera = false;
+            await StartPhotoCameraAsync();
+        }
+    }
+
+    private async Task OpenPhotoVerificationModal()
+    {
+        showPhotoVerificationModal = true;
+        isPhotoCaptureClosing = false;
+        photoCameraMessage = string.Empty;
+        pendingStartPhotoCamera = string.IsNullOrWhiteSpace(photoVerificationImage);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ClosePhotoVerificationModalAsync()
+    {
+        showPhotoVerificationModal = false;
+        pendingStartPhotoCamera = false;
+        isPhotoCaptureClosing = false;
+        await StopPhotoCameraAsync();
+    }
+
+    private async Task StartPhotoCameraAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(photoVerificationImage))
+        {
+            return;
+        }
+
+        try
+        {
+            photoCameraMessage = string.Empty;
+            await JS.InvokeVoidAsync("etrWorkFromHome.startCamera", photoVideoRef);
+        }
+        catch
+        {
+            photoCameraMessage = "Camera access is unavailable. Check browser permissions and try again.";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task StopPhotoCameraAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("etrWorkFromHome.stopCamera", photoVideoRef);
+        }
+        catch { }
+    }
+
+    private async Task CapturePhotoAsync()
+    {
+        if (!showPhotoVerificationModal || !string.IsNullOrWhiteSpace(photoVerificationImage))
+        {
+            return;
+        }
+
+        try
+        {
+            photoVerificationImage = await JS.InvokeAsync<string>("etrWorkFromHome.capturePhoto", photoVideoRef);
+            photoCameraMessage = string.Empty;
+            await StopPhotoCameraAsync();
+            isPhotoCaptureClosing = true;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(2000);
+
+            if (isPhotoCaptureClosing)
+            {
+                await ClosePhotoVerificationModalAsync();
+            }
+        }
+        catch
+        {
+            photoCameraMessage = "Could not capture a photo. Try again after the camera preview appears.";
+        }
+    }
+
+    private async Task RetakePhotoAsync()
+    {
+        photoVerificationImage = string.Empty;
+        photoCameraMessage = string.Empty;
+        isPhotoCaptureClosing = false;
+        pendingStartPhotoCamera = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ResetPhotoVerification()
+    {
+        photoVerificationImage = string.Empty;
+        photoCameraMessage = string.Empty;
+        showPhotoVerificationModal = false;
+        pendingStartPhotoCamera = false;
+        isPhotoCaptureClosing = false;
     }
 
     private async Task RegisterOutsideClickAsync()
@@ -1644,6 +2254,96 @@
 
         // No configured path: write under wwwroot/uploads/wfh-mov and return web relative path
         var defaultRoot = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
+        return await WriteToPathAsync(defaultRoot, true, true);
+    }
+
+    private async Task<string?> SavePhotoVerificationAsync(string? dataUrl, Employee employee)
+    {
+        if (string.IsNullOrWhiteSpace(dataUrl))
+        {
+            return null;
+        }
+
+        const string dataUrlPrefix = "data:image/jpeg;base64,";
+        var base64 = dataUrl.StartsWith(dataUrlPrefix, StringComparison.OrdinalIgnoreCase)
+            ? dataUrl[dataUrlPrefix.Length..]
+            : dataUrl;
+
+        byte[] photoBytes;
+        try
+        {
+            photoBytes = Convert.FromBase64String(base64);
+        }
+        catch (FormatException)
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Error,
+                Title = "Photo save failed",
+                Message = "The captured photo could not be read. Please retake the photo.",
+                Duration = 5000
+            });
+            return null;
+        }
+
+        var configuredPath = Configuration["Uploads:WfhPhotoVerificationPath"];
+        var safeId = Regex.Replace(employee.IdNumber, "[^A-Za-z0-9_-]", "");
+        if (string.IsNullOrWhiteSpace(safeId))
+        {
+            safeId = employee.EmployeeId.ToString();
+        }
+
+        var safeName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{safeId}_photo-verification.jpg";
+
+        async Task<string?> WriteToPathAsync(string root, bool returnWebRelative, bool showFailureToast)
+        {
+            try
+            {
+                var uploadsRootResolved = Path.IsPathRooted(root) ? root : Path.Combine(Environment.ContentRootPath, root);
+                Directory.CreateDirectory(uploadsRootResolved);
+
+                var fullPath = Path.Combine(uploadsRootResolved, safeName);
+                await File.WriteAllBytesAsync(fullPath, photoBytes);
+
+                if (returnWebRelative)
+                {
+                    var wwwroot = Environment.WebRootPath ?? string.Empty;
+                    var relative = Path.GetRelativePath(wwwroot, fullPath).Replace('\\', '/');
+                    return "/" + relative;
+                }
+
+                return fullPath;
+            }
+            catch (Exception ex)
+            {
+                if (showFailureToast)
+                {
+                    ToastService.Show(new ToastMessage
+                    {
+                        Type = ToastType.Error,
+                        Title = "Photo save failed",
+                        Message = $"Could not save photo verification: {ex.Message}",
+                        Duration = 6000
+                    });
+                }
+
+                return null;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            var result = await WriteToPathAsync(configuredPath, false, false);
+            if (!string.IsNullOrWhiteSpace(result))
+            {
+                return result;
+            }
+
+            var fallback = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-photo-verification");
+            return await WriteToPathAsync(fallback, true, true);
+        }
+
+        var defaultRoot = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-photo-verification");
         return await WriteToPathAsync(defaultRoot, true, true);
     }
 
