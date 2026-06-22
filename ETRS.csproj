@@ -6,16 +6,13 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
 		<UseAppHost>false</UseAppHost>
-       <AssemblyName>Financial</AssemblyName>
+		<AssemblyName>Financial</AssemblyName>
 		<RootNamespace>Financial</RootNamespace>
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Content Remove="wwwroot\images\banner.jpg" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <None Include="wwwroot\images\banner.jpg" />
+		<Content Remove="wwwroot\images\banner.jpg" />
+		<None Include="wwwroot\images\banner.jpg" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -24,26 +21,29 @@
 		<Compile Remove="artifacts\**\*.cs" />
 		<Compile Remove="build-temp\**\*.cs" />
 		<Compile Remove="build-verify\**\*.cs" />
+		<Compile Remove="build-check-temp\**\*.cs" />
 		<EmbeddedResource Remove="bin\**" />
 		<EmbeddedResource Remove="obj\**" />
 		<EmbeddedResource Remove="artifacts\**" />
 		<EmbeddedResource Remove="build-temp\**" />
 		<EmbeddedResource Remove="build-verify\**" />
+		<EmbeddedResource Remove="build-check-temp\**" />
 		<Content Remove="bin\**" />
 		<Content Remove="obj\**" />
 		<Content Remove="artifacts\**" />
 		<Content Remove="build-temp\**" />
 		<Content Remove="build-verify\**" />
+		<Content Remove="build-check-temp\**" />
 		<None Remove="bin\**" />
 		<None Remove="obj\**" />
 		<None Remove="artifacts\**" />
 		<None Remove="build-temp\**" />
 		<None Remove="build-verify\**" />
+		<None Remove="build-check-temp\**" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
-		<PackageReference Include="Mapster" Version="7.4.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.1" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.1">
@@ -57,34 +57,10 @@
 		</PackageReference>
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
-		<PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="10.1.0" />
-		<PackageReference Include="Syncfusion.Blazor.Buttons" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Charts" Version="32.1.20" />
 		<PackageReference Include="Syncfusion.Blazor.Core" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Data" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.DataForm" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.DropDowns" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Grid" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Inputs" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Layouts" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Lists" Version="32.1.20" />
+		<PackageReference Include="Syncfusion.Blazor.Buttons" Version="32.1.20" />
 		<PackageReference Include="Syncfusion.Blazor.Navigations" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Notifications" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Popups" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.ProgressBar" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.SfPdfViewer" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Spinner" Version="32.1.20" />
 		<PackageReference Include="Syncfusion.Blazor.Themes" Version="32.1.20" />
-        <PackageReference Include="QuestPDF" Version="2024.3.0" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Components\Pages\Accounting\" />
-	  <Folder Include="DTO\Library\" />
-	  <Folder Include="Hubs\" />
-	  <Folder Include="Migrations\" />
-	  <Folder Include="Model\Modules\" />
-	  <Folder Include="Model\Trace\" />
 	</ItemGroup>
 
 	<PropertyGroup>

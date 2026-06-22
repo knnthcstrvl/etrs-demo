@@ -89,7 +89,6 @@ builder.Services.Configure<Microsoft.AspNetCore.Components.Server.CircuitOptions
     options.DetailedErrors = true;
 });
 
-MappingProfile.RegisterMappings();
 
 var app = builder.Build();
 

@@ -39,16 +39,12 @@
             _toasts.Add(m);
         }
 
-        // debug: notify browser that container initialized
-        try { _ = JS.InvokeVoidAsync("console.log", "ToastContainer: initialized"); } catch { }
     }
 
     private void Show(ToastMessage message)
     {
         // ensure UI updates run on the renderer synchronization context
         _ = InvokeAsync(() => {
-            // server log for debugging
-            try { Console.WriteLine($"ToastContainer: Show invoked - {message.Title} / {message.Message}"); } catch { }
             // enforce visible limit
             while (_toasts.Count >= MaxVisible)
             {
@@ -74,8 +70,6 @@
                 }
                 catch { }
             });
-            // write a debug message to the browser console to help troubleshooting
-            try { _ = JS.InvokeVoidAsync("console.log", "ToastContainer: show", message.Title, message.Message); } catch { }
             StateHasChanged();
 
             if (message.Duration > 0)
