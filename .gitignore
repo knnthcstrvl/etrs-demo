@@ -100,6 +100,15 @@ coverage*.xml
 !**/[Pp]ackages/build/
 
 # =========================
+## BUILD ARTIFACTS (local)
+# =========================
+
+artifacts/
+build-temp/
+build-verify/
+build-check-temp/
+
+# =========================
 ## PUBLISH / DEPLOY
 # =========================
 
@@ -137,8 +146,19 @@ Backup*/
 *.bak
 
 # =========================
+## CLIENT LIBRARIES (libman-managed, restore via: libman restore)
+# =========================
+
+wwwroot/lib/
+
+# =========================
+## USER UPLOADS (runtime data, not source)
+# =========================
+
+wwwroot/uploads/
+
+# =========================
 ## OPTIONAL (UNCOMMENT IF NEEDED)
 # =========================
 
-# wwwroot/   # Uncomment ONLY if auto-generated
 # bower_components/
