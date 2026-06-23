@@ -57,10 +57,6 @@
 		</PackageReference>
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
-		<PackageReference Include="Syncfusion.Blazor.Core" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Buttons" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Navigations" Version="32.1.20" />
-		<PackageReference Include="Syncfusion.Blazor.Themes" Version="32.1.20" />
 	</ItemGroup>
 
 	<PropertyGroup>

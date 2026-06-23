@@ -1,7 +1,6 @@
 using Financial;
 using Financial.Components;
 using Financial.Data;
-// Financial.Hubs removed
 using Financial.Repositories.Implement;
 using Financial.Repositories.Interface;
 using Financial.Services.Implements;
@@ -12,8 +11,6 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
-using Syncfusion.Blazor;
-using Syncfusion.Licensing;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -50,13 +47,8 @@ builder.Services.AddCors();
 builder.Services.AddLocalization();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
-{
-    options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
-});
 builder.Services.AddControllers();
-builder.Services.AddSyncfusionBlazor();
-SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjHTQxAR8/V1JGaF5cXGpCf1FpRmJGdld5fUVHYVZUTXxaS00DNHVRdkdmWH1ceXRdQ2VeUUJ3WEdWYEs=");
+builder.Services.AddAntiforgery(options => options.Cookie.Path = "/etr");
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -92,6 +84,8 @@ builder.Services.Configure<Microsoft.AspNetCore.Components.Server.CircuitOptions
 
 var app = builder.Build();
 
+app.UsePathBase("/etr");
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -105,7 +99,7 @@ else
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "ETRS API v1");
+    c.SwaggerEndpoint("/etr/swagger/v1/swagger.json", "ETRS API v1");
     c.DisplayRequestDuration();
 });
 
@@ -125,7 +119,6 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-// TransactionNotificationHub removed
 
 using (var scope = app.Services.CreateScope())
 {
