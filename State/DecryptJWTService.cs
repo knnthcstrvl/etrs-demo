@@ -16,17 +16,15 @@ namespace Financial.State
                 var token = handler.ReadJwtToken(jwtToken);
 
                 var id = token.Claims.FirstOrDefault(_ => _.Type == ClaimTypes.NameIdentifier);
-                var fname = token.Claims.FirstOrDefault(_ => _.Type == "FirstName");
-                var lname = token.Claims.FirstOrDefault(_ => _.Type == "LastName");
-                var email = token.Claims.FirstOrDefault(_ => _.Type == ClaimTypes.Email);
+                var name = token.Claims.FirstOrDefault(_ => _.Type == "Name");
+                var username = token.Claims.FirstOrDefault(_ => _.Type == ClaimTypes.Name);
                 var role = token.Claims.FirstOrDefault(_ => _.Type == ClaimTypes.Role);
                 var exp = token.Claims.FirstOrDefault(_ => _.Type == "exp");
 
                 return new CustomUserClaims(
                     Id: id?.Value ?? string.Empty,
-                    FirstName: fname?.Value ?? string.Empty,
-                    LastName: lname?.Value ?? string.Empty,
-                    Email: email?.Value ?? string.Empty,
+                    Name: name?.Value ?? string.Empty,
+                    Username: username?.Value ?? string.Empty,
                     Role: role?.Value ?? string.Empty,
                     Jwt: jwtToken,
                     Expiry: exp?.Value ?? string.Empty);

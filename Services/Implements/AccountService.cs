@@ -7,6 +7,7 @@ using Financial.State;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using static Financial.Responses.CustomResponses;
 
 namespace Financial.Services.Implements
@@ -82,7 +83,7 @@ namespace Financial.Services.Implements
                 ClearAuthorizationHeader();
 
                 var response = await _httpClient.PostAsJsonAsync("api/account/login", model);
-                var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+                var result = await ReadJsonOrErrorAsync<LoginResponse>(response);
 
                 return result ?? new LoginResponse(false, "Login failed.");
             }
@@ -185,6 +186,33 @@ namespace Financial.Services.Implements
             }
 
             await _protectedSessionStorage.SetAsync("c_user_session", jwtToken);
+        }
+
+        private static async Task<T?> ReadJsonOrErrorAsync<T>(HttpResponseMessage response)
+        {
+            try
+            {
+                return await response.Content.ReadFromJsonAsync<T>();
+            }
+            catch
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var message = string.IsNullOrWhiteSpace(content)
+                    ? $"Request failed with status {(int)response.StatusCode}."
+                    : content.Trim();
+
+                if (message.Length > 300)
+                {
+                    message = $"{message[..300]}...";
+                }
+
+                if (typeof(T) == typeof(LoginResponse))
+                {
+                    return (T)(object)new LoginResponse(false, message);
+                }
+
+                throw;
+            }
         }
     }
 }

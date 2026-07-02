@@ -24,7 +24,8 @@
             }
 
             var role = user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
-            var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? string.Empty;
+            var userIdText = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var hasUserId = int.TryParse(userIdText, out var userId);
 
             if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
             {
@@ -34,7 +35,9 @@
             }
 
             await using var db = await DbFactory.CreateDbContextAsync();
-            var account = await db.UserAccounts.FirstOrDefaultAsync(u => u.Email == email);
+            var account = hasUserId
+                ? await db.UserAccounts.FirstOrDefaultAsync(u => u.UserAccountId == userId)
+                : null;
             if (account is null)
             {
                 authorized = false;

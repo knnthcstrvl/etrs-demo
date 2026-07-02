@@ -12,7 +12,6 @@ namespace Financial.Services
 
         public bool IsInitialized { get; private set; }
         public string Role { get; private set; } = string.Empty;
-        public string Email { get; private set; } = string.Empty;
         public string Username { get; private set; } = string.Empty;
         public string DisplayName { get; private set; } = string.Empty;
         public HashSet<string> AccessSet { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -46,7 +45,6 @@ namespace Financial.Services
                 if (user?.Identity is null || !user.Identity.IsAuthenticated)
                 {
                     Role = string.Empty;
-                    Email = string.Empty;
                     Username = string.Empty;
                     DisplayName = string.Empty;
                     IsInitialized = true;
@@ -55,18 +53,19 @@ namespace Financial.Services
                 }
 
                 Role = user.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
-                Email = user.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;
                 Username = user.Identity?.Name ?? string.Empty;
+                var userIdText = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var hasUserId = int.TryParse(userIdText, out var userId);
 
                 await using var db = _dbFactory.CreateDbContext();
                 var account = await db.UserAccounts
-                    .Where(u => u.Email == Email || (!string.IsNullOrEmpty(Username) && u.Username == Username))
+                    .Where(u => (hasUserId && u.UserAccountId == userId) || (!string.IsNullOrEmpty(Username) && u.Username == Username))
                     .FirstOrDefaultAsync();
 
-                DisplayName = FormatDisplayName(account?.LastName, account?.FirstName, account?.MiddleName);
+                DisplayName = account?.Name ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(DisplayName))
                 {
-                    DisplayName = !string.IsNullOrWhiteSpace(Username) ? Username : Email;
+                    DisplayName = Username;
                 }
 
                 if (account is not null)
@@ -123,15 +122,6 @@ namespace Financial.Services
         public bool HasDivisionScope()
             => string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase)
                 || DivisionScope.Count > 0;
-
-        private static string FormatDisplayName(string? lastName, string? firstName, string? middleName)
-        {
-            var parts = new[] { firstName, middleName, lastName }
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value!.Trim());
-
-            return string.Join(" ", parts);
-        }
 
         private static HashSet<string> ParseDivisionScope(string? value)
             => new((value ?? string.Empty)

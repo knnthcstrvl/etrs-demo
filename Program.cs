@@ -127,9 +127,9 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = scope.ServiceProvider.GetRequiredService<EtrsDbContext>();
-        await Financial.Data.DatabaseSchemaUpdater.EnsureUserAccountColumnsAsync(db);
         // Ensure EF migrations are applied
         await db.Database.MigrateAsync();
+        await Financial.Data.DatabaseSchemaUpdater.EnsureUserAccountColumnsAsync(db);
         await Financial.Data.DatabaseSchemaUpdater.EnsureAttendanceLogWfhColumnsAsync(db);
 
         // Run only critical seeders on startup. Other seeders are disabled to

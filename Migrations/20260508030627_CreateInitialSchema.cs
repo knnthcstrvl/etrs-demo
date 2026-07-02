@@ -53,20 +53,17 @@ namespace Financial.Migrations
                 {
                     UserAccountId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    LastName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    FirstName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    MiddleName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Username = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Password = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Role = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    DivisionCenterAdminUnit = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    Designation = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    AccessLevel = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    DivisionCenterAdminUnit = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
+                    AccessLevel = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
                     RememberToken = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     DateCreated = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    DateUpdated = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    DateUpdated = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    MustChangePassword = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -164,12 +161,6 @@ namespace Financial.Migrations
                 name: "IX_Employees_IdNumber",
                 table: "Employees",
                 column: "IdNumber",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_UserAccounts_Email",
-                table: "UserAccounts",
-                column: "Email",
                 unique: true);
 
             migrationBuilder.CreateIndex(

@@ -79,18 +79,17 @@ namespace Financial.State
 
         public ClaimsPrincipal SetClaimPrincipal(CustomUserClaims claims)
         {
-            if (string.IsNullOrWhiteSpace(claims.Email)) return new ClaimsPrincipal();
+            if (string.IsNullOrWhiteSpace(claims.Id)) return new ClaimsPrincipal();
             _constant.JWTToken = claims.Jwt ?? string.Empty;
 
-            Console.WriteLine($"Email: {claims.Email} JWTToken:{_constant.JWTToken}");
+            Console.WriteLine($"Username: {claims.Username} JWTToken:{_constant.JWTToken}");
 
             return new ClaimsPrincipal(new ClaimsIdentity(
                 new List<Claim>
                 {
                     new(ClaimTypes.NameIdentifier, claims.Id ?? string.Empty),
-                    new("FirstName", claims.FirstName ?? string.Empty),
-                    new("LastName", claims.LastName ?? string.Empty),
-                    new(ClaimTypes.Email, claims.Email),
+                    new(ClaimTypes.Name, claims.Username ?? string.Empty),
+                    new("Name", claims.Name ?? string.Empty),
                     new(ClaimTypes.Role, claims.Role ?? string.Empty),
                     new("Jwt", claims.Jwt ?? string.Empty)
                 }, "JwtAuth"));

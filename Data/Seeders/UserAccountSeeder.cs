@@ -8,11 +8,10 @@ namespace Financial.Data.Seeders
     {
         public static async Task SeedAdminAsync(EtrsDbContext db)
         {
-            const string adminEmail = "admin@etrs.local";
             const string adminUsername = "admin";
 
             var existingAdmin = await db.UserAccounts
-                .FirstOrDefaultAsync(u => u.Email == adminEmail || u.Username == adminUsername);
+                .FirstOrDefaultAsync(u => u.Username == adminUsername);
 
             if (existingAdmin is not null)
             {
@@ -48,16 +47,12 @@ namespace Financial.Data.Seeders
 
             db.UserAccounts.Add(new UserAccount
             {
-                LastName = "Administrator",
-                FirstName = "System",
-                MiddleName = string.Empty,
-                Email = adminEmail,
+                Name = "System Administrator",
                 Username = adminUsername,
                 Password = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
                 Role = "Admin",
                 AccessLevel = string.Join(",", AccessPolicy.AdminAssignableAccess.OrderBy(value => value)),
                 DivisionCenterUnit = "Administration",
-                Designation = "System Administrator",
                 RememberToken = string.Empty,
                 IsActive = true,
                 DateCreated = DateTime.UtcNow

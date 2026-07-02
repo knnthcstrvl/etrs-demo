@@ -7,17 +7,8 @@ namespace Financial.Model
         [Key]
         public int UserAccountId { get; set; }
 
-        [MaxLength(100)]
-        public string LastName { get; set; } = string.Empty;
-
-        [MaxLength(100)]
-        public string FirstName { get; set; } = string.Empty;
-
-        [MaxLength(100)]
-        public string MiddleName { get; set; } = string.Empty;
-
         [MaxLength(150)]
-        public string Email { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
 
         [MaxLength(100)]
         public string Username { get; set; } = string.Empty;
@@ -29,9 +20,6 @@ namespace Financial.Model
 
         [MaxLength(1000)]
         public string DivisionCenterUnit { get; set; } = string.Empty;
-
-        [MaxLength(150)]
-        public string Designation { get; set; } = string.Empty;
 
         [MaxLength(1000)]
         // AccessLevel stores comma separated access rights (eg: "Add,Edit,Export")

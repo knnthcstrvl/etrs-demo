@@ -33,8 +33,15 @@ namespace Financial.Controllers
         [AllowAnonymous]
         public async Task<ActionResult<LoginResponse>> LoginAsync(LoginDto model)
         {
-            var result = await _userAccountRepository.LoginAsync(model);
-            return Ok(result);
+            try
+            {
+                var result = await _userAccountRepository.LoginAsync(model);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return Ok(new LoginResponse(false, $"Login failed: {ex.Message}"));
+            }
         }
 
         [HttpPost("refresh-token")]

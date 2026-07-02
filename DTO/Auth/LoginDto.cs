@@ -4,8 +4,8 @@ namespace Financial.DTO.Auth
 {
     public class LoginDto
     {
-        [Required(ErrorMessage = "Please enter your email or username.")]
-        public string Email { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Please enter your username.")]
+        public string Username { get; set; } = string.Empty;
 
         [Required, DataType(DataType.Password)]
         public string Password { get; set; } = string.Empty;

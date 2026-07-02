@@ -32,10 +32,6 @@ namespace Financial.Data
             base.OnModelCreating(modelBuilder);
 
             modelBuilder.Entity<UserAccount>()
-                .HasIndex(u => u.Email)
-                .IsUnique();
-
-            modelBuilder.Entity<UserAccount>()
                 .HasIndex(u => u.Username)
                 .IsUnique();
 

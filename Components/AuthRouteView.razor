@@ -74,11 +74,10 @@
 
     private async Task<bool> CurrentAccountIsValidAsync(ClaimsPrincipal user)
     {
-        var email = user.FindFirst(ClaimTypes.Email)?.Value;
         var userIdText = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var hasUserId = int.TryParse(userIdText, out var userId);
 
-        if (!hasUserId && string.IsNullOrWhiteSpace(email))
+        if (!hasUserId)
         {
             return false;
         }
@@ -88,8 +87,7 @@
             .AsNoTracking()
             .AnyAsync(account =>
                 account.IsActive
-                && ((hasUserId && account.UserAccountId == userId)
-                    || (!string.IsNullOrWhiteSpace(email) && account.Email == email)));
+                && account.UserAccountId == userId);
     }
 }
 

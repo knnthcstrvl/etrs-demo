@@ -124,14 +124,14 @@
     private ElementReference _profileBtn;
 
     private string ProfileDisplayName
-        => FirstNonEmpty(CurrentUser.DisplayName, CurrentUser.Username, CurrentUser.Email, "User");
+        => FirstNonEmpty(CurrentUser.DisplayName, CurrentUser.Username, "User");
 
     private string ProfileMeta
-        => FirstNonEmpty(CurrentUser.Email, CurrentUser.Username, "Signed in");
+        => FirstNonEmpty(CurrentUser.Username, "Signed in");
 
     private string ProfileInitials => GetAvatarInitial(ProfileDisplayName);
 
-    private string ProfileAvatarStyle => GetAvatarStyle(FirstNonEmpty(CurrentUser.Email, CurrentUser.Username, ProfileDisplayName));
+    private string ProfileAvatarStyle => GetAvatarStyle(FirstNonEmpty(CurrentUser.Username, ProfileDisplayName));
 
     private void ToggleProfileMenu()
     {

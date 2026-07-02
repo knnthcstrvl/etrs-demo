@@ -156,27 +156,6 @@
                             </div>
 
                             <div class="attendance-filter-field">
-                                <label class="attendance-table-toolbar-label" for="userFilterDesignation">Designation</label>
-                                <div class="attendance-filter-select-wrap">
-                                    <button type="button"
-                                            id="userFilterDesignation"
-                                            class="attendance-filter-select-trigger @(activeFilterField == "designation" ? "active" : null)"
-                                            @onclick='() => ToggleFilterField("designation")'>
-                                        <span class="attendance-filter-select-value">@DisplayValue(filterDesignation, "All Designations")</span>
-                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
-                                    </button>
-
-                                    <div class="attendance-filter-select-menu @(activeFilterField == "designation" ? "show" : null)">
-                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDesignation) ? "active" : null)" @onclick='() => SetFilterValue("designation", string.Empty)'>All Designations</button>
-                                        @foreach (var option in CurrentDesignationOptions)
-                                        {
-                                            <button type="button" class="attendance-filter-select-option @(string.Equals(filterDesignation, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("designation", option)'>@option</button>
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="attendance-filter-field">
                                 <label class="attendance-table-toolbar-label" for="userFilterStatus">Status</label>
                                 <div class="attendance-filter-select-wrap">
                                     <button type="button"
@@ -253,7 +232,7 @@
                             <div class="attendance-detail-section attendance-detail-hero">
                                 <div>
                                     <div class="attendance-detail-eyebrow">User</div>
-                                    <div class="attendance-detail-person">@FormatName(selectedUser.LastName, selectedUser.FirstName, selectedUser.MiddleName)</div>
+                                    <div class="attendance-detail-person">@DisplayValue(selectedUser.Name)</div>
                                     <div class="attendance-detail-meta">@DisplayValue(selectedUser.Username)</div>
                                 </div>
                                 <span class="status-badge @(selectedUser.IsActive ? "status-ok" : "status-danger")">@(selectedUser.IsActive ? "Active" : "Inactive")</span>
@@ -262,20 +241,12 @@
                             <div class="attendance-detail-section attendance-detail-section-primary">
                                 <div class="attendance-detail-grid">
                                     <div class="attendance-detail-field">
-                                        <span class="attendance-detail-label">Email</span>
-                                        <strong>@DisplayValue(selectedUser.Email)</strong>
-                                    </div>
-                                    <div class="attendance-detail-field">
                                         <span class="attendance-detail-label">Created</span>
                                         <strong>@FormatDate(selectedUser.DateCreated)</strong>
                                     </div>
                                     <div class="attendance-detail-field">
                                         <span class="attendance-detail-label">Division/Center/Admin Unit</span>
                                         <strong>@DisplayDelimitedValue(selectedUser.DivisionCenterUnit)</strong>
-                                    </div>
-                                    <div class="attendance-detail-field">
-                                        <span class="attendance-detail-label">Designation</span>
-                                        <strong>@DisplayValue(selectedUser.Designation)</strong>
                                     </div>
                                 </div>
                             </div>
@@ -335,24 +306,12 @@
                                     <div class="attendance-detail-section user-modal-section user-modal-identity">
                                         <div class="attendance-input-grid">
                                             <div class="attendance-input-field">
-                                                <label class="attendance-table-toolbar-label" for="userLastName">Last Name</label>
-                                                <input id="userLastName" class="form-control attendance-input-control" @bind="userForm.LastName" />
-                                            </div>
-                                            <div class="attendance-input-field">
-                                                <label class="attendance-table-toolbar-label" for="userFirstName">First Name</label>
-                                                <input id="userFirstName" class="form-control attendance-input-control" @bind="userForm.FirstName" />
-                                            </div>
-                                            <div class="attendance-input-field">
-                                                <label class="attendance-table-toolbar-label" for="userMiddleName">Middle Name</label>
-                                                <input id="userMiddleName" class="form-control attendance-input-control" @bind="userForm.MiddleName" />
+                                                <label class="attendance-table-toolbar-label" for="userName">Name</label>
+                                                <input id="userName" class="form-control attendance-input-control" @bind="userForm.Name" />
                                             </div>
                                             <div class="attendance-input-field">
                                                 <label class="attendance-table-toolbar-label" for="userUsername">Username</label>
                                                 <input id="userUsername" class="form-control attendance-input-control" @bind="userForm.Username" />
-                                            </div>
-                                            <div class="attendance-input-field">
-                                                <label class="attendance-table-toolbar-label" for="userEmail">Email</label>
-                                                <input id="userEmail" class="form-control attendance-input-control" @bind="userForm.Email" />
                                             </div>
                                             <div class="attendance-input-field">
                                                 <label class="attendance-table-toolbar-label" for="userDivision">Division/Center/Admin Unit</label>
@@ -407,10 +366,6 @@
                                                         }
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div class="attendance-input-field">
-                                                <label class="attendance-table-toolbar-label" for="userDesignation">Designation</label>
-                                                <input id="userDesignation" class="form-control attendance-input-control" @bind="userForm.Designation" />
                                             </div>
                                         </div>
                                     </div>
@@ -658,7 +613,7 @@
                             <div class="attendance-detail-section attendance-detail-hero user-modal-hero">
                                 <div>
                                     <div class="attendance-detail-eyebrow">Reset Password</div>
-                                    <div class="attendance-detail-person">@FormatName(userPendingPasswordReset.LastName, userPendingPasswordReset.FirstName, userPendingPasswordReset.MiddleName)</div>
+                                    <div class="attendance-detail-person">@DisplayValue(userPendingPasswordReset.Name)</div>
                                     <div class="attendance-detail-meta">@DisplayValue(userPendingPasswordReset.Username)</div>
                                 </div>
                             </div>
@@ -738,7 +693,7 @@
                                 </div>
                                 <div>
                                     <div class="attendance-detail-eyebrow">Confirm Delete</div>
-                                    <div class="attendance-detail-person">@FormatName(userPendingDelete.LastName, userPendingDelete.FirstName, userPendingDelete.MiddleName)</div>
+                                    <div class="attendance-detail-person">@DisplayValue(userPendingDelete.Name)</div>
                                     <div class="attendance-detail-meta">
                                         This will permanently delete the user account and its access settings.
                                     </div>
@@ -770,11 +725,9 @@
                         <th class="attendance-actions-column">Actions</th>
                         <th>@SortHeader("Name", "name")</th>
                         <th>@SortHeader("Username", "username")</th>
-                        <th>Email</th>
                         <th>@SortHeader("Role", "role")</th>
                         <th>Access Level</th>
                         <th>@SortHeader("Division/Center/Admin Unit", "division")</th>
-                        <th>@SortHeader("Designation", "designation")</th>
                         <th>@SortHeader("Status", "status")</th>
                         <th>@SortHeader("Created", "created")</th>
                     </tr>
@@ -823,9 +776,8 @@
                                     <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
                                 </button>
                             </td>
-                            <td><span class="cell-ellipsis" title="@FormatName(user.LastName, user.FirstName, user.MiddleName)">@FormatName(user.LastName, user.FirstName, user.MiddleName)</span></td>
+                            <td><span class="cell-ellipsis" title="@DisplayValue(user.Name)">@DisplayValue(user.Name)</span></td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(user.Username)">@DisplayValue(user.Username)</span></td>
-                            <td><span class="cell-ellipsis" title="@DisplayValue(user.Email)">@DisplayValue(user.Email)</span></td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(user.Role)">@DisplayValue(user.Role)</span></td>
                             <td>
                                 <div class="user-access-pill-list" title="@DisplayAccess(user.AccessLevel)">
@@ -836,7 +788,6 @@
                                 </div>
                             </td>
                             <td><span class="cell-ellipsis" title="@DisplayDelimitedValue(user.DivisionCenterUnit)">@DisplayDelimitedValue(user.DivisionCenterUnit)</span></td>
-                            <td><span class="cell-ellipsis" title="@DisplayValue(user.Designation)">@DisplayValue(user.Designation)</span></td>
                             <td><span class="status-badge @(user.IsActive ? "status-ok" : "status-danger")">@(user.IsActive ? "Active" : "Inactive")</span></td>
                             <td><span class="cell-ellipsis" title="@FormatDate(user.DateCreated)">@FormatDate(user.DateCreated)</span></td>
                         </tr>
@@ -844,7 +795,7 @@
                     @if (!PagedUsers.Any())
                     {
                         <tr>
-                            <td colspan="10" class="attendance-empty-state">No users match the current search and filters.</td>
+                            <td colspan="8" class="attendance-empty-state">No users match the current search and filters.</td>
                         </tr>
                     }
                 </tbody>
@@ -858,8 +809,8 @@
              @onclick:stopPropagation="true">
             @if (hoveredUserRowMenuUser is not null)
             {
-                <div class="attendance-hover-row-menu-title" title="@FormatName(hoveredUserRowMenuUser.LastName, hoveredUserRowMenuUser.FirstName, hoveredUserRowMenuUser.MiddleName)">
-                    @FormatName(hoveredUserRowMenuUser.LastName, hoveredUserRowMenuUser.FirstName, hoveredUserRowMenuUser.MiddleName)
+                <div class="attendance-hover-row-menu-title" title="@DisplayValue(hoveredUserRowMenuUser.Name)">
+                    @DisplayValue(hoveredUserRowMenuUser.Name)
                 </div>
                 <button type="button" @onclick="OpenHoveredUserDetail">
                     <i class="fa-solid fa-eye" aria-hidden="true"></i>
@@ -2380,7 +2331,6 @@
     private string filterUsername = string.Empty;
     private string filterRole = string.Empty;
     private string filterDivision = string.Empty;
-    private string filterDesignation = string.Empty;
     private string filterStatus = string.Empty;
     private string? activeFilterField;
     private string? sortColumn;
@@ -2482,14 +2432,12 @@
             || !string.IsNullOrWhiteSpace(filterUsername)
             || !string.IsNullOrWhiteSpace(filterRole)
             || !string.IsNullOrWhiteSpace(filterDivision)
-            || !string.IsNullOrWhiteSpace(filterDesignation)
             || !string.IsNullOrWhiteSpace(filterStatus);
 
-    private IEnumerable<string> CurrentNameOptions => GetDistinctOptions(users.Select(user => FormatName(user.LastName, user.FirstName, user.MiddleName)));
+    private IEnumerable<string> CurrentNameOptions => GetDistinctOptions(users.Select(user => user.Name));
     private IEnumerable<string> CurrentUsernameOptions => GetDistinctOptions(users.Select(user => user.Username));
     private IEnumerable<string> CurrentRoleOptions => GetDistinctOptions(users.Select(user => user.Role));
     private IEnumerable<string> CurrentDivisionOptions => GetDistinctOptions(users.SelectMany(user => ParseDelimitedValues(user.DivisionCenterUnit)));
-    private IEnumerable<string> CurrentDesignationOptions => GetDistinctOptions(users.Select(user => user.Designation));
 
     protected override async Task OnInitializedAsync()
     {
@@ -2508,8 +2456,7 @@
 
         users = await Db.UserAccounts
             .AsNoTracking()
-            .OrderBy(u => u.LastName)
-            .ThenBy(u => u.FirstName)
+            .OrderBy(u => u.Name)
             .ToListAsync();
 
         activeUsers = users.Count(u => u.IsActive);
@@ -2552,7 +2499,7 @@
             return false;
         }
 
-        if (!MatchesSelectedValue(FormatName(user.LastName, user.FirstName, user.MiddleName), filterName))
+        if (!MatchesSelectedValue(user.Name, filterName))
         {
             return false;
         }
@@ -2572,11 +2519,6 @@
             return false;
         }
 
-        if (!MatchesSelectedValue(user.Designation, filterDesignation))
-        {
-            return false;
-        }
-
         return MatchesSelectedValue(GetStatusText(user), filterStatus);
     }
 
@@ -2588,12 +2530,10 @@
             return true;
         }
 
-        return MatchesUserName(user.LastName, user.FirstName, user.MiddleName, query)
+        return ContainsText(user.Name, query)
             || ContainsText(user.Username, query)
-            || ContainsText(user.Email, query)
             || ContainsText(user.Role, query)
             || ContainsText(user.DivisionCenterUnit, query)
-            || ContainsText(user.Designation, query)
             || ContainsText(GetStatusText(user), query)
             || ContainsText(FormatDate(user.DateCreated), query);
     }
@@ -2635,26 +2575,6 @@
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(item => !string.IsNullOrWhiteSpace(item));
 
-    private static bool MatchesUserName(string? lastName, string? firstName, string? middleName, string? query)
-    {
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            return true;
-        }
-
-        var trimmedQuery = query.Trim();
-        var fullName = string.Join(" ", new[] { firstName, middleName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
-        var reversedName = string.Join(" ", new[] { lastName, firstName, middleName }.Where(value => !string.IsNullOrWhiteSpace(value)));
-        var formattedName = FormatName(lastName ?? string.Empty, firstName ?? string.Empty, middleName ?? string.Empty);
-
-        return ContainsText(firstName, trimmedQuery)
-            || ContainsText(middleName, trimmedQuery)
-            || ContainsText(lastName, trimmedQuery)
-            || ContainsText(fullName, trimmedQuery)
-            || ContainsText(reversedName, trimmedQuery)
-            || ContainsText(formattedName, trimmedQuery);
-    }
-
     private static IEnumerable<string> GetDistinctOptions(IEnumerable<string?> values)
         => values
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -2689,9 +2609,6 @@
                 break;
             case "division":
                 filterDivision = value;
-                break;
-            case "designation":
-                filterDesignation = value;
                 break;
             case "status":
                 filterStatus = value;
@@ -2745,7 +2662,6 @@
         filterUsername = string.Empty;
         filterRole = string.Empty;
         filterDivision = string.Empty;
-        filterDesignation = string.Empty;
         filterStatus = string.Empty;
         showFilterMenu = false;
         showEntriesMenu = false;
@@ -2887,31 +2803,20 @@
 
         return column switch
         {
-            "name" => OrderByDirection(source, descending, user => NormalizeSortValue(user.LastName))
-                .ThenBy(user => NormalizeSortValue(user.FirstName))
-                .ThenBy(user => NormalizeSortValue(user.MiddleName)),
+            "name" => OrderByDirection(source, descending, user => NormalizeSortValue(user.Name)),
             "username" => OrderByDirection(source, descending, user => NormalizeSortValue(user.Username))
-                .ThenBy(user => NormalizeSortValue(user.LastName))
-                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+                .ThenBy(user => NormalizeSortValue(user.Name)),
             "role" => OrderByDirection(source, descending, user => NormalizeSortValue(user.Role))
-                .ThenBy(user => NormalizeSortValue(user.LastName))
-                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+                .ThenBy(user => NormalizeSortValue(user.Name)),
             "division" => OrderByDirection(source, descending, user => NormalizeSortValue(user.DivisionCenterUnit))
-                .ThenBy(user => NormalizeSortValue(user.LastName))
-                .ThenBy(user => NormalizeSortValue(user.FirstName)),
-            "designation" => OrderByDirection(source, descending, user => NormalizeSortValue(user.Designation))
-                .ThenBy(user => NormalizeSortValue(user.LastName))
-                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+                .ThenBy(user => NormalizeSortValue(user.Name)),
             "status" => OrderByDirection(source, descending, GetStatusText)
-                .ThenBy(user => NormalizeSortValue(user.LastName))
-                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+                .ThenBy(user => NormalizeSortValue(user.Name)),
             "created" => OrderByDirection(source, descending, user => user.DateCreated)
-                .ThenBy(user => NormalizeSortValue(user.LastName))
-                .ThenBy(user => NormalizeSortValue(user.FirstName)),
+                .ThenBy(user => NormalizeSortValue(user.Name)),
             _ => source
                 .OrderByDescending(user => user.DateCreated)
-                .ThenBy(user => NormalizeSortValue(user.LastName))
-                .ThenBy(user => NormalizeSortValue(user.FirstName))
+                .ThenBy(user => NormalizeSortValue(user.Name))
         };
     }
 
@@ -3131,14 +3036,10 @@
         userForm = new UserAccount
         {
             UserAccountId = user.UserAccountId,
-            LastName = user.LastName,
-            FirstName = user.FirstName,
-            MiddleName = user.MiddleName,
+            Name = user.Name,
             Username = user.Username,
-            Email = user.Email,
             Role = user.Role,
             DivisionCenterUnit = user.DivisionCenterUnit,
-            Designation = user.Designation,
             IsActive = user.IsActive,
             AccessLevel = user.AccessLevel
         };
@@ -3252,7 +3153,7 @@
         userForm.DivisionCenterUnit = string.Join(", ", selectedDivisions.OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
         userForm.AccessLevel = string.Join(",", selectedAccess.OrderBy(value => value));
         var wasEditingUser = isEditingUser;
-        var savedUserName = FormatName(userForm.LastName, userForm.FirstName, userForm.MiddleName);
+        var savedUserName = DisplayValue(userForm.Name);
 
         try
         {
@@ -3265,14 +3166,10 @@
                     return;
                 }
 
-                existing.LastName = userForm.LastName;
-                existing.FirstName = userForm.FirstName;
-                existing.MiddleName = userForm.MiddleName;
+                existing.Name = userForm.Name;
                 existing.Username = userForm.Username;
-                existing.Email = userForm.Email;
                 existing.Role = userForm.Role;
                 existing.DivisionCenterUnit = userForm.DivisionCenterUnit;
-                existing.Designation = userForm.Designation;
                 existing.IsActive = userForm.IsActive;
                 existing.AccessLevel = userForm.AccessLevel;
                 existing.DateUpdated = DateTime.UtcNow;
@@ -3425,7 +3322,7 @@
         try
         {
             var userId = userPendingDelete.UserAccountId;
-            var userName = FormatName(userPendingDelete.LastName, userPendingDelete.FirstName, userPendingDelete.MiddleName);
+            var userName = DisplayValue(userPendingDelete.Name);
             var existing = await Db.UserAccounts.FindAsync(userId);
 
             if (existing is null)
@@ -3556,9 +3453,7 @@
         }
 
         return (!string.IsNullOrWhiteSpace(user.Username)
-                && string.Equals(user.Username, CurrentUser.Username, StringComparison.OrdinalIgnoreCase))
-            || (!string.IsNullOrWhiteSpace(user.Email)
-                && string.Equals(user.Email, CurrentUser.Email, StringComparison.OrdinalIgnoreCase));
+                && string.Equals(user.Username, CurrentUser.Username, StringComparison.OrdinalIgnoreCase));
     }
 
     private void CloseUserDropdowns()
@@ -3949,13 +3844,6 @@
         userAccessMenuMaxHeight = 320;
         userDivisionMenuMaxHeight = 320;
         userStatusMenuMaxHeight = 120;
-    }
-
-    private static string FormatName(string? lastName, string? firstName, string? middleName)
-    {
-        var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
-        var formatted = $"{lastName}, {firstName}{middleInitial}".Trim(' ', ',');
-        return string.IsNullOrWhiteSpace(formatted) ? "-" : formatted;
     }
 
     private static string FormatDate(DateTime value) => value.ToString("MMM dd, yyyy");

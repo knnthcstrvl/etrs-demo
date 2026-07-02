@@ -33,18 +33,17 @@ namespace Financial.Repositories.Implement
         private async Task<Model.UserAccount?> GetUser(string signInName)
         {
             var normalizedSignInName = signInName.Trim();
-            return await _context.UserAccounts.FirstOrDefaultAsync(e =>
-                e.Email == normalizedSignInName || e.Username == normalizedSignInName);
+            return await _context.UserAccounts.FirstOrDefaultAsync(e => e.Username == normalizedSignInName);
         }
 
         public async Task<CustomResponses.LoginResponse> LoginAsync(LoginDto model)
         {
-            var findUser = await GetUser(model.Email);
+            var findUser = await GetUser(model.Username);
             if (findUser == null) return new LoginResponse(false, "User not Found!");
 
             if (!BCrypt.Net.BCrypt.Verify(model.Password, findUser.Password))
             {
-                return new LoginResponse(false, "Email/Password not valid");
+                return new LoginResponse(false, "Username/Password not valid");
             }
 
             string jwtToken = GenerateToken(findUser);
@@ -59,9 +58,8 @@ namespace Financial.Repositories.Implement
             var userClaims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.UserAccountId.ToString()),
-                new Claim("FirstName", user.FirstName),
-                new Claim("LastName", user.LastName),
-                new Claim(ClaimTypes.Email, user.Email!),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim("Name", user.Name),
                 new Claim(ClaimTypes.Role, user.Role!)
             };
 
@@ -83,7 +81,7 @@ namespace Financial.Repositories.Implement
 
         public async Task<CustomResponses.RegistrationResponse> RegisterAsync(RegisterDto model)
         {
-            var findUser = await GetUser(model.Email);
+            var findUser = await GetUser(model.Username);
             if (findUser != null)
             {
                 return new RegistrationResponse(false, "User Already Exist!");
@@ -92,10 +90,8 @@ namespace Financial.Repositories.Implement
             _context.UserAccounts.Add(
                 new UserAccount()
                 {
-                    FirstName = model.FirstName,
-                    LastName = model.LastName,
-                    Email = model.Email,
-                    Username = model.Email,
+                    Name = model.Name,
+                    Username = model.Username,
                     Password = BCrypt.Net.BCrypt.HashPassword(model.Password),
                     MustChangePassword = true,
                     IsActive = true,
