@@ -47,8 +47,12 @@ builder.Services.AddCors();
 builder.Services.AddLocalization();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddSignalR(options =>
+{
+    options.MaximumReceiveMessageSize = 2 * 1024 * 1024;
+});
 builder.Services.AddControllers();
-builder.Services.AddAntiforgery(options => options.Cookie.Path = "/etr");
+builder.Services.AddAntiforgery();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -84,11 +88,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Components.Server.CircuitOptions
 
 var app = builder.Build();
 
-app.UsePathBase("/etr");
-
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseExceptionHandler("/etr/Error", createScopeForErrors: true);
     app.UseHsts();
 }
 else
@@ -99,11 +101,11 @@ else
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/etr/swagger/v1/swagger.json", "ETRS API v1");
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "ETRS API v1");
     c.DisplayRequestDuration();
 });
 
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseStatusCodePagesWithReExecute("/etr/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 app.UseAntiforgery();
 

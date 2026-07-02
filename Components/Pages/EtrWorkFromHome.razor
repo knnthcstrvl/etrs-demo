@@ -1,4 +1,4 @@
-@page "/etr-work-from-home"
+@page "/etr/etr-work-from-home"
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @using Financial.Data
 @using Financial.Model.Dtr
@@ -1591,7 +1591,7 @@
             {
                 Type = ToastType.Warning,
                 Title = "Inactive employee",
-                Message = $"{employee.FirstName} {employee.LastName} is inactive and cannot submit a WFH log.",
+                Message = $"{FormatEmployeeName(employee)} is inactive and cannot submit a WFH log.",
                 Duration = 5000
             });
             return false;
@@ -1678,7 +1678,7 @@
                 {
                     Type = ToastType.Warning,
                     Title = "Inactive employee",
-                    Message = $"{employee.FirstName} {employee.LastName} is inactive and cannot submit a WFH log.",
+                    Message = $"{FormatEmployeeName(employee)} is inactive and cannot submit a WFH log.",
                     Duration = 5000
                 });
                 return;
@@ -1748,7 +1748,7 @@
                 {
                     Type = ToastType.Warning,
                     Title = "WFH blocked",
-                    Message = $"{employee.FirstName} {employee.LastName} is tagged as {arrangementLabel} for today and cannot submit a WFH log.",
+                    Message = $"{FormatEmployeeName(employee)} is tagged as {arrangementLabel} for today and cannot submit a WFH log.",
                     Duration = 5000
                 });
                 return;
@@ -1803,7 +1803,7 @@
             {
                 Type = ToastType.Success,
                 Title = "Saved",
-                Message = $"WFH time {entryModel.LogType} recorded for {employee.FirstName} {employee.LastName}.",
+                Message = $"WFH time {entryModel.LogType} recorded for {FormatEmployeeName(employee)}.",
                 Duration = 3500
             });
 
@@ -2159,8 +2159,10 @@
 
     private static string FormatEmployeeName(Employee employee)
     {
+        var last = employee.LastName?.Trim() ?? string.Empty;
+        var first = employee.FirstName?.Trim() ?? string.Empty;
         var middleInitial = string.IsNullOrWhiteSpace(employee.MiddleName) ? string.Empty : $" {employee.MiddleName.Trim()[0]}.";
-        return $"{employee.FirstName} {employee.LastName}{middleInitial}";
+        return $"{last}, {first}{middleInitial}".Trim(' ', ',').ToUpperInvariant();
     }
 
     private static string DisplayValue(string? value)

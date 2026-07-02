@@ -1,4 +1,4 @@
-@page "/employees"
+@page "/etr/employees"
 @using Financial.Data
 @using Financial.Model.Dtr
 @using System.Text
@@ -2102,10 +2102,12 @@
         RefreshFilteredEmployees();
     }
 
-    private static string FormatName(string lastName, string firstName, string middleName)
+    private static string FormatName(string? lastName, string? firstName, string? middleName)
     {
+        var last = lastName?.Trim() ?? string.Empty;
+        var first = firstName?.Trim() ?? string.Empty;
         var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
-        return $"{lastName}, {firstName}{middleInitial}";
+        return $"{last}, {first}{middleInitial}".Trim(' ', ',').ToUpperInvariant();
     }
 
     private void RefreshFilteredEmployees(bool resetPaging = false)

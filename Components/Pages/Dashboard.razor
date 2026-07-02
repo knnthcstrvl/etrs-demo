@@ -1,4 +1,4 @@
-@page "/dashboard"
+@page "/etr/dashboard"
 <PageTitle>ETRS | Dashboard</PageTitle>
 @using Financial.Data
 @using Financial.Model.Dtr
@@ -5021,10 +5021,12 @@
         divisionPieTotal = divisionPieOnsiteCount + divisionPieWfhCount;
     }
 
-    private static string FormatName(string lastName, string firstName, string middleName)
+    private static string FormatName(string? lastName, string? firstName, string? middleName)
     {
+        var last = lastName?.Trim() ?? string.Empty;
+        var first = firstName?.Trim() ?? string.Empty;
         var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
-        return $"{lastName}, {firstName}{middleInitial}";
+        return $"{last}, {first}{middleInitial}".Trim(' ', ',').ToUpperInvariant();
     }
 
     private static string FormatEmployeeMeta(string? divisionCenterUnit, string? designation)

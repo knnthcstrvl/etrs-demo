@@ -1,4 +1,4 @@
-@page "/login"
+@page "/etr/login"
 @layout BlankLayout
 @using Financial.DTO.Auth
 @inject Financial.Services.IToastService ToastService
@@ -472,7 +472,7 @@
         {
             // already authenticated - redirect to dashboard (client-side)
             _constants.JWTToken = user.Claims.FirstOrDefault(_ => _.Type == "Jwt")?.Value!;
-            NavManager.NavigateTo("/dashboard");
+            NavManager.NavigateTo("/etr/dashboard");
             return;
         }
 
@@ -544,7 +544,7 @@
     private void CloseDeletedAccountModal()
     {
         showDeletedAccountModal = false;
-        NavManager.NavigateTo("/login", replace: true);
+        NavManager.NavigateTo("/etr/login", replace: true);
     }
 
     private string GetPostLoginDestination()
@@ -555,9 +555,9 @@
             : "/" + relativePath;
 
         var pathOnly = pathAndQuery.Split('?', '#')[0].TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(pathOnly) || pathOnly == "/" || string.Equals(pathOnly, "/login", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(pathOnly) || pathOnly == "/" || string.Equals(pathOnly, "/etr/login", StringComparison.OrdinalIgnoreCase))
         {
-            return "/dashboard";
+            return "/etr/dashboard";
         }
 
         return pathAndQuery;

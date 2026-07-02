@@ -36,7 +36,7 @@
                 }
 
                 _authState = await AuthStateProvider.GetAuthenticationStateAsync();
-                NavManager.NavigateTo("/login?accountDeleted=1");
+                NavManager.NavigateTo("/etr/login?accountDeleted=1");
                 _initialized = true;
                 return;
             }
@@ -45,7 +45,7 @@
         // If user is authenticated and tries to open login page -> redirect to dashboard (client-side)
         if (user?.Identity?.IsAuthenticated == true && IsLoginPage(pageType))
         {
-            NavManager.NavigateTo("/dashboard");
+            NavManager.NavigateTo("/etr/dashboard");
             return;
         }
 
@@ -107,7 +107,7 @@ else
         // Prevent authenticated users from accessing the login page
         if (IsLoginPage(pageType))
         {
-            NavManager.NavigateTo("/dashboard");
+            NavManager.NavigateTo("/etr/dashboard");
         }
         else
         {

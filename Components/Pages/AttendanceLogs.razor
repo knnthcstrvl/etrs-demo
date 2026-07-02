@@ -1,4 +1,4 @@
-@page "/attendance-logs"
+@page "/etr/attendance-logs"
 @using Financial.Data
 @inject Financial.Services.CurrentUserService CurrentUser
 @using Financial.Model.Dtr
@@ -5442,10 +5442,12 @@
 
 
 
-    private static string FormatName(string lastName, string firstName, string middleName)
+    private static string FormatName(string? lastName, string? firstName, string? middleName)
     {
+        var last = lastName?.Trim() ?? string.Empty;
+        var first = firstName?.Trim() ?? string.Empty;
         var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
-        return $"{lastName}, {firstName}{middleInitial}";
+        return $"{last}, {first}{middleInitial}".Trim(' ', ',').ToUpperInvariant();
     }
 
     private static IEnumerable<string> GetDistinctOptions(IEnumerable<string?> values)
@@ -5839,7 +5841,7 @@
 
         if (!IsActiveEmployeeStatus(employee.Status))
         {
-            ShowToast(ToastType.Warning, "Inactive employee", $"{employee.FirstName} {employee.LastName} is inactive and cannot be manually encoded.");
+            ShowToast(ToastType.Warning, "Inactive employee", $"{FormatInputEmployeeName(employee)} is inactive and cannot be manually encoded.");
             return;
         }
 
@@ -5899,7 +5901,7 @@
 
         if (wfhTag is not null && string.Equals(GetWorkArrangement(wfhTag), "WFH", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"{employee.FirstName} {employee.LastName} is tagged as WFH for {attendanceDate:MMMM dd, yyyy} and cannot be manually encoded as onsite.");
+            throw new InvalidOperationException($"{FormatInputEmployeeName(employee)} is tagged as WFH for {attendanceDate:MMMM dd, yyyy} and cannot be manually encoded as onsite.");
         }
 
         var log = await Db.AttendanceLogs
@@ -5929,7 +5931,7 @@
         log.Tardiness = ComputeTardinessForOnsite(log, employee.Status);
 
         await Db.SaveChangesAsync();
-        ShowToast(ToastType.Success, "Onsite log saved", $"{employee.FirstName} {employee.LastName} onsite log was saved.");
+        ShowToast(ToastType.Success, "Onsite log saved", $"{FormatInputEmployeeName(employee)} onsite log was saved.");
     }
 
     private async Task SaveWfhInputLogAsync(Employee employee)
@@ -5976,7 +5978,7 @@
         log.Tardiness = ComputeTardinessForWfh(log, employee.Status);
 
         await Db.SaveChangesAsync();
-        ShowToast(ToastType.Success, "WFH log saved", $"{employee.FirstName} {employee.LastName} WFH log was saved.");
+        ShowToast(ToastType.Success, "WFH log saved", $"{FormatInputEmployeeName(employee)} WFH log was saved.");
     }
 
     private async Task SaveEditedOnsiteLogAsync()
@@ -6004,7 +6006,7 @@
         log.Tardiness = NormalizeStoredTardiness(editLogForm.Tardiness, computedLateUndertime);
 
         await Db.SaveChangesAsync();
-        ShowToast(ToastType.Success, "Onsite log updated", $"{log.FirstName} {log.LastName} onsite log was updated.");
+        ShowToast(ToastType.Success, "Onsite log updated", $"{FormatName(log.LastName, log.FirstName, log.MiddleName)} onsite log was updated.");
     }
 
     private async Task SaveEditedWfhLogAsync()
@@ -6040,7 +6042,7 @@
         log.Tardiness = NormalizeStoredTardiness(editLogForm.Tardiness, computedLateUndertime);
 
         await Db.SaveChangesAsync();
-        ShowToast(ToastType.Success, "WFH log updated", $"{log.FirstName} {log.LastName} WFH log was updated.");
+        ShowToast(ToastType.Success, "WFH log updated", $"{FormatName(log.LastName, log.FirstName, log.MiddleName)} WFH log was updated.");
     }
 
     private static DateTime? CombineDateAndTime(DateTime date, string? timeText)
@@ -6111,7 +6113,8 @@
         "Half-Day (PM)",
         "Late",
         "Undertime",
-        "Late with Undertime"
+        "Late with Undertime",
+        "Incomplete"
     };
 
     private static string NormalizeTardinessForEdit(string? value)
@@ -6384,8 +6387,7 @@
 
     private static string FormatInputEmployeeName(Employee employee)
     {
-        var middleInitial = string.IsNullOrWhiteSpace(employee.MiddleName) ? string.Empty : $" {employee.MiddleName.Trim()[0]}.";
-        return $"{employee.FirstName} {employee.LastName}{middleInitial}";
+        return FormatName(employee.LastName, employee.FirstName, employee.MiddleName);
     }
 
     [JSInvokable]

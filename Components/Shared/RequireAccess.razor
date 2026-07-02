@@ -19,7 +19,7 @@
             var user = state.User;
             if (user?.Identity is null || !user.Identity.IsAuthenticated)
             {
-                Nav.NavigateTo("/login");
+                Nav.NavigateTo("/etr/login");
                 return;
             }
 
@@ -39,7 +39,7 @@
             {
                 authorized = false;
                 initialized = true;
-                Nav.NavigateTo("/dashboard");
+                Nav.NavigateTo("/etr/dashboard");
                 return;
             }
 
@@ -58,13 +58,13 @@
             if (!authorized)
             {
                 // redirect to dashboard if not authorized
-                Nav.NavigateTo("/dashboard");
+                Nav.NavigateTo("/etr/dashboard");
             }
         }
         catch
         {
             authorized = false;
-            Nav.NavigateTo("/dashboard");
+            Nav.NavigateTo("/etr/dashboard");
         }
         finally
         {

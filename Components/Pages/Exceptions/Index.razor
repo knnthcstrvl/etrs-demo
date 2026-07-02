@@ -1,4 +1,4 @@
-@page "/exceptions"
+@page "/etr/exceptions"
 @using Financial.Data
 @using Financial.Model.Dtr
 @using Microsoft.AspNetCore.Components.Web
@@ -3276,7 +3276,7 @@
             }
 
             await Db.SaveChangesAsync();
-            ShowToast(ToastType.Success, "Employee tag saved", $"{employee.FirstName} {employee.LastName} was tagged as {log.WorkArrangement} for {attendanceDate:MMM dd, yyyy}.");
+            ShowToast(ToastType.Success, "Employee tag saved", $"{FormatName(employee.LastName, employee.FirstName, employee.MiddleName)} was tagged as {log.WorkArrangement} for {attendanceDate:MMM dd, yyyy}.");
         }
         catch (Exception ex)
         {
@@ -3515,10 +3515,12 @@
         return string.IsNullOrWhiteSpace(log.WorkArrangement) ? WfhOptionValue : log.WorkArrangement;
     }
 
-    private static string FormatName(string lastName, string firstName, string middleName)
+    private static string FormatName(string? lastName, string? firstName, string? middleName)
     {
+        var last = lastName?.Trim() ?? string.Empty;
+        var first = firstName?.Trim() ?? string.Empty;
         var middleInitial = string.IsNullOrWhiteSpace(middleName) ? string.Empty : $" {middleName.Trim()[0]}.";
-        return $"{lastName}, {firstName}{middleInitial}";
+        return $"{last}, {first}{middleInitial}".Trim(' ', ',').ToUpperInvariant();
     }
 
     private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;

@@ -61,16 +61,19 @@ window.etrWorkFromHome = (function () {
             throw new Error('Camera preview is not ready.');
         }
 
+        const maxWidth = 480;
+        const maxHeight = 360;
+        const scale = Math.min(1, maxWidth / videoElement.videoWidth, maxHeight / videoElement.videoHeight);
         const canvas = document.createElement('canvas');
-        canvas.width = videoElement.videoWidth;
-        canvas.height = videoElement.videoHeight;
+        canvas.width = Math.max(1, Math.round(videoElement.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(videoElement.videoHeight * scale));
 
         const context = canvas.getContext('2d');
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = 'high';
         context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
-        return canvas.toDataURL('image/jpeg', 0.95);
+        return canvas.toDataURL('image/jpeg', 0.7);
     }
 
     return {

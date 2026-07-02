@@ -90,11 +90,11 @@
 
     private readonly List<MenuItem> AllItems = new()
     {
-        new() { Label = "Dashboard", Url = "/dashboard", Icon = "fa-solid fa-chart-column", Match = NavLinkMatch.All },
-        new() { Label = "Attendance Logs", Url = "/attendance-logs", Icon = "fa-regular fa-clock", Match = NavLinkMatch.Prefix },
-        new() { Label = "Employees", Url = "/employees", Icon = "fa-regular fa-circle-user", Match = NavLinkMatch.Prefix },
-        new() { Label = "Exceptions", Url = "/exceptions", Icon = "fa-regular fa-address-card", Match = NavLinkMatch.Prefix },
-        new() { Label = "Users", Url = "/users", Icon = "fa-regular fa-user", Match = NavLinkMatch.Prefix }
+        new() { Label = "Dashboard", Url = "/etr/dashboard", Icon = "fa-solid fa-chart-column", Match = NavLinkMatch.All },
+        new() { Label = "Attendance Logs", Url = "/etr/attendance-logs", Icon = "fa-regular fa-clock", Match = NavLinkMatch.Prefix },
+        new() { Label = "Employees", Url = "/etr/employees", Icon = "fa-regular fa-circle-user", Match = NavLinkMatch.Prefix },
+        new() { Label = "Exceptions", Url = "/etr/exceptions", Icon = "fa-regular fa-address-card", Match = NavLinkMatch.Prefix },
+        new() { Label = "Users", Url = "/etr/users", Icon = "fa-regular fa-user", Match = NavLinkMatch.Prefix }
     };
 
     // Visible items will be computed on render from CurrentUser
@@ -147,7 +147,7 @@
     private void OpenSettings()
     {
         // navigate to settings page
-        NavManager.NavigateTo("/settings");
+        NavManager.NavigateTo("/etr/settings");
         IsProfileMenuOpen = false;
     }
 
@@ -166,7 +166,7 @@
         catch { }
 
         // navigate to login and force reload
-        NavManager.NavigateTo("/login", true);
+        NavManager.NavigateTo("/etr/login", true);
     }
 
     protected override async Task OnInitializedAsync()
