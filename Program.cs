@@ -130,11 +130,12 @@ using (var scope = app.Services.CreateScope())
         await Financial.Data.DatabaseSchemaUpdater.EnsureUserAccountColumnsAsync(db);
         // Ensure EF migrations are applied
         await db.Database.MigrateAsync();
+        await Financial.Data.DatabaseSchemaUpdater.EnsureAttendanceLogWfhColumnsAsync(db);
 
         // Run only critical seeders on startup. Other seeders are disabled to
         // avoid inserting demo/legacy data in production. Keep UserAccount seeding.
         await Financial.Data.Seeders.UserAccountSeeder.SeedAdminAsync(db);
-        // EmployeeSeeder, ExceptionConditionSeeder, BiometricDeviceSeeder,
+        // EmployeeSeeder, ExceptionConditionSeeder,
         // AttendanceLogSeeder and AttendanceLogWfhSeeder are intentionally
         // disabled. Run them manually if needed.
     }

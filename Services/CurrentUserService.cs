@@ -16,6 +16,7 @@ namespace Financial.Services
         public string Username { get; private set; } = string.Empty;
         public string DisplayName { get; private set; } = string.Empty;
         public HashSet<string> AccessSet { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> DivisionScope { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
         public event Action? OnChanged;
 
@@ -40,6 +41,7 @@ namespace Financial.Services
                 var state = await _authProvider.GetAuthenticationStateAsync();
                 var user = state.User;
                 AccessSet.Clear();
+                DivisionScope.Clear();
 
                 if (user?.Identity is null || !user.Identity.IsAuthenticated)
                 {
@@ -65,6 +67,11 @@ namespace Financial.Services
                 if (string.IsNullOrWhiteSpace(DisplayName))
                 {
                     DisplayName = !string.IsNullOrWhiteSpace(Username) ? Username : Email;
+                }
+
+                if (account is not null)
+                {
+                    DivisionScope = ParseDivisionScope(account.DivisionCenterUnit);
                 }
 
                 if (string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase))
@@ -105,6 +112,18 @@ namespace Financial.Services
             return AccessPolicy.HasAnyAccess(AccessSet);
         }
 
+        public bool CanAccessDivision(string? division)
+        {
+            if (string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase)) return true;
+            if (DivisionScope.Count == 0) return false;
+            return !string.IsNullOrWhiteSpace(division)
+                && DivisionScope.Contains(division.Trim());
+        }
+
+        public bool HasDivisionScope()
+            => string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase)
+                || DivisionScope.Count > 0;
+
         private static string FormatDisplayName(string? lastName, string? firstName, string? middleName)
         {
             var parts = new[] { firstName, middleName, lastName }
@@ -113,5 +132,11 @@ namespace Financial.Services
 
             return string.Join(" ", parts);
         }
+
+        private static HashSet<string> ParseDivisionScope(string? value)
+            => new((value ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(item => !string.IsNullOrWhiteSpace(item)),
+                StringComparer.OrdinalIgnoreCase);
     }
 }

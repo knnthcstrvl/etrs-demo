@@ -125,18 +125,18 @@
                             </div>
                         </div>
                         <div class="attendance-filter-field">
-                            <label class="attendance-table-toolbar-label" for="exceptionsFilterDivision">Division / Unit</label>
+                            <label class="attendance-table-toolbar-label" for="exceptionsFilterDivision">Division/Center/Admin Unit</label>
                             <div class="attendance-filter-select-wrap">
                                 <button type="button"
                                         id="exceptionsFilterDivision"
                                         class="attendance-filter-select-trigger @(activeFilterField == "division" ? "active" : null)"
                                         @onclick='() => ToggleFilterField("division")'>
-                                    <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions / Units")</span>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions/Centers/Admin Units")</span>
                                     <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
                                 </button>
 
                                 <div class="attendance-filter-select-menu @(activeFilterField == "division" ? "show" : null)">
-                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions/Centers/Admin Units</button>
                                     @foreach (var option in DivisionOptions)
                                     {
                                         <button type="button" class="attendance-filter-select-option @(string.Equals(filterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("division", option)'>@option</button>
@@ -211,7 +211,7 @@
                         <th class="attendance-actions-column">Actions</th>
                         <th>@SortHeader("ID Number", "id")</th>
                         <th>@SortHeader("Employee", "employee")</th>
-                        <th>@SortHeader("Division / Unit", "division")</th>
+                        <th>@SortHeader("Division/Center/Admin Unit", "division")</th>
                         <th>@SortHeader("Designation", "designation")</th>
                         <th>Current Tag</th>
                         <th>Updated</th>
@@ -345,7 +345,7 @@
                                 <strong>@selectedDetailRow.EmployeeName</strong>
                             </div>
                             <div class="attendance-detail-field">
-                                <span class="attendance-detail-label">Division / Unit</span>
+                                <span class="attendance-detail-label">Division/Center/Admin Unit</span>
                                 <strong>@DisplayValue(selectedDetailRow.DivisionCenterUnit)</strong>
                             </div>
                             <div class="attendance-detail-field">
@@ -621,7 +621,7 @@
                                             <tr>
                                                 <th>ID Number</th>
                                                 <th>Employee</th>
-                                                <th>Division / Unit</th>
+                                                <th>Division/Center/Admin Unit</th>
                                                 <th>Current Tag</th>
                                                 @if (CanEditCalendarTable(tableMode))
                                                 {

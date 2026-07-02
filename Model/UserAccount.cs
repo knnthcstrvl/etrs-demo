@@ -27,7 +27,7 @@ namespace Financial.Model
         [MaxLength(50)]
         public string Role { get; set; } = "User";
 
-        [MaxLength(150)]
+        [MaxLength(1000)]
         public string DivisionCenterUnit { get; set; } = string.Empty;
 
         [MaxLength(150)]

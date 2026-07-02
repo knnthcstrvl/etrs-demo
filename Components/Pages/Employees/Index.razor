@@ -117,18 +117,18 @@
                         </div>
 
                         <div class="attendance-filter-field">
-                            <label class="attendance-table-toolbar-label" for="employeeFilterDivision">Division / Unit</label>
+                            <label class="attendance-table-toolbar-label" for="employeeFilterDivision">Division/Center/Admin Unit</label>
                             <div class="attendance-filter-select-wrap">
                                 <button type="button"
                                         id="employeeFilterDivision"
                                         class="attendance-filter-select-trigger @(activeFilterField == "division" ? "active" : null)"
                                         @onclick='() => ToggleFilterField("division")'>
-                                    <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions / Units")</span>
+                                    <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions/Centers/Admin Units")</span>
                                     <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
                                 </button>
 
                                 <div class="attendance-filter-select-menu @(activeFilterField == "division" ? "show" : null)">
-                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions/Centers/Admin Units</button>
                                     @foreach (var option in CurrentDivisionOptions)
                                     {
                                         <button type="button" class="attendance-filter-select-option @(string.Equals(filterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("division", option)'>@option</button>
@@ -272,7 +272,7 @@
                                     <strong>@DisplayValue(selectedEmployee.MiddleName)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
-                                    <span class="attendance-detail-label">Division / Unit</span>
+                                    <span class="attendance-detail-label">Division/Center/Admin Unit</span>
                                     <strong>@DisplayValue(selectedEmployee.DivisionCenterUnit)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
@@ -332,7 +332,7 @@
                                     <input class="form-control attendance-input-control" @bind="employeeForm.MiddleName" />
                                 </div>
                                 <div class="attendance-input-field">
-                                    <span class="attendance-detail-label">Division / Unit</span>
+                                    <span class="attendance-detail-label">Division/Center/Admin Unit</span>
                                     <input class="form-control attendance-input-control" @bind="employeeForm.DivisionCenterUnit" />
                                 </div>
                                 <div class="attendance-input-field">
@@ -569,7 +569,7 @@
                     <th class="attendance-actions-column">Actions</th>
                     <th>@SortHeader("ID Number", "id")</th>
                     <th>@SortHeader("Name", "employee")</th>
-                    <th>@SortHeader("Division / Unit", "division")</th>
+                    <th>@SortHeader("Division/Center/Admin Unit", "division")</th>
                     <th>@SortHeader("Designation", "designation")</th>
                     <th>@SortHeader("Status", "status")</th>
                 </tr>
@@ -1985,7 +1985,7 @@
         "LastName",
         "FirstName",
         "MiddleName",
-        "DivisionCenterUnit",
+        "DivisionCenterAdminUnit",
         "Designation",
         "Status"
     };
@@ -2001,10 +2001,12 @@
         ["First Name"] = "FirstName",
         ["MiddleName"] = "MiddleName",
         ["Middle Name"] = "MiddleName",
-        ["DivisionCenterUnit"] = "DivisionCenterUnit",
-        ["Division / Unit"] = "DivisionCenterUnit",
-        ["Division/Unit"] = "DivisionCenterUnit",
-        ["Division"] = "DivisionCenterUnit",
+        ["DivisionCenterAdminUnit"] = "DivisionCenterAdminUnit",
+        ["DivisionCenterUnit"] = "DivisionCenterAdminUnit",
+        ["Division/Center/Admin Unit"] = "DivisionCenterAdminUnit",
+        ["Division / Unit"] = "DivisionCenterAdminUnit",
+        ["Division/Unit"] = "DivisionCenterAdminUnit",
+        ["Division"] = "DivisionCenterAdminUnit",
         ["Designation"] = "Designation",
         ["Status"] = "Status"
     };
@@ -2071,6 +2073,22 @@
     private IEnumerable<string> CurrentDesignationOptions => GetDistinctOptions(employees.Select(employee => employee.Designation));
     private IEnumerable<string> CurrentStatusOptions => GetDistinctOptions(employees.Select(employee => employee.Status));
 
+    private IQueryable<Employee> ApplyDivisionScope(IQueryable<Employee> query)
+    {
+        if (string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return query;
+        }
+
+        var scope = CurrentUser.DivisionScope.ToArray();
+        return scope.Length == 0
+            ? query.Where(employee => false)
+            : query.Where(employee => scope.Contains(employee.DivisionCenterUnit));
+    }
+
+    private bool CanAccessEmployeeDivision(string? division)
+        => CurrentUser.CanAccessDivision(division);
+
     protected override async Task OnInitializedAsync()
     {
         await CurrentUser.InitializeAsync();
@@ -2084,7 +2102,7 @@
 
     private async Task LoadEmployeesAsync()
     {
-        employees = await Db.Employees
+        employees = await ApplyDivisionScope(Db.Employees)
             .AsNoTracking()
             .OrderByDescending(e => e.EmployeeId)
             .ThenBy(e => e.LastName)
@@ -2672,7 +2690,7 @@
                 return;
             }
 
-            var existingEmployees = await Db.Employees.ToListAsync();
+            var existingEmployees = await ApplyDivisionScope(Db.Employees).ToListAsync();
             var employeesByIdNumber = existingEmployees
                 .Where(employee => !string.IsNullOrWhiteSpace(employee.IdNumber))
                 .ToDictionary(employee => employee.IdNumber, StringComparer.OrdinalIgnoreCase);
@@ -2692,10 +2710,12 @@
 
                 var idNumber = GetMappedValue(values, headerMap, "IdNumber");
                 Employee employee;
+                var rowWasUpdate = false;
 
                 if (!string.IsNullOrWhiteSpace(idNumber) && employeesByIdNumber.TryGetValue(idNumber, out var existingEmployee))
                 {
                     employee = existingEmployee;
+                    rowWasUpdate = true;
                     updated++;
                 }
                 else
@@ -2715,9 +2735,34 @@
                 employee.LastName = GetMappedValue(values, headerMap, "LastName");
                 employee.FirstName = GetMappedValue(values, headerMap, "FirstName");
                 employee.MiddleName = GetMappedValue(values, headerMap, "MiddleName");
-                employee.DivisionCenterUnit = GetMappedValue(values, headerMap, "DivisionCenterUnit");
+                employee.DivisionCenterUnit = GetMappedValue(values, headerMap, "DivisionCenterAdminUnit");
                 employee.Designation = GetMappedValue(values, headerMap, "Designation");
                 employee.Status = GetMappedValue(values, headerMap, "Status");
+
+                if (!CanAccessEmployeeDivision(employee.DivisionCenterUnit))
+                {
+                    if (employee.EmployeeId == 0)
+                    {
+                        Db.Employees.Remove(employee);
+                    }
+
+                    if (rowWasUpdate)
+                    {
+                        updated--;
+                    }
+                    else
+                    {
+                        inserted--;
+                    }
+
+                    skipped++;
+                    if (!string.IsNullOrWhiteSpace(idNumber))
+                    {
+                        employeesByIdNumber.Remove(idNumber);
+                    }
+
+                    continue;
+                }
             }
 
             await Db.SaveChangesAsync();

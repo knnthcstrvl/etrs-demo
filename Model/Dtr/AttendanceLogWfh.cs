@@ -36,7 +36,7 @@ namespace Financial.Model.Dtr
         public string Mov { get; set; } = string.Empty;
 
         [MaxLength(500)]
-        public string PhotoVerification { get; set; } = string.Empty;
+        public string Verification { get; set; } = string.Empty;
 
         public DateTime? TimeIn { get; set; }
         public DateTime? TimeOut { get; set; }
@@ -53,5 +53,19 @@ namespace Financial.Model.Dtr
         public DateTime? TagUpdatedAt { get; set; }
 
         public DateTime AttendanceDate { get; set; } = DateTime.Today;
+
+        [MaxLength(20)]
+        public string MovApprovalStatus { get; set; } = "Pending"; // Pending, Approved, Rejected
+
+        public DateTime? MovApprovedAt { get; set; }
+
+        public DateTime? MovRejectedAt { get; set; }
+
+        [MaxLength(20)]
+        public string PhotoVerificationApprovalStatus { get; set; } = "Pending"; // Pending, Approved, Rejected
+
+        public DateTime? PhotoVerificationApprovedAt { get; set; }
+
+        public DateTime? PhotoVerificationRejectedAt { get; set; }
     }
 }

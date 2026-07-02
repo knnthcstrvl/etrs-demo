@@ -292,7 +292,7 @@
                         <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
                     </button>
                     <div class="attendance-filter-select-menu dashboard-division-menu @(showDivisionPieMenu ? "show" : null)">
-                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(selectedDivisionPie) ? "active" : null)" @onclick='() => SelectDivisionPie(string.Empty)'>All Divisions / Units</button>
+                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(selectedDivisionPie) ? "active" : null)" @onclick='() => SelectDivisionPie(string.Empty)'>All Divisions/Centers/Admin Units</button>
                         @foreach (var option in divisionPieOptions)
                         {
                             <button type="button" class="attendance-filter-select-option @(string.Equals(selectedDivisionPie, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SelectDivisionPie(option)'>@option</button>
@@ -401,15 +401,15 @@
                                             </div>
                                         </div>
                                         <div class="attendance-filter-field">
-                                            <label class="attendance-table-toolbar-label" for="dashboardFilterDivision">Division / Unit</label>
+                                            <label class="attendance-table-toolbar-label" for="dashboardFilterDivision">Division/Center/Admin Unit</label>
                                             <div class="attendance-filter-select-wrap">
                                                 <button type="button" id="dashboardFilterDivision" class="attendance-filter-select-trigger @(activeViewMoreFilterField == "division" ? "active" : null)" @onclick='() => ToggleViewMoreFilterField("division")'>
-                                                    <span class="attendance-filter-select-value">@DisplayValue(viewMoreFilterDivision, "All Divisions / Units")</span>
+                                                    <span class="attendance-filter-select-value">@DisplayValue(viewMoreFilterDivision, "All Divisions/Centers/Admin Units")</span>
                                                     <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
                                                 </button>
 
                                                 <div class="attendance-filter-select-menu @(activeViewMoreFilterField == "division" ? "show" : null)">
-                                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(viewMoreFilterDivision) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                                    <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(viewMoreFilterDivision) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("division", string.Empty)'>All Divisions/Centers/Admin Units</button>
                                                     @foreach (var option in CurrentViewMoreDivisionOptions)
                                                     {
                                                         <button type="button" class="attendance-filter-select-option @(string.Equals(viewMoreFilterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetViewMoreFilterValue("division", option)'>@option</button>
@@ -681,7 +681,7 @@
 
                 <div class="attendance-detail-footer">
                     <button type="button" class="attendance-detail-text-action" @onclick="CloseExportLogsModal" disabled="@isExportingLogs">Cancel</button>
-                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@isExportingLogs">@(isExportingLogs ? "Exporting..." : "Export")</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@isExportingLogs">@(isExportingLogs ? "Exporting..." : "Export CSV")</button>
                 </div>
             </div>
         </div>
@@ -3162,7 +3162,7 @@
     private string DashboardChartColumnStyle => $"--dashboard-chart-columns: {Math.Max(lateUndertimeChart.Count, 1)};";
     private string DivisionPiePeriodLabel => FormatDateRange(filterStart, filterEnd);
     private string SelectedDivisionPieLabel => string.IsNullOrWhiteSpace(selectedDivisionPie)
-        ? "All Divisions / Units"
+        ? "All Divisions/Centers/Admin Units"
         : selectedDivisionPie;
     private double DivisionPieOnsitePercent => divisionPieTotal <= 0
         ? 0
@@ -3237,6 +3237,45 @@
     private int ViewMoreFilteredCount => viewMoreTable == DashboardTableMenu.Onsite
         ? FilteredViewMoreOnsiteLogs.Count()
         : FilteredViewMoreWfhLogs.Count();
+
+    private IQueryable<Employee> ApplyDivisionScope(IQueryable<Employee> query)
+    {
+        if (string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return query;
+        }
+
+        var scope = CurrentUser.DivisionScope.ToArray();
+        return scope.Length == 0
+            ? query.Where(employee => false)
+            : query.Where(employee => scope.Contains(employee.DivisionCenterUnit));
+    }
+
+    private IQueryable<AttendanceLog> ApplyDivisionScope(IQueryable<AttendanceLog> query)
+    {
+        if (string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return query;
+        }
+
+        var scope = CurrentUser.DivisionScope.ToArray();
+        return scope.Length == 0
+            ? query.Where(log => false)
+            : query.Where(log => scope.Contains(log.DivisionCenterUnit));
+    }
+
+    private IQueryable<AttendanceLogWfh> ApplyDivisionScope(IQueryable<AttendanceLogWfh> query)
+    {
+        if (string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return query;
+        }
+
+        var scope = CurrentUser.DivisionScope.ToArray();
+        return scope.Length == 0
+            ? query.Where(log => false)
+            : query.Where(log => scope.Contains(log.DivisionCenterUnit));
+    }
 
     private int ViewMoreTotalPages => Math.Max(1, (int)Math.Ceiling(ViewMoreFilteredCount / (double)viewMorePageSize));
 
@@ -3346,7 +3385,7 @@
 
         if (table == DashboardTableMenu.Onsite)
         {
-            viewMoreOnsiteLogs = await Db.AttendanceLogs
+            viewMoreOnsiteLogs = await ApplyDivisionScope(Db.AttendanceLogs)
                 .AsNoTracking()
                 .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
                 .OrderByDescending(l => l.AttendanceDate)
@@ -3357,7 +3396,7 @@
             return;
         }
 
-        viewMoreWfhLogs = await Db.AttendanceLogsWfh
+        viewMoreWfhLogs = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Where(l => (l.TimeIn.HasValue || l.TimeOut.HasValue) && l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .OrderByDescending(l => l.AttendanceDate)
@@ -3650,52 +3689,58 @@
         => BuildCsv(
             new[]
             {
-                "AttendanceLogId",
                 "ID Number",
                 "Employee",
-                "AM Time In",
-                "AM Time Out",
-                "PM Time In",
-                "PM Time Out",
-                "Attendance Date"
+                "Division/Center/Admin Unit",
+                "Designation",
+                "Status",
+                "Attendance Date",
+                "Time In (AM)",
+                "Time Out (PM)",
+                "Late/Undertime"
             },
             logs.Select(log => new[]
             {
-                log.AttendanceLogId.ToString(),
                 log.IdNumber,
                 FormatName(log.LastName, log.FirstName, log.MiddleName),
+                log.DivisionCenterUnit,
+                log.Designation,
+                GetOnsiteAttendanceStatus(log),
+                log.AttendanceDate.ToString("yyyy-MM-dd"),
                 log.TimeInAm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
-                log.TimeOutAm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
-                log.TimeInPm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
                 log.TimeOutPm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
-                log.AttendanceDate.ToString("yyyy-MM-dd")
+                DisplayTardiness(log.Tardiness)
             }));
 
     private string BuildWfhCsv(IEnumerable<AttendanceLogWfh> logs)
         => BuildCsv(
             new[]
             {
-                "AttendanceLogWfhId",
                 "ID Number",
                 "Employee",
-                "Time In",
-                "Time Out",
+                "Division/Center/Admin Unit",
+                "Designation",
+                "Status",
+                "Attendance Date",
                 "Target",
                 "Accomplishment",
-                "MOV",
-                "Attendance Date"
+                "Time In",
+                "Time Out",
+                "Late/Undertime"
             },
             logs.Select(log => new[]
             {
-                log.AttendanceLogWfhId.ToString(),
                 log.IdNumber,
                 FormatName(log.LastName, log.FirstName, log.MiddleName),
-                log.TimeIn?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
-                log.TimeOut?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
+                log.DivisionCenterUnit,
+                log.Designation,
+                GetWfhAttendanceStatus(log),
+                log.AttendanceDate.ToString("yyyy-MM-dd"),
                 log.Target,
                 log.Accomplishment,
-                log.Mov,
-                log.AttendanceDate.ToString("yyyy-MM-dd")
+                log.TimeIn?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
+                log.TimeOut?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
+                DisplayTardiness(log.Tardiness)
             }));
 
     private static string BuildCsvBase64(string csv)
@@ -3719,6 +3764,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await CurrentUser.InitializeAsync();
         StartLiveClock();
         await RefreshAvailablePeriodsAsync(preserveSelections: false);
         await LoadRecentLogsAsync();
@@ -3996,7 +4042,7 @@
 
             if (exportLogType == DashboardTableMenu.Wfh)
             {
-                var exportWfhLogs = await Db.AttendanceLogsWfh
+                var exportWfhLogs = await ApplyDivisionScope(Db.AttendanceLogsWfh)
                     .AsNoTracking()
                     .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
                     .Where(l => l.TimeIn.HasValue
@@ -4014,7 +4060,7 @@
             }
             else
             {
-                var exportOnsiteLogs = await Db.AttendanceLogs
+                var exportOnsiteLogs = await ApplyDivisionScope(Db.AttendanceLogs)
                     .AsNoTracking()
                     .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
                     .OrderByDescending(l => l.AttendanceDate)
@@ -4282,13 +4328,13 @@
         var previousSecond = preserveSelections ? secondSelectedPeriod : null;
         var previousExport = preserveSelections ? exportSelectedPeriod : null;
         var previousExportSecond = preserveSelections ? exportSecondSelectedPeriod : null;
-        var datesOnsite = await Db.AttendanceLogs
+        var datesOnsite = await ApplyDivisionScope(Db.AttendanceLogs)
             .AsNoTracking()
             .Select(l => l.AttendanceDate)
             .Distinct()
             .ToListAsync();
 
-        var datesWfh = await Db.AttendanceLogsWfh
+        var datesWfh = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Where(l => l.TimeIn.HasValue || l.TimeOut.HasValue || !string.IsNullOrWhiteSpace(l.Target) || !string.IsNullOrWhiteSpace(l.Accomplishment) || !string.IsNullOrWhiteSpace(l.Mov))
             .Select(l => l.AttendanceDate)
@@ -4377,13 +4423,13 @@
         var start = filterStart == default ? DateTime.Today : filterStart.Date;
         var endExclusive = (filterEnd == default ? DateTime.Today : filterEnd.Date).AddDays(1);
 
-        employeeCount = await Db.Employees.CountAsync();
-        onsiteLogsToday = await Db.AttendanceLogs.CountAsync(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive);
-        wfhLogsToday = await Db.AttendanceLogsWfh.CountAsync(l =>
+        employeeCount = await ApplyDivisionScope(Db.Employees).CountAsync();
+        onsiteLogsToday = await ApplyDivisionScope(Db.AttendanceLogs).CountAsync(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive);
+        wfhLogsToday = await ApplyDivisionScope(Db.AttendanceLogsWfh).CountAsync(l =>
             l.AttendanceDate >= start && l.AttendanceDate < endExclusive &&
             (l.TimeIn.HasValue || l.TimeOut.HasValue));
 
-        recentOnsiteLogs = await Db.AttendanceLogs
+        recentOnsiteLogs = await ApplyDivisionScope(Db.AttendanceLogs)
             .AsNoTracking()
             .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .OrderByDescending(l => l.AttendanceDate)
@@ -4391,7 +4437,7 @@
             .Take(5)
             .ToListAsync();
 
-        recentWfhLogs = await Db.AttendanceLogsWfh
+        recentWfhLogs = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Where(l => (l.TimeIn.HasValue || l.TimeOut.HasValue) && l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .OrderByDescending(l => l.AttendanceDate)
@@ -4406,13 +4452,13 @@
 
     private async Task LoadLateUndertimeChartAsync(DateTime start, DateTime endExclusive)
     {
-        var onsiteLogs = await Db.AttendanceLogs
+        var onsiteLogs = await ApplyDivisionScope(Db.AttendanceLogs)
             .AsNoTracking()
             .Include(l => l.Employee)
             .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .ToListAsync();
 
-        var wfhLogs = await Db.AttendanceLogsWfh
+        var wfhLogs = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Include(l => l.Employee)
             .Include(l => l.ExceptionCondition)
@@ -4619,6 +4665,43 @@
         => !string.IsNullOrWhiteSpace(log.ExceptionCondition?.ConditionName)
             ? log.ExceptionCondition.ConditionName
             : string.IsNullOrWhiteSpace(log.WorkArrangement) ? "WFH" : log.WorkArrangement;
+
+    private static string DisplayTardiness(string? value)
+    {
+        var displayValue = GetStoredTardinessDisplayValue(value);
+        return string.IsNullOrWhiteSpace(displayValue) ? "On Time" : displayValue;
+    }
+
+    private static string GetOnsiteAttendanceStatus(AttendanceLog log)
+    {
+        if (!log.TimeInAm.HasValue && !log.TimeInPm.HasValue)
+        {
+            return "Absent";
+        }
+
+        return "Present";
+    }
+
+    private static string GetWfhAttendanceStatus(AttendanceLogWfh log)
+    {
+        var arrangement = GetWorkArrangement(log);
+        if (!string.Equals(arrangement, "WFH", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Exception";
+        }
+
+        if (!log.TimeIn.HasValue && !log.TimeOut.HasValue)
+        {
+            return "Tagged";
+        }
+
+        if (!log.TimeIn.HasValue || !log.TimeOut.HasValue)
+        {
+            return "Incomplete";
+        }
+
+        return "Submitted";
+    }
 
     private static TimeSpan CalculateLateDuration(DateTime date, DateTime actualTimeIn, string? employeeStatus)
     {
@@ -4978,13 +5061,13 @@
 
     private async Task LoadDivisionPieAsync(DateTime start, DateTime endExclusive)
     {
-        var onsiteDivisions = await Db.AttendanceLogs
+        var onsiteDivisions = await ApplyDivisionScope(Db.AttendanceLogs)
             .AsNoTracking()
             .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .Select(l => l.DivisionCenterUnit)
             .ToListAsync();
 
-        var wfhDivisions = await Db.AttendanceLogsWfh
+        var wfhDivisions = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .Where(l => l.TimeIn.HasValue || l.TimeOut.HasValue)

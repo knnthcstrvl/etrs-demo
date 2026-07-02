@@ -33,9 +33,6 @@ namespace Financial.Migrations
                     b.Property<DateTime>("AttendanceDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("BiometricDeviceId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Designation")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -44,7 +41,8 @@ namespace Financial.Migrations
                     b.Property<string>("DivisionCenterUnit")
                         .IsRequired()
                         .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("DivisionCenterAdminUnit");
 
                     b.Property<int>("EmployeeId")
                         .HasColumnType("int");
@@ -69,10 +67,33 @@ namespace Financial.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("MovApprovalStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("MovApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("MovRejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PhotoVerificationApprovalStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("PhotoVerificationApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PhotoVerificationRejectedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Tardiness")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("LateUndertime");
 
                     b.Property<DateTime?>("TimeInAm")
                         .HasColumnType("datetime2");
@@ -87,8 +108,6 @@ namespace Financial.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("AttendanceLogId");
-
-                    b.HasIndex("BiometricDeviceId");
 
                     b.HasIndex("EmployeeId", "AttendanceDate");
 
@@ -118,7 +137,8 @@ namespace Financial.Migrations
                     b.Property<string>("DivisionCenterUnit")
                         .IsRequired()
                         .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("DivisionCenterAdminUnit");
 
                     b.Property<int>("EmployeeId")
                         .HasColumnType("int");
@@ -151,10 +171,27 @@ namespace Financial.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<string>("PhotoVerification")
+                    b.Property<string>("MovApprovalStatus")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("MovApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("MovRejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PhotoVerificationApprovalStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("PhotoVerificationApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PhotoVerificationRejectedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("TagUpdatedAt")
                         .HasColumnType("datetime2");
@@ -162,7 +199,8 @@ namespace Financial.Migrations
                     b.Property<string>("Tardiness")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("LateUndertime");
 
                     b.Property<string>("Target")
                         .IsRequired()
@@ -173,6 +211,11 @@ namespace Financial.Migrations
 
                     b.Property<DateTime?>("TimeOut")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Verification")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("WorkArrangement")
                         .IsRequired()
@@ -186,42 +229,6 @@ namespace Financial.Migrations
                     b.HasIndex("EmployeeId", "AttendanceDate");
 
                     b.ToTable("AttendanceLogsWfh");
-                });
-
-            modelBuilder.Entity("Financial.Model.Dtr.BiometricDevice", b =>
-                {
-                    b.Property<int>("BiometricDeviceId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BiometricDeviceId"));
-
-                    b.Property<string>("DeviceName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("Location")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("SerialNumber")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.HasKey("BiometricDeviceId");
-
-                    b.HasIndex("SerialNumber")
-                        .IsUnique();
-
-                    b.ToTable("BiometricDevices");
                 });
 
             modelBuilder.Entity("Financial.Model.Dtr.Employee", b =>
@@ -240,7 +247,8 @@ namespace Financial.Migrations
                     b.Property<string>("DivisionCenterUnit")
                         .IsRequired()
                         .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("DivisionCenterAdminUnit");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -333,8 +341,9 @@ namespace Financial.Migrations
 
                     b.Property<string>("DivisionCenterUnit")
                         .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("DivisionCenterAdminUnit");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -393,18 +402,11 @@ namespace Financial.Migrations
 
             modelBuilder.Entity("Financial.Model.Dtr.AttendanceLog", b =>
                 {
-                    b.HasOne("Financial.Model.Dtr.BiometricDevice", "BiometricDevice")
-                        .WithMany("AttendanceLogs")
-                        .HasForeignKey("BiometricDeviceId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("Financial.Model.Dtr.Employee", "Employee")
                         .WithMany("AttendanceLogs")
                         .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("BiometricDevice");
 
                     b.Navigation("Employee");
                 });
@@ -425,11 +427,6 @@ namespace Financial.Migrations
                     b.Navigation("Employee");
 
                     b.Navigation("ExceptionCondition");
-                });
-
-            modelBuilder.Entity("Financial.Model.Dtr.BiometricDevice", b =>
-                {
-                    b.Navigation("AttendanceLogs");
                 });
 
             modelBuilder.Entity("Financial.Model.Dtr.Employee", b =>

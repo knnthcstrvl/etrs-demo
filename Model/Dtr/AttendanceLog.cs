@@ -10,9 +10,6 @@ namespace Financial.Model.Dtr
         public int EmployeeId { get; set; }
         public Employee Employee { get; set; } = null!;
 
-        public int? BiometricDeviceId { get; set; }
-        public BiometricDevice? BiometricDevice { get; set; }
-
         [MaxLength(30)]
         public string IdNumber { get; set; } = string.Empty;
 
@@ -40,5 +37,19 @@ namespace Financial.Model.Dtr
         public string Tardiness { get; set; } = string.Empty;
 
         public DateTime AttendanceDate { get; set; } = DateTime.Today;
+
+        [MaxLength(20)]
+        public string MovApprovalStatus { get; set; } = "Pending"; // Pending, Approved, Rejected
+
+        public DateTime? MovApprovedAt { get; set; }
+
+        public DateTime? MovRejectedAt { get; set; }
+
+        [MaxLength(20)]
+        public string PhotoVerificationApprovalStatus { get; set; } = "Pending"; // Pending, Approved, Rejected
+
+        public DateTime? PhotoVerificationApprovedAt { get; set; }
+
+        public DateTime? PhotoVerificationRejectedAt { get; set; }
     }
 }

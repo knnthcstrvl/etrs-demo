@@ -135,18 +135,18 @@
                             </div>
 
                             <div class="attendance-filter-field">
-                                <label class="attendance-table-toolbar-label" for="userFilterDivision">Division / Unit</label>
+                                <label class="attendance-table-toolbar-label" for="userFilterDivision">Division/Center/Admin Unit</label>
                                 <div class="attendance-filter-select-wrap">
                                     <button type="button"
                                             id="userFilterDivision"
                                             class="attendance-filter-select-trigger @(activeFilterField == "division" ? "active" : null)"
                                             @onclick='() => ToggleFilterField("division")'>
-                                        <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions / Units")</span>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions/Centers/Admin Units")</span>
                                         <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
                                     </button>
 
                                     <div class="attendance-filter-select-menu @(activeFilterField == "division" ? "show" : null)">
-                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions/Centers/Admin Units</button>
                                         @foreach (var option in CurrentDivisionOptions)
                                         {
                                             <button type="button" class="attendance-filter-select-option @(string.Equals(filterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("division", option)'>@option</button>
@@ -270,8 +270,8 @@
                                         <strong>@FormatDate(selectedUser.DateCreated)</strong>
                                     </div>
                                     <div class="attendance-detail-field">
-                                        <span class="attendance-detail-label">Division / Unit</span>
-                                        <strong>@DisplayValue(selectedUser.DivisionCenterUnit)</strong>
+                                        <span class="attendance-detail-label">Division/Center/Admin Unit</span>
+                                        <strong>@DisplayDelimitedValue(selectedUser.DivisionCenterUnit)</strong>
                                     </div>
                                     <div class="attendance-detail-field">
                                         <span class="attendance-detail-label">Designation</span>
@@ -355,8 +355,58 @@
                                                 <input id="userEmail" class="form-control attendance-input-control" @bind="userForm.Email" />
                                             </div>
                                             <div class="attendance-input-field">
-                                                <label class="attendance-table-toolbar-label" for="userDivision">Division / Unit</label>
-                                                <input id="userDivision" class="form-control attendance-input-control" @bind="userForm.DivisionCenterUnit" />
+                                                <label class="attendance-table-toolbar-label" for="userDivision">Division/Center/Admin Unit</label>
+                                                <div class="attendance-filter-select-wrap user-modal-dropdown division-select" @onclick:stopPropagation="true">
+                                                    <button type="button"
+                                                            id="userDivision"
+                                                            @ref="userDivisionButtonRef"
+                                                            class="attendance-filter-select-trigger attendance-input-control access-pills @(showDivisionDropdown ? "active" : null)"
+                                                            @onclick="ToggleDivisionDropdown">
+                                                        <span class="access-placeholder">@GetDivisionSelectionLabel()</span>
+                                                        @if (selectedDivisions.Count > 0)
+                                                        {
+                                                            <span class="access-count-pill">
+                                                                <span>@selectedDivisions.Count</span>
+                                                                <span class="access-count-clear" role="button" tabindex="0" title="Clear divisions" @onclick="ClearDivisions" @onclick:stopPropagation="true">
+                                                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                                                </span>
+                                                            </span>
+                                                        }
+                                                        <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
+                                                    </button>
+
+                                                    <div class="@GetUserModalDropdownMenuClass(showDivisionDropdown, openDivisionDropdownUpward)" style="@GetUserModalDropdownMenuStyle(userDivisionMenuMaxHeight)">
+                                                        <button type="button"
+                                                                class="attendance-filter-select-option access-option access-option-select-all @(AllDivisionsSelected ? "active" : null)"
+                                                                @onclick="ToggleAllDivisions">
+                                                            <span class="access-option-check">
+                                                                @if (AllDivisionsSelected)
+                                                                {
+                                                                    <i class="fa-solid fa-minus" aria-hidden="true"></i>
+                                                                }
+                                                            </span>
+                                                            <span>Select all</span>
+                                                        </button>
+                                                        @foreach (var option in divisionOptions)
+                                                        {
+                                                            <button type="button"
+                                                                    class="attendance-filter-select-option access-option @(selectedDivisions.Contains(option) ? "active" : null)"
+                                                                    @onclick="() => ToggleDivision(option)">
+                                                                <span class="access-option-check">
+                                                                    @if (selectedDivisions.Contains(option))
+                                                                    {
+                                                                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                                                                    }
+                                                                </span>
+                                                                <span>@option</span>
+                                                            </button>
+                                                        }
+                                                        @if (divisionOptions.Count == 0)
+                                                        {
+                                                            <div class="attendance-filter-select-empty">No divisions available</div>
+                                                        }
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div class="attendance-input-field">
                                                 <label class="attendance-table-toolbar-label" for="userDesignation">Designation</label>
@@ -723,7 +773,7 @@
                         <th>Email</th>
                         <th>@SortHeader("Role", "role")</th>
                         <th>Access Level</th>
-                        <th>@SortHeader("Division / Unit", "division")</th>
+                        <th>@SortHeader("Division/Center/Admin Unit", "division")</th>
                         <th>@SortHeader("Designation", "designation")</th>
                         <th>@SortHeader("Status", "status")</th>
                         <th>@SortHeader("Created", "created")</th>
@@ -785,7 +835,7 @@
                                     }
                                 </div>
                             </td>
-                            <td><span class="cell-ellipsis" title="@DisplayValue(user.DivisionCenterUnit)">@DisplayValue(user.DivisionCenterUnit)</span></td>
+                            <td><span class="cell-ellipsis" title="@DisplayDelimitedValue(user.DivisionCenterUnit)">@DisplayDelimitedValue(user.DivisionCenterUnit)</span></td>
                             <td><span class="cell-ellipsis" title="@DisplayValue(user.Designation)">@DisplayValue(user.Designation)</span></td>
                             <td><span class="status-badge @(user.IsActive ? "status-ok" : "status-danger")">@(user.IsActive ? "Active" : "Inactive")</span></td>
                             <td><span class="cell-ellipsis" title="@FormatDate(user.DateCreated)">@FormatDate(user.DateCreated)</span></td>
@@ -900,7 +950,8 @@
 
     .attendance-filter-dropdown,
     .attendance-filter-field,
-    .access-select {
+    .access-select,
+    .division-select {
         position: relative;
     }
 
@@ -1937,6 +1988,12 @@
         line-height: 1;
     }
 
+    .attendance-filter-select-empty {
+        padding: 0.6rem 0.65rem;
+        color: var(--finance-text-muted);
+        font-size: 0.82rem;
+    }
+
     .user-access-pill-list {
         display: flex;
         align-items: center;
@@ -2380,16 +2437,22 @@
     private bool activeAccessChildOpenUpward;
     private bool showRoleDropdown;
     private bool showAccessDropdown;
+    private bool showDivisionDropdown;
     private bool showStatusDropdown;
     private bool openRoleDropdownUpward;
     private bool openAccessDropdownUpward;
+    private bool openDivisionDropdownUpward;
     private bool openStatusDropdownUpward;
     private double userRoleMenuMaxHeight = 120;
     private double userAccessMenuMaxHeight = 320;
+    private double userDivisionMenuMaxHeight = 320;
     private double userStatusMenuMaxHeight = 120;
     private ElementReference userRoleButtonRef;
     private ElementReference userAccessButtonRef;
+    private ElementReference userDivisionButtonRef;
     private ElementReference userStatusButtonRef;
+    private readonly List<string> divisionOptions = new();
+    private HashSet<string> selectedDivisions = new(StringComparer.OrdinalIgnoreCase);
 
     private bool HasHoveredRowMenu => showRowActionMenu && hoveredUserRowMenuUser is not null;
     private IEnumerable<AccessMenuOption> CurrentAccessOptions => activeAccessTab == AccessTab.Specific
@@ -2400,6 +2463,8 @@
 
     private bool CurrentTabAllAccessSelected
         => GetCurrentTabSelectableAccess().All(access => selectedAccess.Contains(access));
+    private bool AllDivisionsSelected
+        => divisionOptions.Count > 0 && divisionOptions.All(option => selectedDivisions.Contains(option));
     private string RowActionMenuStyle => $"left:{rowActionMenuLeft:0}px;top:{rowActionMenuTop:0}px;";
     private bool CanDeleteUsers => CurrentUser.HasAccess(AccessPolicy.DeleteUser);
     private bool CanDeleteUser(UserAccount? user) => CanDeleteUsers && !IsCurrentUser(user);
@@ -2423,7 +2488,7 @@
     private IEnumerable<string> CurrentNameOptions => GetDistinctOptions(users.Select(user => FormatName(user.LastName, user.FirstName, user.MiddleName)));
     private IEnumerable<string> CurrentUsernameOptions => GetDistinctOptions(users.Select(user => user.Username));
     private IEnumerable<string> CurrentRoleOptions => GetDistinctOptions(users.Select(user => user.Role));
-    private IEnumerable<string> CurrentDivisionOptions => GetDistinctOptions(users.Select(user => user.DivisionCenterUnit));
+    private IEnumerable<string> CurrentDivisionOptions => GetDistinctOptions(users.SelectMany(user => ParseDelimitedValues(user.DivisionCenterUnit)));
     private IEnumerable<string> CurrentDesignationOptions => GetDistinctOptions(users.Select(user => user.Designation));
 
     protected override async Task OnInitializedAsync()
@@ -2439,6 +2504,8 @@
 
     private async Task LoadUsersAsync()
     {
+        await LoadDivisionOptionsAsync();
+
         users = await Db.UserAccounts
             .AsNoTracking()
             .OrderBy(u => u.LastName)
@@ -2450,6 +2517,19 @@
         adminUsers = users.Count(u => string.Equals(u.Role, "Admin", StringComparison.OrdinalIgnoreCase));
 
         RefreshFilteredUsers();
+    }
+
+    private async Task LoadDivisionOptionsAsync()
+    {
+        var options = await Db.Employees
+            .AsNoTracking()
+            .Select(employee => employee.DivisionCenterUnit)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct()
+            .ToListAsync();
+
+        divisionOptions.Clear();
+        divisionOptions.AddRange(GetDistinctOptions(options));
     }
 
     private void RefreshFilteredUsers(bool resetPaging = false)
@@ -2487,7 +2567,7 @@
             return false;
         }
 
-        if (!MatchesSelectedValue(user.DivisionCenterUnit, filterDivision))
+        if (!MatchesDelimitedSelectedValue(user.DivisionCenterUnit, filterDivision))
         {
             return false;
         }
@@ -2538,6 +2618,22 @@
 
         return string.Equals(source?.Trim(), selectedValue.Trim(), StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool MatchesDelimitedSelectedValue(string? source, string? selectedValue)
+    {
+        if (string.IsNullOrWhiteSpace(selectedValue))
+        {
+            return true;
+        }
+
+        return ParseDelimitedValues(source)
+            .Any(value => string.Equals(value, selectedValue.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IEnumerable<string> ParseDelimitedValues(string? value)
+        => (value ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(item => !string.IsNullOrWhiteSpace(item));
 
     private static bool MatchesUserName(string? lastName, string? firstName, string? middleName, string? query)
     {
@@ -3008,11 +3104,14 @@
         };
         addUserPasswordConfirm = string.Empty;
         selectedAccess = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        selectedDivisions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         showRoleDropdown = false;
         showAccessDropdown = false;
+        showDivisionDropdown = false;
         showStatusDropdown = false;
         openRoleDropdownUpward = false;
         openAccessDropdownUpward = false;
+        openDivisionDropdownUpward = false;
         openStatusDropdownUpward = false;
         activeAccessTab = AccessTab.Specific;
         activeAccessParent = null;
@@ -3047,11 +3146,14 @@
 
         var tokens = (user.AccessLevel ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         selectedAccess = new HashSet<string>(NormalizeAccessTokens(tokens), StringComparer.OrdinalIgnoreCase);
+        selectedDivisions = new HashSet<string>(ParseDelimitedValues(user.DivisionCenterUnit), StringComparer.OrdinalIgnoreCase);
         showRoleDropdown = false;
         showAccessDropdown = false;
+        showDivisionDropdown = false;
         showStatusDropdown = false;
         openRoleDropdownUpward = false;
         openAccessDropdownUpward = false;
+        openDivisionDropdownUpward = false;
         openStatusDropdownUpward = false;
         activeAccessTab = AccessTab.Specific;
         activeAccessParent = null;
@@ -3098,9 +3200,11 @@
         showUserModal = false;
         showRoleDropdown = false;
         showAccessDropdown = false;
+        showDivisionDropdown = false;
         showStatusDropdown = false;
         openRoleDropdownUpward = false;
         openAccessDropdownUpward = false;
+        openDivisionDropdownUpward = false;
         openStatusDropdownUpward = false;
         activeAccessParent = null;
         activeAccessChildOpenLeft = false;
@@ -3108,6 +3212,7 @@
         userModalStep = UserModalStep.PersonalInfo;
         userModalStepMovingForward = true;
         addUserPasswordConfirm = string.Empty;
+        selectedDivisions.Clear();
         ResetUserModalMenuPlacement();
     }
 
@@ -3144,6 +3249,7 @@
 
         SyncParentSelections();
 
+        userForm.DivisionCenterUnit = string.Join(", ", selectedDivisions.OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
         userForm.AccessLevel = string.Join(",", selectedAccess.OrderBy(value => value));
         var wasEditingUser = isEditingUser;
         var savedUserName = FormatName(userForm.LastName, userForm.FirstName, userForm.MiddleName);
@@ -3185,9 +3291,11 @@
             showUserModal = false;
             showRoleDropdown = false;
             showAccessDropdown = false;
+            showDivisionDropdown = false;
             showStatusDropdown = false;
             openRoleDropdownUpward = false;
             openAccessDropdownUpward = false;
+            openDivisionDropdownUpward = false;
             openStatusDropdownUpward = false;
             activeAccessParent = null;
             activeAccessChildOpenLeft = false;
@@ -3195,6 +3303,7 @@
             userModalStep = UserModalStep.PersonalInfo;
             userModalStepMovingForward = true;
             addUserPasswordConfirm = string.Empty;
+            selectedDivisions.Clear();
             ResetUserModalMenuPlacement();
 
             ShowToast(
@@ -3456,9 +3565,11 @@
     {
         showRoleDropdown = false;
         showAccessDropdown = false;
+        showDivisionDropdown = false;
         showStatusDropdown = false;
         openRoleDropdownUpward = false;
         openAccessDropdownUpward = false;
+        openDivisionDropdownUpward = false;
         openStatusDropdownUpward = false;
     }
 
@@ -3475,9 +3586,11 @@
         openRoleDropdownUpward = placement.OpenUpward;
         userRoleMenuMaxHeight = placement.MaxHeight;
         openAccessDropdownUpward = false;
+        openDivisionDropdownUpward = false;
         openStatusDropdownUpward = false;
         showRoleDropdown = true;
         showAccessDropdown = false;
+        showDivisionDropdown = false;
         showStatusDropdown = false;
     }
 
@@ -3490,6 +3603,56 @@
         }
         showRoleDropdown = false;
         openRoleDropdownUpward = false;
+    }
+
+    private async Task ToggleDivisionDropdown()
+    {
+        if (showDivisionDropdown)
+        {
+            showDivisionDropdown = false;
+            openDivisionDropdownUpward = false;
+            return;
+        }
+
+        var placement = await GetUserModalMenuPlacementAsync(userDivisionButtonRef, GetDivisionMenuEstimatedHeight());
+        openDivisionDropdownUpward = placement.OpenUpward;
+        userDivisionMenuMaxHeight = placement.MaxHeight;
+        openRoleDropdownUpward = false;
+        openAccessDropdownUpward = false;
+        openStatusDropdownUpward = false;
+        showDivisionDropdown = true;
+        showRoleDropdown = false;
+        showAccessDropdown = false;
+        showStatusDropdown = false;
+    }
+
+    private void ToggleDivision(string option)
+    {
+        if (string.IsNullOrWhiteSpace(option))
+        {
+            return;
+        }
+
+        if (!selectedDivisions.Add(option))
+        {
+            selectedDivisions.Remove(option);
+        }
+    }
+
+    private void ToggleAllDivisions()
+    {
+        if (AllDivisionsSelected)
+        {
+            selectedDivisions.Clear();
+            return;
+        }
+
+        selectedDivisions = new HashSet<string>(divisionOptions, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void ClearDivisions(MouseEventArgs _)
+    {
+        selectedDivisions.Clear();
     }
 
     private async Task ToggleStatusDropdown()
@@ -3506,9 +3669,11 @@
         userStatusMenuMaxHeight = placement.MaxHeight;
         openRoleDropdownUpward = false;
         openAccessDropdownUpward = false;
+        openDivisionDropdownUpward = false;
         showStatusDropdown = true;
         showRoleDropdown = false;
         showAccessDropdown = false;
+        showDivisionDropdown = false;
     }
 
     private void SelectStatus(string option)
@@ -3531,9 +3696,11 @@
         openAccessDropdownUpward = placement.OpenUpward;
         userAccessMenuMaxHeight = placement.MaxHeight;
         openRoleDropdownUpward = false;
+        openDivisionDropdownUpward = false;
         openStatusDropdownUpward = false;
         showAccessDropdown = true;
         showRoleDropdown = false;
+        showDivisionDropdown = false;
         showStatusDropdown = false;
     }
 
@@ -3758,10 +3925,29 @@
     private double GetAccessMenuEstimatedHeight()
         => Math.Max(220, CurrentAccessOptions.Count() * 40 + 76);
 
+    private double GetDivisionMenuEstimatedHeight()
+        => Math.Min(360, Math.Max(120, divisionOptions.Count * 40 + 48));
+
+    private string GetDivisionSelectionLabel()
+    {
+        if (selectedDivisions.Count == 0)
+        {
+            return "Select divisions";
+        }
+
+        if (selectedDivisions.Count == 1)
+        {
+            return selectedDivisions.First();
+        }
+
+        return "Selected divisions";
+    }
+
     private void ResetUserModalMenuPlacement()
     {
         userRoleMenuMaxHeight = 120;
         userAccessMenuMaxHeight = 320;
+        userDivisionMenuMaxHeight = 320;
         userStatusMenuMaxHeight = 120;
     }
 
@@ -3778,6 +3964,12 @@
 
     private static string DisplayValue(string? value, string fallback)
         => string.IsNullOrWhiteSpace(value) ? fallback : value;
+
+    private static string DisplayDelimitedValue(string? value)
+    {
+        var values = ParseDelimitedValues(value).ToArray();
+        return values.Length == 0 ? "-" : string.Join(", ", values);
+    }
 
     private static string GetStatusText(UserAccount user) => user.IsActive ? "Active" : "Inactive";
 

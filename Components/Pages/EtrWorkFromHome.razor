@@ -5,6 +5,9 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
 @using System.ComponentModel.DataAnnotations
+@using System.Net
+@using System.Net.Mail
+@using System.Security.Cryptography
 @using System.Text.RegularExpressions
 @inject ProcurementDbContext Db
 @inject IToastService ToastService
@@ -64,58 +67,56 @@
 
                 <div class="form-row">
                     <label class="required-star">ID Number</label>
-                    <div class="id-photo-row">
-                        <div class="employee-search-wrap" @ref="employeeSearchWrapRef">
-                            <div class="employee-search-input-wrap">
-                                <input
-                                    value="@employeeSearchText"
-                                    @oninput="HandleIdInputChanged"
-                                    @onfocus="HandleIdInputFocus"
-                                    class="etr-input employee-search-input field-control"
-                                    disabled="@isSubmitting"
-                                    autocomplete="off" />
-                                <span class="employee-search-icon" aria-hidden="true">Search</span>
-                            </div>
-
-                            <div class="@GetEmployeeOverlayClass()">
-                                @if (showEmployeeResults)
-                                {
-                                    @if (employeeSearchResults.Count == 0)
-                                    {
-                                        <div class="employee-empty-state">No Employee Found</div>
-                                    }
-                                    else
-                                    {
-                                        <div class="employee-results-grid">
-                                            @foreach (var employee in employeeSearchResults)
-                                            {
-                                                <button type="button" class="@GetEmployeeResultClass(employee)" @onclick="() => SelectEmployee(employee)">
-                                                    <span class="employee-result-id">@employee.IdNumber</span>
-                                                    <span class="employee-result-name">@FormatEmployeeName(employee)</span>
-                                                </button>
-                                            }
-                                        </div>
-                                    }
-                                }
-                            </div>
+                    <div class="employee-search-wrap" @ref="employeeSearchWrapRef">
+                        <div class="employee-search-input-wrap">
+                            <input
+                                value="@employeeSearchText"
+                                @oninput="HandleIdInputChanged"
+                                @onfocus="HandleIdInputFocus"
+                                class="etr-input employee-search-input field-control"
+                                disabled="@isSubmitting"
+                                autocomplete="off" />
+                            <span class="employee-search-icon" aria-hidden="true">Search</span>
                         </div>
 
-                        <div class="@GetPhotoVerificationFieldClass()">
-                            <button type="button"
-                                    class="photo-verification-icon-button"
-                                    @onclick="OpenPhotoVerificationModal"
-                                    disabled="@isSubmitting"
-                                    aria-label="Open photo verification">
-                                <i class="fa-solid fa-camera" aria-hidden="true"></i>
-                            </button>
-                            <span class="photo-verification-status" aria-label="@PhotoVerificationStatusLabel">
-                                @if (!string.IsNullOrWhiteSpace(photoVerificationImage))
+                        <div class="@GetEmployeeOverlayClass()">
+                            @if (showEmployeeResults)
+                            {
+                                @if (employeeSearchResults.Count == 0)
                                 {
-                                    <i class="fa-solid fa-check" aria-hidden="true"></i>
+                                    <div class="employee-empty-state">No Employee Found</div>
                                 }
-                            </span>
+                                else
+                                {
+                                    <div class="employee-results-grid">
+                                        @foreach (var employee in employeeSearchResults)
+                                        {
+                                            <button type="button" class="@GetEmployeeResultClass(employee)" @onclick="() => SelectEmployee(employee)">
+                                                <span class="employee-result-id">@employee.IdNumber</span>
+                                                <span class="employee-result-name">@FormatEmployeeName(employee)</span>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            }
                         </div>
                     </div>
+                </div>
+
+                <div class="form-row">
+                    <label class="required-star">Verification</label>
+                    <button type="button"
+                            class="@GetVerificationButtonClass()"
+                            @onclick="OpenVerificationAsync"
+                            disabled="@isSubmitting">
+                        <span>@VerificationButtonText</span>
+                        <span class="verification-button-status" aria-label="@VerificationStatusLabel">
+                            @if (HasCompletedVerification)
+                            {
+                                <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            }
+                        </span>
+                    </button>
                 </div>
 
                 <div class="@GetSectionClass("IN")" aria-hidden="@(entryModel.LogType != "IN")">
@@ -142,12 +143,14 @@
                     <div class="form-row">
                         <label>Means of Verification</label>
                         <div class="file-upload-wrap">
-                            <label for="movUpload" class="etr-file-button">Choose File</label>
+                            <label for="movUpload" class="etr-file-button">Choose Files</label>
                             <InputFile id="movUpload"
                                        class="etr-file-input"
                                        OnChange="HandleMovSelected"
+                                       accept=".pdf"
+                                       multiple
                                        disabled="@isSubmitting" />
-                            <span class="upload-note upload-file-name">@(string.IsNullOrWhiteSpace(entryModel.MovFileName) ? "No file chosen." : entryModel.MovFileName)</span>
+                            <span class="upload-note upload-file-name">@GetMovUploadLabel()</span>
                         </div>
                     </div>
                 </div>
@@ -191,9 +194,16 @@
                         {
                             <img class="confirmation-photo-thumb" src="@photoVerificationImage" alt="Photo verification" />
                         }
+                        else if (!string.IsNullOrWhiteSpace(emailVerificationVerifiedEmail))
+                        {
+                            <div class="confirmation-photo-thumb confirmation-photo-placeholder">
+                                <i class="fa-solid fa-envelope-circle-check" aria-hidden="true"></i>
+                                <span>Email Verified</span>
+                            </div>
+                        }
                         else
                         {
-                            <div class="confirmation-photo-thumb confirmation-photo-placeholder">No Image</div>
+                            <div class="confirmation-photo-thumb confirmation-photo-placeholder">No Verification</div>
                         }
                     </div>
 
@@ -208,7 +218,7 @@
                                 <strong>@DateTime.Today.ToString("MMMM d, yyyy")</strong>
                             </div>
                             <div class="attendance-detail-field">
-                                <span class="attendance-detail-label">Division / Unit</span>
+                                <span class="attendance-detail-label">Division/Center/Admin Unit</span>
                                 <strong>@DisplayValue(selectedEmployee.DivisionCenterUnit)</strong>
                             </div>
                             <div class="attendance-detail-field">
@@ -232,6 +242,101 @@
                     <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ConfirmSubmitAsync" disabled="@isSubmitting">
                         @(isSubmitting ? "Submitting..." : $"Confirm {entryModel.LogType}")
                     </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (showVerificationChoiceModal)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseVerificationChoiceModal">
+            <div class="attendance-detail-modal etr-verification-choice-modal" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Verification</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseVerificationChoiceModal" aria-label="Close verification choices">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body">
+                    <div class="etr-verification-choice-stack">
+                        <button type="button" class="etr-verification-choice-card" @onclick="ChoosePhotoVerificationAsync" disabled="@RequiresEmailVerificationForTimeOut">
+                            <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                            <span>Photo</span>
+                        </button>
+                        <div class="etr-verification-choice-divider">Or</div>
+                        <button type="button" class="etr-verification-choice-card" @onclick="ChooseEmailVerificationAsync">
+                            <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                            <span>Email</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (showEmailVerificationModal)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseEmailVerificationModal">
+            <div class="attendance-detail-modal etr-email-modal" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Email Verification</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseEmailVerificationModal" aria-label="Close email verification" disabled="@isSendingEmailCode">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body">
+                    <div class="attendance-detail-section attendance-detail-hero">
+                        <div>
+                            <div class="attendance-detail-eyebrow">Code Check</div>
+                            <div class="attendance-detail-person">@EmailVerificationStatusText</div>
+                            <div class="attendance-detail-meta">Enter an email address, send a code, then submit the code within 5 minutes.</div>
+                        </div>
+                        <div class="attendance-detail-status">WFH @entryModel.LogType</div>
+                    </div>
+
+                    <div class="attendance-detail-section etr-email-section">
+                        <label class="attendance-detail-label" for="emailVerificationAddress">Email Address</label>
+                        <div class="etr-email-send-row">
+                            <input id="emailVerificationAddress"
+                                   value="@emailVerificationAddress"
+                                   @oninput="HandleEmailVerificationAddressChanged"
+                                   class="etr-input field-control"
+                                   type="email"
+                                   autocomplete="email"
+                                   disabled="@isSendingEmailCode" />
+                            <button type="button" class="btn btn-primary attendance-detail-done etr-email-action-button" @onclick="SendEmailVerificationCodeAsync" disabled="@isSendingEmailCode">
+                                @(isSendingEmailCode ? "Sending..." : "Send Code")
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="attendance-detail-section etr-email-section">
+                        <label class="attendance-detail-label" for="emailVerificationCode">Verification Code</label>
+                        <div class="etr-email-send-row">
+                            <input id="emailVerificationCode"
+                                   value="@emailVerificationCodeInput"
+                                   @oninput="HandleEmailVerificationCodeChanged"
+                                   class="etr-input field-control etr-code-input"
+                                   inputmode="numeric"
+                                   maxlength="6"
+                                   autocomplete="one-time-code"
+                                   disabled="@isSendingEmailCode" />
+                            <button type="button" class="btn btn-primary attendance-detail-done etr-email-action-button" @onclick="VerifyEmailCodeAsync" disabled="@isSendingEmailCode">
+                                Verify
+                            </button>
+                        </div>
+                        <div class="attendance-detail-meta">@EmailVerificationHelpText</div>
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseEmailVerificationModal" disabled="@isSendingEmailCode">Close</button>
                 </div>
             </div>
         </div>
@@ -414,23 +519,23 @@
         color: #4b5563 !important;
     }
 
-    body.etrs-dark-theme .etr-shell .photo-verification-field {
+    body.etrs-dark-theme .etr-shell .verification-button {
         background: #ffffff !important;
         border-color: transparent !important;
         color: #111827 !important;
     }
 
-    body.etrs-dark-theme .etr-shell .photo-verification-field.disabled {
+    body.etrs-dark-theme .etr-shell .verification-button:disabled {
         background: #ffffff !important;
         color: #6b7280 !important;
         opacity: 1 !important;
     }
 
-    body.etrs-dark-theme .etr-shell .photo-verification-status {
+    body.etrs-dark-theme .etr-shell .verification-button-status {
         background: #d1d5db !important;
     }
 
-    body.etrs-dark-theme .etr-shell .photo-verification-field.verified .photo-verification-status {
+    body.etrs-dark-theme .etr-shell .verification-button.verified .verification-button-status {
         background: #10b981 !important;
     }
 
@@ -763,14 +868,7 @@
         font-size: 0.9rem;
     }
 
-    .id-photo-row {
-        display: grid;
-        grid-template-columns: minmax(0, 17fr) minmax(92px, 3fr);
-        gap: 0.55rem;
-        align-items: stretch;
-    }
-
-    .photo-verification-field {
+    .verification-button {
         width: 100%;
         height: 2.625rem;
         display: flex;
@@ -787,27 +885,21 @@
         transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
     }
 
-    .photo-verification-field.disabled {
+    .verification-button:disabled {
         background: #ffffff;
         color: #6b7280;
         opacity: 1;
+        cursor: not-allowed;
     }
 
-    .photo-verification-icon-button {
-        flex: 0 0 auto;
-        width: 1.9rem;
-        height: 1.9rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border: 0;
-        border-radius: 8px;
-        background: transparent;
-        color: #111827;
-        font-size: 1rem;
+    .verification-button:not(:disabled):hover,
+    .verification-button:not(:disabled):focus-visible {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16,185,129,0.14);
+        outline: none;
     }
 
-    .photo-verification-status {
+    .verification-button-status {
         flex: 0 0 auto;
         width: 0.95rem;
         height: 0.95rem;
@@ -821,22 +913,8 @@
         line-height: 1;
     }
 
-    .photo-verification-field.verified .photo-verification-status {
+    .verification-button.verified .verification-button-status {
         background: #10b981;
-    }
-
-    .photo-verification-icon-button:not(:disabled):hover,
-    .photo-verification-icon-button:not(:disabled):focus-visible {
-        background: #f5f7fa;
-        color: #0f172a;
-        outline: none;
-    }
-
-    .photo-verification-icon-button:disabled {
-        background: transparent;
-        color: #111827;
-        cursor: not-allowed;
-        opacity: 1;
     }
 
     .transition-panel {
@@ -997,6 +1075,79 @@
         width: min(100%, 720px);
     }
 
+    .etr-verification-choice-modal,
+    .etr-email-modal {
+        width: min(100%, 640px);
+    }
+
+    .etr-verification-choice-stack {
+        display: grid;
+        gap: 1.4rem;
+        padding: clamp(0.5rem, 2vw, 1.25rem);
+    }
+
+    .etr-verification-choice-card {
+        min-height: 8.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        border: 2px solid var(--etrs-gray-900);
+        border-radius: 0;
+        background: #ffffff;
+        color: var(--etrs-black);
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+
+    .etr-verification-choice-card:hover,
+    .etr-verification-choice-card:focus-visible {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16,185,129,0.14);
+        outline: none;
+    }
+
+    .etr-verification-choice-card:disabled {
+        border-color: var(--etrs-gray-300);
+        color: var(--etrs-gray-600);
+        background: var(--etrs-gray-100);
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    .etr-verification-choice-divider {
+        text-align: center;
+        color: var(--etrs-black);
+        font-size: 1.25rem;
+        font-weight: 500;
+    }
+
+    .etr-email-section {
+        display: grid;
+        gap: 0.65rem;
+    }
+
+    .etr-email-send-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.65rem;
+        align-items: center;
+    }
+
+    .etr-email-action-button {
+        width: auto;
+        min-width: 7rem;
+        border-radius: 10px;
+        background: #ffffff;
+        border-color: var(--etrs-gray-300);
+        color: var(--etrs-black);
+    }
+
+    .etr-code-input {
+        letter-spacing: 0.18em;
+        font-weight: 700;
+    }
+
     .etr-photo-modal.photo-capture-success {
         position: relative;
     }
@@ -1119,6 +1270,8 @@
 
     .confirmation-photo-placeholder {
         display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
         align-items: center;
         justify-content: center;
         background: var(--etrs-gray-100);
@@ -1479,6 +1632,14 @@
             flex: 0 0 auto;
             width: auto;
         }
+
+        .etr-email-send-row {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .etr-email-action-button {
+            width: 100%;
+        }
     }
 </style>
 
@@ -1498,12 +1659,23 @@
     private DateTime? pendingSubmissionTime;
     private DateTime? confirmationTimeIn;
     private DateTime? confirmationTimeOut;
+    private bool showVerificationChoiceModal;
     private bool showPhotoVerificationModal;
+    private bool showEmailVerificationModal;
     private bool pendingStartPhotoCamera;
     private bool isPhotoCaptureClosing;
     private ElementReference photoVideoRef;
     private string photoVerificationImage = string.Empty;
     private string photoCameraMessage = string.Empty;
+    private string emailVerificationAddress = string.Empty;
+    private string emailVerificationCodeInput = string.Empty;
+    private string emailVerificationPendingCode = string.Empty;
+    private string emailVerificationPendingEmail = string.Empty;
+    private string emailVerificationVerifiedEmail = string.Empty;
+    private DateTime? emailVerificationCodeExpiresAt;
+    private int emailVerificationAttempts;
+    private bool isSendingEmailCode;
+    private bool timeOutRequiresEmailVerification = false;
 
     private class EtrEntryModel
         : IValidatableObject
@@ -1518,7 +1690,7 @@
         public string Accomplishment { get; set; } = string.Empty;
 
         public string MovFileName { get; set; } = string.Empty;
-        public IBrowserFile? MovFile { get; set; }
+        public List<IBrowserFile> MovFiles { get; set; } = new();
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
@@ -1544,6 +1716,35 @@
     }
 
     private bool IsSubmitDisabled => isSubmitting;
+    private bool HasCompletedVerification
+        => !string.IsNullOrWhiteSpace(photoVerificationImage)
+            || !string.IsNullOrWhiteSpace(emailVerificationVerifiedEmail);
+
+    private bool RequiresEmailVerificationForTimeOut
+        => entryModel.LogType == "OUT" && timeOutRequiresEmailVerification;
+
+    private string VerificationButtonText
+        => !string.IsNullOrWhiteSpace(photoVerificationImage)
+            ? "Photo Verified"
+            : !string.IsNullOrWhiteSpace(emailVerificationVerifiedEmail)
+                ? "Email Verified"
+                : RequiresEmailVerificationForTimeOut
+                    ? "Email Verification Required"
+                    : "Verification";
+
+    private string VerificationStatusLabel
+        => HasCompletedVerification ? "Verified" : "Not verified";
+
+    private string EmailVerificationStatusText
+        => string.IsNullOrWhiteSpace(emailVerificationVerifiedEmail)
+            ? "Ready for email code"
+            : "Email verified";
+
+    private string EmailVerificationHelpText
+        => string.IsNullOrWhiteSpace(emailVerificationPendingCode)
+            ? "Send a code before verifying."
+            : $"Code expires at {emailVerificationCodeExpiresAt?.ToString("h:mm tt") ?? "-"}; {Math.Max(0, 5 - emailVerificationAttempts)} attempt(s) left.";
+
     private string PhotoVerificationStatusLabel
         => string.IsNullOrWhiteSpace(photoVerificationImage)
             ? "No photo"
@@ -1600,6 +1801,8 @@
         var todayLog = await Db.AttendanceLogsWfh
             .AsNoTracking()
             .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == DateTime.Today);
+
+        ApplyTimeOutVerificationRequirement(todayLog);
 
         pendingSubmissionTime = DateTime.Now;
 
@@ -1684,13 +1887,26 @@
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(photoVerificationImage))
+            await RefreshTimeOutVerificationRequirementAsync();
+            if (RequiresEmailVerificationForTimeOut && string.IsNullOrWhiteSpace(emailVerificationVerifiedEmail))
             {
                 ToastService.Show(new ToastMessage
                 {
                     Type = ToastType.Warning,
-                    Title = "Photo required",
-                    Message = "Capture a photo verification before submitting your WFH log.",
+                    Title = "Email verification required",
+                    Message = "Your WFH time IN used email verification, so time OUT must also use email verification.",
+                    Duration = 5000
+                });
+                return;
+            }
+
+            if (!HasCompletedVerification)
+            {
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = "Verification required",
+                    Message = "Complete photo or email verification before submitting your WFH log.",
                     Duration = 4000
                 });
                 return;
@@ -1698,15 +1914,26 @@
 
             var today = DateTime.Today;
             var now = submissionTime ?? DateTime.Now;
-            var photoVerificationPath = await SavePhotoVerificationAsync(photoVerificationImage, employee);
-            if (string.IsNullOrWhiteSpace(photoVerificationPath))
-            {
-                return;
-            }
 
             var log = await Db.AttendanceLogsWfh
                 .Include(l => l.ExceptionCondition)
                 .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == today);
+
+            var verificationValue = string.Empty;
+            if (!string.IsNullOrWhiteSpace(photoVerificationImage))
+            {
+                var photoPath = await SavePhotoVerificationAsync(photoVerificationImage, employee, entryModel.LogType);
+                if (string.IsNullOrWhiteSpace(photoPath))
+                {
+                    return;
+                }
+
+                verificationValue = BuildPhotoVerificationValue(log?.Verification ?? string.Empty, photoPath, entryModel.LogType);
+            }
+            else
+            {
+                verificationValue = emailVerificationVerifiedEmail.Trim();
+            }
 
             if (entryModel.LogType == "OUT" && (log is null || !log.TimeIn.HasValue))
             {
@@ -1789,13 +2016,13 @@
 
                 log.TimeOut = now;
                 log.Accomplishment = entryModel.Accomplishment.Trim();
-                log.Mov = await SaveMovFileAsync(entryModel.MovFile) ?? log.Mov;
+                log.Mov = await SaveMovFilesAsync(entryModel.MovFiles, employee) ?? log.Mov;
             }
 
             log.Tardiness = CalculateWfhTardiness(log.TimeIn);
-            log.PhotoVerification = string.IsNullOrWhiteSpace(photoVerificationPath)
-                ? log.PhotoVerification
-                : photoVerificationPath;
+            log.Verification = string.IsNullOrWhiteSpace(verificationValue)
+                ? log.Verification
+                : verificationValue;
 
             await Db.SaveChangesAsync();
 
@@ -1813,7 +2040,7 @@
             employeeSearchResults.Clear();
             employeeSearchText = string.Empty;
             showEmployeeResults = false;
-            ResetPhotoVerification();
+            ResetVerification();
             pendingSubmissionTime = null;
             confirmationTimeIn = null;
             confirmationTimeOut = null;
@@ -1835,7 +2062,7 @@
             var shouldStopPhotoCamera = showPhotoVerificationModal;
             selectedEmployee = null;
             showSubmitConfirmation = false;
-            ResetPhotoVerification();
+            ResetVerification();
             if (shouldStopPhotoCamera)
             {
                 await StopPhotoCameraAsync();
@@ -1897,10 +2124,46 @@
         dotNetRef?.Dispose();
     }
 
-    private async Task HandleMovSelected(InputFileChangeEventArgs e)
+    private Task HandleMovSelected(InputFileChangeEventArgs e)
     {
-        entryModel.MovFile = e.File;
-        entryModel.MovFileName = e.File?.Name ?? string.Empty;
+        var selectedFiles = e.GetMultipleFiles();
+        var validFiles = new List<IBrowserFile>();
+
+        foreach (var file in selectedFiles)
+        {
+            if (!IsAllowedMovFile(file))
+            {
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = "Unsupported file",
+                    Message = $"File '{file.Name}' is not supported. Only PDF files are accepted.",
+                    Duration = 5000
+                });
+                continue;
+            }
+
+            if (file.Size > 10 * 1024 * 1024)
+            {
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = "File too large",
+                    Message = $"File '{file.Name}' exceeds the 10 MB limit.",
+                    Duration = 5000
+                });
+                continue;
+            }
+
+            validFiles.Add(file);
+        }
+
+        entryModel.MovFiles = validFiles;
+        entryModel.MovFileName = validFiles.Count == 0
+            ? string.Empty
+            : string.Join(", ", validFiles.Select(file => file.Name));
+
+        return Task.CompletedTask;
     }
 
     private string GetOptionClass(string type)
@@ -1924,18 +2187,13 @@
 
     private string GetSectionClass(string type) => entryModel.LogType == type ? "transition-panel active" : "transition-panel";
 
-    private string GetPhotoVerificationFieldClass()
+    private string GetVerificationButtonClass()
     {
-        var classes = new List<string> { "photo-verification-field" };
+        var classes = new List<string> { "verification-button" };
 
-        if (!string.IsNullOrWhiteSpace(photoVerificationImage))
+        if (HasCompletedVerification)
         {
             classes.Add("verified");
-        }
-
-        if (isSubmitting)
-        {
-            classes.Add("disabled");
         }
 
         return string.Join(" ", classes);
@@ -1968,9 +2226,10 @@
         return string.Join(" ", classes);
     }
 
-    private void SelectLogType(string type)
+    private async Task SelectLogType(string type)
     {
         entryModel.LogType = type;
+        await RefreshTimeOutVerificationRequirementAsync();
         editContext.NotifyFieldChanged(new FieldIdentifier(entryModel, nameof(EtrEntryModel.LogType)));
     }
 
@@ -2010,7 +2269,7 @@
         showSubmitConfirmation = false;
         if (shouldResetPhoto)
         {
-            ResetPhotoVerification();
+            ResetVerification();
         }
         pendingSubmissionTime = null;
         confirmationTimeIn = null;
@@ -2018,10 +2277,7 @@
         ClearFieldValidation(nameof(EtrEntryModel.IdNumber));
         editContext.NotifyFieldChanged(new FieldIdentifier(entryModel, nameof(EtrEntryModel.IdNumber)));
         await UnregisterOutsideClickAsync();
-        if (string.IsNullOrWhiteSpace(photoVerificationImage))
-        {
-            await OpenPhotoVerificationModal();
-        }
+        await RefreshTimeOutVerificationRequirementAsync();
     }
 
     [JSInvokable]
@@ -2046,6 +2302,299 @@
             pendingStartPhotoCamera = false;
             await StartPhotoCameraAsync();
         }
+    }
+
+    private async Task OpenVerificationAsync()
+    {
+        await RefreshTimeOutVerificationRequirementAsync();
+        if (RequiresEmailVerificationForTimeOut)
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Information,
+                Title = "Email verification required",
+                Message = "Your WFH time IN used email verification, so time OUT must also use email verification.",
+                Duration = 4500
+            });
+            await ChooseEmailVerificationAsync();
+            return;
+        }
+
+        OpenVerificationChoiceModal();
+    }
+
+    private void OpenVerificationChoiceModal()
+    {
+        showVerificationChoiceModal = true;
+    }
+
+    private void CloseVerificationChoiceModal()
+    {
+        showVerificationChoiceModal = false;
+    }
+
+    private async Task ChoosePhotoVerificationAsync()
+    {
+        await RefreshTimeOutVerificationRequirementAsync();
+        if (RequiresEmailVerificationForTimeOut)
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Email verification required",
+                Message = "Photo verification cannot be used for time OUT because time IN used email verification.",
+                Duration = 5000
+            });
+            await ChooseEmailVerificationAsync();
+            return;
+        }
+
+        showVerificationChoiceModal = false;
+        ResetEmailVerification(keepModalState: false);
+        await OpenPhotoVerificationModal();
+    }
+
+    private async Task ChooseEmailVerificationAsync()
+    {
+        showVerificationChoiceModal = false;
+        await ClosePhotoVerificationModalAsync();
+        photoVerificationImage = string.Empty;
+        photoCameraMessage = string.Empty;
+        showEmailVerificationModal = true;
+    }
+
+    private void CloseEmailVerificationModal()
+    {
+        if (isSendingEmailCode)
+        {
+            return;
+        }
+
+        showEmailVerificationModal = false;
+    }
+
+    private void HandleEmailVerificationAddressChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        emailVerificationAddress = value;
+        if (!string.Equals(emailVerificationVerifiedEmail, value.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            emailVerificationVerifiedEmail = string.Empty;
+        }
+    }
+
+    private void HandleEmailVerificationCodeChanged(ChangeEventArgs e)
+    {
+        emailVerificationCodeInput = Regex.Replace(e.Value?.ToString() ?? string.Empty, "[^0-9]", "");
+        if (emailVerificationCodeInput.Length > 6)
+        {
+            emailVerificationCodeInput = emailVerificationCodeInput[..6];
+        }
+    }
+
+    private async Task SendEmailVerificationCodeAsync()
+    {
+        if (isSendingEmailCode)
+        {
+            return;
+        }
+
+        var recipient = emailVerificationAddress.Trim();
+        if (!IsValidEmailAddress(recipient))
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Invalid email",
+                Message = "Enter a valid email address to receive the code.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        isSendingEmailCode = true;
+        try
+        {
+            var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+            await SendVerificationEmailAsync(recipient, code);
+
+            emailVerificationPendingCode = code;
+            emailVerificationPendingEmail = recipient;
+            emailVerificationVerifiedEmail = string.Empty;
+            emailVerificationCodeInput = string.Empty;
+            emailVerificationCodeExpiresAt = DateTime.Now.AddMinutes(5);
+            emailVerificationAttempts = 0;
+
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Success,
+                Title = "Code sent",
+                Message = $"A verification code was sent to {recipient}.",
+                Duration = 4000
+            });
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Error,
+                Title = "Email failed",
+                Message = GetEmailVerificationFailureMessage(ex),
+                Duration = 8000
+            });
+        }
+        finally
+        {
+            isSendingEmailCode = false;
+        }
+    }
+
+    private async Task SendVerificationEmailAsync(string recipient, string code)
+    {
+        var senderEmail = Configuration["Email:Smtp:SenderEmail"] ?? "bswmetrmailer@gmail.com";
+        var senderPassword = (Configuration["Email:Smtp:Password"] ?? "BpL84Nd1PpXY").Replace(" ", "");
+        var senderName = Configuration["Email:Smtp:SenderName"] ?? "BSWM ETRS";
+        var host = Configuration["Email:Smtp:Host"] ?? "smtp.gmail.com";
+        var port = int.TryParse(Configuration["Email:Smtp:Port"], out var configuredPort) ? configuredPort : 587;
+
+        using var message = new MailMessage
+        {
+            From = new MailAddress(senderEmail, senderName),
+            Subject = "WFH Verification Code",
+            Body = $"Your WFH verification code is {code}. This code expires in 5 minutes.",
+            IsBodyHtml = false
+        };
+        message.To.Add(recipient);
+
+        using var client = new SmtpClient(host, port)
+        {
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            EnableSsl = true,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(senderEmail, senderPassword)
+        };
+
+        await client.SendMailAsync(message);
+    }
+
+    private static string GetEmailVerificationFailureMessage(Exception ex)
+    {
+        var message = ex.Message;
+        if (message.Contains("Authentication Required", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("not authenticated", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("5.7.0", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Gmail refused the sender login. Use a Gmail App Password for bswmetrmailer@gmail.com, then put that 16-character app password in Email:Smtp:Password.";
+        }
+
+        return $"Could not send the verification code: {message}";
+    }
+
+    private void VerifyEmailCodeAsync()
+    {
+        if (string.IsNullOrWhiteSpace(emailVerificationPendingCode)
+            || string.IsNullOrWhiteSpace(emailVerificationPendingEmail)
+            || emailVerificationCodeExpiresAt is null)
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Code required",
+                Message = "Send a verification code before verifying.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        if (DateTime.Now > emailVerificationCodeExpiresAt.Value)
+        {
+            ClearPendingEmailCode();
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Code expired",
+                Message = "Send a new verification code and try again.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        if (!string.Equals(emailVerificationAddress.Trim(), emailVerificationPendingEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Email changed",
+                Message = "Send a new code for the current email address.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        emailVerificationAttempts++;
+        if (!string.Equals(emailVerificationCodeInput.Trim(), emailVerificationPendingCode, StringComparison.Ordinal))
+        {
+            if (emailVerificationAttempts >= 5)
+            {
+                ClearPendingEmailCode();
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = "Too many attempts",
+                    Message = "Send a new verification code and try again.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Warning,
+                Title = "Invalid code",
+                Message = $"The code is incorrect. {5 - emailVerificationAttempts} attempt(s) left.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        emailVerificationVerifiedEmail = emailVerificationPendingEmail;
+        ClearPendingEmailCode();
+        showEmailVerificationModal = false;
+
+        ToastService.Show(new ToastMessage
+        {
+            Type = ToastType.Success,
+            Title = "Email verified",
+            Message = "Email verification is complete.",
+            Duration = 3500
+        });
+    }
+
+    private static bool IsValidEmailAddress(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        try
+        {
+            var address = new MailAddress(value.Trim());
+            return string.Equals(address.Address, value.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void ClearPendingEmailCode()
+    {
+        emailVerificationPendingCode = string.Empty;
+        emailVerificationPendingEmail = string.Empty;
+        emailVerificationCodeInput = string.Empty;
+        emailVerificationCodeExpiresAt = null;
+        emailVerificationAttempts = 0;
     }
 
     private async Task OpenPhotoVerificationModal()
@@ -2103,6 +2652,7 @@
         try
         {
             photoVerificationImage = await JS.InvokeAsync<string>("etrWorkFromHome.capturePhoto", photoVideoRef);
+            ResetEmailVerification(keepModalState: false);
             photoCameraMessage = string.Empty;
             await StopPhotoCameraAsync();
             isPhotoCaptureClosing = true;
@@ -2129,13 +2679,26 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private void ResetPhotoVerification()
+    private void ResetVerification()
     {
         photoVerificationImage = string.Empty;
         photoCameraMessage = string.Empty;
         showPhotoVerificationModal = false;
         pendingStartPhotoCamera = false;
         isPhotoCaptureClosing = false;
+        ResetEmailVerification(keepModalState: false);
+        showVerificationChoiceModal = false;
+    }
+
+    private void ResetEmailVerification(bool keepModalState)
+    {
+        emailVerificationAddress = string.Empty;
+        emailVerificationVerifiedEmail = string.Empty;
+        ClearPendingEmailCode();
+        if (!keepModalState)
+        {
+            showEmailVerificationModal = false;
+        }
     }
 
     private async Task RegisterOutsideClickAsync()
@@ -2190,27 +2753,46 @@
         return hasLetter && alphaNumericCount >= 10;
     }
 
-    private async Task<string?> SaveMovFileAsync(IBrowserFile? file)
+    private string GetMovUploadLabel()
+        => entryModel.MovFiles.Count == 0
+            ? "No file chosen."
+            : string.Join(", ", entryModel.MovFiles.Select(file => file.Name));
+
+    private static bool IsAllowedMovFile(IBrowserFile file)
     {
-        if (file is null)
+        var extension = Path.GetExtension(file.Name);
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            return false;
+        }
+
+        var normalizedExtension = extension.Trim().ToLowerInvariant();
+        return normalizedExtension == ".pdf";
+    }
+
+    private async Task<string?> SaveMovFilesAsync(IReadOnlyList<IBrowserFile>? files, Employee employee)
+    {
+        if (files is null || files.Count == 0)
         {
             return null;
         }
-        // Read configured upload path from appsettings (e.g. a NAS UNC path)
+
         var configuredPath = Configuration["Uploads:WfhMovPath"];
+        var savedPaths = new List<string>();
+        const long maxFileSizeBytes = 10 * 1024 * 1024;
 
-        var safeName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Path.GetFileName(file.Name)}";
-
-        async Task<string?> WriteToPathAsync(string root, bool returnWebRelative, bool showFailureToast)
+        async Task<string?> WriteToPathAsync(IBrowserFile file, string root, bool returnWebRelative, bool showFailureToast)
         {
             try
             {
                 var uploadsRootResolved = Path.IsPathRooted(root) ? root : Path.Combine(Environment.ContentRootPath, root);
-                Directory.CreateDirectory(uploadsRootResolved);
+                var directory = GetEmployeeUploadDirectory(uploadsRootResolved, employee, "FILES");
+                Directory.CreateDirectory(directory);
 
-                var fullPath = Path.Combine(uploadsRootResolved, safeName);
+                var safeName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Path.GetFileName(file.Name)}";
+                var fullPath = Path.Combine(directory, safeName);
 
-                await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+                await using var stream = file.OpenReadStream(maxFileSizeBytes);
                 await using var fileStream = File.Create(fullPath);
                 await stream.CopyToAsync(fileStream);
 
@@ -2231,7 +2813,7 @@
                     {
                         Type = ToastType.Error,
                         Title = "File upload failed",
-                        Message = $"Could not save MOV: {ex.Message}",
+                        Message = $"Could not save MOV '{file.Name}': {ex.Message}",
                         Duration = 6000
                     });
                 }
@@ -2240,27 +2822,49 @@
             }
         }
 
-        // Try configured path first
-        if (!string.IsNullOrWhiteSpace(configuredPath))
+        foreach (var file in files)
         {
-            var result = await WriteToPathAsync(configuredPath, false, false);
-            if (!string.IsNullOrWhiteSpace(result))
+            if (!IsAllowedMovFile(file))
             {
-                return result;
+                continue;
             }
 
-            // fallback to wwwroot/uploads/wfh-mov if configured path failed
-            var fallback = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
-            var fallbackResult = await WriteToPathAsync(fallback, true, true);
-            return fallbackResult;
+            if (file.Size > maxFileSizeBytes)
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(configuredPath))
+            {
+                var result = await WriteToPathAsync(file, configuredPath, false, false);
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    savedPaths.Add(result);
+                    continue;
+                }
+
+                var fallback = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
+                var fallbackResult = await WriteToPathAsync(file, fallback, true, true);
+                if (!string.IsNullOrWhiteSpace(fallbackResult))
+                {
+                    savedPaths.Add(fallbackResult);
+                }
+            }
+            else
+            {
+                var defaultRoot = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
+                var result = await WriteToPathAsync(file, defaultRoot, true, true);
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    savedPaths.Add(result);
+                }
+            }
         }
 
-        // No configured path: write under wwwroot/uploads/wfh-mov and return web relative path
-        var defaultRoot = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
-        return await WriteToPathAsync(defaultRoot, true, true);
+        return savedPaths.Count == 0 ? null : string.Join(";", savedPaths);
     }
 
-    private async Task<string?> SavePhotoVerificationAsync(string? dataUrl, Employee employee)
+    private async Task<string?> SavePhotoVerificationAsync(string? dataUrl, Employee employee, string logType)
     {
         if (string.IsNullOrWhiteSpace(dataUrl))
         {
@@ -2296,16 +2900,18 @@
             safeId = employee.EmployeeId.ToString();
         }
 
-        var safeName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{safeId}_photo-verification.jpg";
+        var safeType = logType.Equals("OUT", StringComparison.OrdinalIgnoreCase) ? "time-out" : "time-in";
+        var safeName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{safeId}_photo-verification-{safeType}.jpg";
 
         async Task<string?> WriteToPathAsync(string root, bool returnWebRelative, bool showFailureToast)
         {
             try
             {
                 var uploadsRootResolved = Path.IsPathRooted(root) ? root : Path.Combine(Environment.ContentRootPath, root);
-                Directory.CreateDirectory(uploadsRootResolved);
+                var directory = GetEmployeeUploadDirectory(uploadsRootResolved, employee, "PHOTO-VERIFICATION");
+                Directory.CreateDirectory(directory);
 
-                var fullPath = Path.Combine(uploadsRootResolved, safeName);
+                var fullPath = Path.Combine(directory, safeName);
                 await File.WriteAllBytesAsync(fullPath, photoBytes);
 
                 if (returnWebRelative)
@@ -2348,6 +2954,92 @@
 
         var defaultRoot = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-photo-verification");
         return await WriteToPathAsync(defaultRoot, true, true);
+    }
+
+    private static string GetEmployeeUploadDirectory(string root, Employee employee, string leafFolderName)
+    {
+        var pathSegments = new List<string> { root };
+        var divisionSegments = (employee.DivisionCenterUnit ?? string.Empty)
+            .Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(SanitizePathSegment)
+            .Where(s => !string.IsNullOrWhiteSpace(s));
+
+        pathSegments.AddRange(divisionSegments);
+        var employeeFolder = $"{SanitizePathSegment(employee.IdNumber)}-{SanitizePathSegment(FormatEmployeeName(employee))}";
+        pathSegments.Add(employeeFolder);
+        pathSegments.Add(leafFolderName);
+
+        return Path.Combine(pathSegments.ToArray());
+    }
+
+    private static string SanitizePathSegment(string? segment)
+    {
+        if (string.IsNullOrWhiteSpace(segment))
+        {
+            return string.Empty;
+        }
+
+        var normalized = segment.Trim();
+        normalized = Regex.Replace(normalized, "[<>:\"/\\|?*,]", string.Empty);
+        normalized = Regex.Replace(normalized, "\\s+", " ").Trim();
+        return normalized.Trim(' ', ',');
+    }
+
+    private static string BuildPhotoVerificationValue(string existingVerification, string newPhotoUrl, string logType)
+    {
+        var values = SplitPhotoVerificationValue(existingVerification);
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var value in values)
+        {
+            var trimmed = value.Trim();
+            if (trimmed.StartsWith("time-in:", StringComparison.OrdinalIgnoreCase))
+            {
+                result["time-in"] = trimmed["time-in:".Length..].Trim();
+            }
+            else if (trimmed.StartsWith("time-out:", StringComparison.OrdinalIgnoreCase))
+            {
+                result["time-out"] = trimmed["time-out:".Length..].Trim();
+            }
+            else if (!result.ContainsKey("time-in"))
+            {
+                result["time-in"] = trimmed;
+            }
+            else if (!result.ContainsKey("time-out"))
+            {
+                result["time-out"] = trimmed;
+            }
+        }
+
+        var key = logType.Equals("OUT", StringComparison.OrdinalIgnoreCase) ? "time-out" : "time-in";
+        result[key] = newPhotoUrl;
+
+        return string.Join("||", result
+            .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Value))
+            .Select(kvp => $"{kvp.Key}:{kvp.Value}"));
+    }
+
+    private static List<string> SplitPhotoVerificationValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return new();
+        }
+
+        var trimmed = value.Trim();
+        var separators = new[] { "||", "|", ";", "\n" };
+        foreach (var separator in separators)
+        {
+            if (trimmed.Contains(separator, StringComparison.Ordinal))
+            {
+                return trimmed
+                    .Split(separator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .ToList();
+            }
+        }
+
+        return new List<string> { trimmed };
     }
 
     private static string CalculateWfhTardiness(DateTime? timeIn)
@@ -2441,4 +3133,34 @@
         validationMessageStore.Clear(fieldIdentifier);
         editContext.NotifyValidationStateChanged();
     }
+
+    private void ApplyTimeOutVerificationRequirement(AttendanceLogWfh? todayLog)
+    {
+        timeOutRequiresEmailVerification = todayLog is not null
+            && IsEmailVerificationValue(todayLog.Verification)
+            && todayLog.TimeIn.HasValue;
+    }
+
+    private async Task RefreshTimeOutVerificationRequirementAsync()
+    {
+        if (selectedEmployee is null)
+        {
+            timeOutRequiresEmailVerification = false;
+            return;
+        }
+
+        var todayLog = await Db.AttendanceLogsWfh
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.EmployeeId == selectedEmployee.EmployeeId && l.AttendanceDate == DateTime.Today);
+
+        ApplyTimeOutVerificationRequirement(todayLog);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static bool IsEmailVerificationValue(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+            && value.Contains('@', StringComparison.Ordinal)
+            && !value.Contains('/', StringComparison.Ordinal)
+            && !value.Contains('\\', StringComparison.Ordinal);
 }
+

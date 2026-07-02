@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,27 +6,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Financial.Migrations
 {
     /// <inheritdoc />
-    public partial class CreateBiometricDevices : Migration
+    public partial class CreateInitialSchema : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "BiometricDevices",
-                columns: table => new
-                {
-                    BiometricDeviceId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    DeviceName = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    Location = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    SerialNumber = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_BiometricDevices", x => x.BiometricDeviceId);
-                });
-
             migrationBuilder.CreateTable(
                 name: "Employees",
                 columns: table => new
@@ -37,7 +21,7 @@ namespace Financial.Migrations
                     LastName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     FirstName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     MiddleName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    DivisionCenterUnit = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    DivisionCenterAdminUnit = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Designation = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Status = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false)
                 },
@@ -76,7 +60,7 @@ namespace Financial.Migrations
                     Username = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Password = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Role = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    DivisionCenterUnit = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    DivisionCenterAdminUnit = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Designation = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     AccessLevel = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     RememberToken = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -96,29 +80,22 @@ namespace Financial.Migrations
                     AttendanceLogId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     EmployeeId = table.Column<int>(type: "int", nullable: false),
-                    BiometricDeviceId = table.Column<int>(type: "int", nullable: true),
                     IdNumber = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     LastName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     FirstName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     MiddleName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    DivisionCenterUnit = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    DivisionCenterAdminUnit = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Designation = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     TimeInAm = table.Column<DateTime>(type: "datetime2", nullable: true),
                     TimeOutAm = table.Column<DateTime>(type: "datetime2", nullable: true),
                     TimeInPm = table.Column<DateTime>(type: "datetime2", nullable: true),
                     TimeOutPm = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    Tardiness = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    LateUndertime = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     AttendanceDate = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AttendanceLogs", x => x.AttendanceLogId);
-                    table.ForeignKey(
-                        name: "FK_AttendanceLogs_BiometricDevices_BiometricDeviceId",
-                        column: x => x.BiometricDeviceId,
-                        principalTable: "BiometricDevices",
-                        principalColumn: "BiometricDeviceId",
-                        onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "FK_AttendanceLogs_Employees_EmployeeId",
                         column: x => x.EmployeeId,
@@ -138,14 +115,14 @@ namespace Financial.Migrations
                     LastName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     FirstName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     MiddleName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    DivisionCenterUnit = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    DivisionCenterAdminUnit = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Designation = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Target = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Accomplishment = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Mov = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     TimeIn = table.Column<DateTime>(type: "datetime2", nullable: true),
                     TimeOut = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    Tardiness = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    LateUndertime = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     WorkArrangement = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     ExceptionConditionId = table.Column<int>(type: "int", nullable: true),
                     TagUpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -169,11 +146,6 @@ namespace Financial.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AttendanceLogs_BiometricDeviceId",
-                table: "AttendanceLogs",
-                column: "BiometricDeviceId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_AttendanceLogs_EmployeeId_AttendanceDate",
                 table: "AttendanceLogs",
                 columns: new[] { "EmployeeId", "AttendanceDate" });
@@ -187,12 +159,6 @@ namespace Financial.Migrations
                 name: "IX_AttendanceLogsWfh_ExceptionConditionId",
                 table: "AttendanceLogsWfh",
                 column: "ExceptionConditionId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_BiometricDevices_SerialNumber",
-                table: "BiometricDevices",
-                column: "SerialNumber",
-                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Employees_IdNumber",
@@ -224,9 +190,6 @@ namespace Financial.Migrations
 
             migrationBuilder.DropTable(
                 name: "UserAccounts");
-
-            migrationBuilder.DropTable(
-                name: "BiometricDevices");
 
             migrationBuilder.DropTable(
                 name: "Employees");

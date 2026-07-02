@@ -210,18 +210,18 @@
                                 </div>
                             </div>
                             <div class="attendance-filter-field">
-                                <label class="attendance-table-toolbar-label" for="attendanceFilterDivision">Division / Unit</label>
+                                <label class="attendance-table-toolbar-label" for="attendanceFilterDivision">Division/Center/Admin Unit</label>
                                 <div class="attendance-filter-select-wrap">
                                     <button type="button"
                                             id="attendanceFilterDivision"
                                             class="attendance-filter-select-trigger @(activeFilterField == "division" ? "active" : null)"
                                             @onclick='() => ToggleFilterField("division")'>
-                                        <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions / Units")</span>
+                                        <span class="attendance-filter-select-value">@DisplayValue(filterDivision, "All Divisions/Centers/Admin Units")</span>
                                         <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
                                     </button>
 
                                     <div class="attendance-filter-select-menu @(activeFilterField == "division" ? "show" : null)">
-                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions / Units</button>
+                                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(filterDivision) ? "active" : null)" @onclick='() => SetFilterValue("division", string.Empty)'>All Divisions/Centers/Admin Units</button>
                                         @foreach (var option in CurrentDivisionOptions)
                                         {
                                             <button type="button" class="attendance-filter-select-option @(string.Equals(filterDivision, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SetFilterValue("division", option)'>@option</button>
@@ -373,13 +373,13 @@
                             <th class="attendance-actions-column">Actions</th>
                             <th>@SortHeader("ID Number", "id", false)</th>
                             <th>@SortHeader("Employee", "employee", false)</th>
-                            <th>@SortHeader("Division / Unit", "division", false)</th>
+                            <th>@SortHeader("Division/Center/Admin Unit", "division", false)</th>
                             <th>@SortHeader("Designation", "designation", false)</th>
                             <th>@SortHeader("Status", "status", false)</th>
                             <th>Attendance Date</th>
                             <th>@SortHeader("AM", "am", false)</th>
                             <th>@SortHeader("PM", "pm", false)</th>
-                            <th>Late/Undertime</th>
+                            <th>LATE/UNDERTIME</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -443,18 +443,18 @@
                             <th class="attendance-actions-column">Actions</th>
                             <th>@SortHeader("ID Number", "id", true)</th>
                             <th>@SortHeader("Employee", "employee", true)</th>
-                            <th>@SortHeader("Division / Unit", "division", true)</th>
+                            <th>@SortHeader("Division/Center/Admin Unit", "division", true)</th>
                             <th>@SortHeader("Designation", "designation", true)</th>
                             <th>@SortHeader("Status", "status", true)</th>
                             <th>Attendance Date</th>
                             <th>Target</th>
                             <th>Accomplishment</th>
                             <th>MOV</th>
-                            <th>Photo Verification</th>
+                            <th>Verification</th>
                             <th>Arrangement</th>
                             <th>@SortHeader("Time In", "timein", true)</th>
                             <th>@SortHeader("Time Out", "timeout", true)</th>
-                            <th>Late/Undertime</th>
+                            <th>LATE/UNDERTIME</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -498,25 +498,49 @@
                                     }
                                     else
                                     {
-                                        <button type="button"
-                                                class="attendance-table-link-button cell-ellipsis"
-                                                title="@log.Mov"
-                                                @onclick="() => OpenWfhDetailWithMovAsync(log)"
-                                                @onclick:stopPropagation="true">Open File</button>
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <button type="button"
+                                                    class="attendance-table-link-button cell-ellipsis"
+                                                    title="@log.Mov"
+                                                    @onclick="() => OpenWfhDetailWithMovAsync(log)"
+                                                    @onclick:stopPropagation="true">Open File</button>
+                                            @if (log.MovApprovalStatus == "Approved")
+                                            {
+                                                <i class="fa-solid fa-check verification-status-icon verification-status-approved" title="Approved" style="flex-shrink: 0;"></i>
+                                            }
+                                            else if (log.MovApprovalStatus == "Rejected")
+                                            {
+                                                <i class="fa-solid fa-xmark verification-status-icon verification-status-rejected" title="Rejected" style="flex-shrink: 0;"></i>
+                                            }
+                                        </div>
                                     }
                                 </td>
                                 <td>
-                                    @if (string.IsNullOrWhiteSpace(log.PhotoVerification))
+                                    @if (string.IsNullOrWhiteSpace(log.Verification))
                                     {
                                         <span class="cell-ellipsis" title="-">-</span>
                                     }
+                                    else if (IsEmailVerificationValue(log.Verification))
+                                    {
+                                        <span class="cell-ellipsis" title="@log.Verification">@log.Verification</span>
+                                    }
                                     else
                                     {
-                                        <button type="button"
-                                                class="attendance-table-link-button cell-ellipsis"
-                                                title="@log.PhotoVerification"
-                                                @onclick="() => OpenWfhDetailWithPhotoVerificationAsync(log)"
-                                                @onclick:stopPropagation="true">Open File</button>
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <button type="button"
+                                                    class="attendance-table-link-button cell-ellipsis"
+                                                    title="@log.Verification"
+                                                    @onclick="() => OpenWfhDetailWithPhotoVerificationAsync(log)"
+                                                    @onclick:stopPropagation="true">Open File</button>
+                                            @if (log.PhotoVerificationApprovalStatus == "Approved")
+                                            {
+                                                <i class="fa-solid fa-check verification-status-icon verification-status-approved" title="Approved" style="flex-shrink: 0;"></i>
+                                            }
+                                            else if (log.PhotoVerificationApprovalStatus == "Rejected")
+                                            {
+                                                <i class="fa-solid fa-xmark verification-status-icon verification-status-rejected" title="Rejected" style="flex-shrink: 0;"></i>
+                                            }
+                                        </div>
                                     }
                                 </td>
                                 <td><span class="cell-ellipsis" title="@GetWorkArrangement(log)">@GetWorkArrangement(log)</span></td>
@@ -631,6 +655,23 @@
                             <div>
                                 <h2 class="attendance-detail-title">@SidecarPreviewTitle</h2>
                             </div>
+                            @if (selectedWfhLog is not null && CurrentUser.HasAccess(AccessPolicy.ApproveVerifications))
+                            {
+                                <div class="attendance-detail-header-actions">
+                                    <button type="button"
+                                            class="btn btn-sm btn-success attendance-detail-header-button"
+                                            @onclick="() => ApproveVerificationSidecarAsync()"
+                                            disabled="@isApprovingVerification">
+                                        <i class="fa-solid fa-check" aria-hidden="true"></i> Accept
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-sm btn-danger attendance-detail-header-button"
+                                            @onclick="() => RejectVerificationSidecarAsync()"
+                                            disabled="@isApprovingVerification">
+                                        <i class="fa-solid fa-xmark" aria-hidden="true"></i> Reject
+                                    </button>
+                                </div>
+                            }
                         </div>
 
                         <div class="attendance-detail-body attendance-mov-preview-body">
@@ -669,9 +710,19 @@
                             else
                             {
                                 <div class="attendance-mov-preview-card">
-                                    <iframe class="attendance-mov-preview-frame"
-                                            src="@MovPreviewFrameUrl"
-                                            title="Means of verification PDF preview"></iframe>
+                                    @if (IsPdfUrl(movPreviewUrl))
+                                    {
+                                        <iframe class="attendance-mov-preview-frame"
+                                                src="@MovPreviewFrameUrl"
+                                                title="Means of verification PDF preview"></iframe>
+                                    }
+                                    else
+                                    {
+                                        <div class="attendance-mov-preview-fallback">
+                                            <p>Means of Verification preview is only available for PDF files.</p>
+                                            <a href="@movPreviewUrl" target="_blank" rel="noopener noreferrer">Open file</a>
+                                        </div>
+                                    }
                                 </div>
                             }
                         </div>
@@ -735,7 +786,7 @@
                                     <strong>@FormatDate(selectedOnsiteLog.AttendanceDate)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
-                                    <span class="attendance-detail-label">Division / Unit</span>
+                                    <span class="attendance-detail-label">Division/Center/Admin Unit</span>
                                     <strong>@DisplayValue(selectedOnsiteLog.DivisionCenterUnit)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
@@ -792,7 +843,7 @@
                                     <strong>@FormatDate(selectedWfhLog.AttendanceDate)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
-                                    <span class="attendance-detail-label">Division / Unit</span>
+                                    <span class="attendance-detail-label">Division/Center/Admin Unit</span>
                                     <strong>@DisplayValue(selectedWfhLog.DivisionCenterUnit)</strong>
                                 </div>
                                 <div class="attendance-detail-field">
@@ -806,11 +857,25 @@
                             <div class="attendance-detail-grid attendance-detail-grid-compact">
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">Time In</span>
-                                    <strong>@FormatClockTime(selectedWfhLog.TimeIn)</strong>
+                                    @if (IsTardinessOverride(selectedWfhLog) || IsVerificationRejected(selectedWfhLog.MovApprovalStatus) || IsVerificationRejected(selectedWfhLog.PhotoVerificationApprovalStatus))
+                                    {
+                                        <strong class="attendance-time-rejected">@FormatClockTime(selectedWfhLog.TimeIn)</strong>
+                                    }
+                                    else
+                                    {
+                                        <strong>@FormatClockTime(selectedWfhLog.TimeIn)</strong>
+                                    }
                                 </div>
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">Time Out</span>
-                                    <strong>@FormatClockTime(selectedWfhLog.TimeOut)</strong>
+                                    @if (IsTardinessOverride(selectedWfhLog) || IsVerificationRejected(selectedWfhLog.MovApprovalStatus) || IsVerificationRejected(selectedWfhLog.PhotoVerificationApprovalStatus))
+                                    {
+                                        <strong class="attendance-time-rejected">@FormatClockTime(selectedWfhLog.TimeOut)</strong>
+                                    }
+                                    else
+                                    {
+                                        <strong>@FormatClockTime(selectedWfhLog.TimeOut)</strong>
+                                    }
                                 </div>
                                 <div class="attendance-detail-field">
                                     <span class="attendance-detail-label">MOV</span>
@@ -820,18 +885,42 @@
                                     }
                                     else
                                     {
-                                        <button type="button" class="attendance-detail-text-action attendance-detail-action-button" @onclick="() => ToggleMovPreviewWithDetailAsync(selectedWfhLog.Mov, FormatName(selectedWfhLog.LastName, selectedWfhLog.FirstName, selectedWfhLog.MiddleName))">@(showMovPreviewWithAttendanceDetail && sidecarPreviewMode == SidecarPreviewMode.Mov ? "Close file" : "Open file")</button>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                            <button type="button" class="attendance-detail-text-action attendance-detail-action-button" @onclick="() => ToggleMovPreviewWithDetailAsync(selectedWfhLog.Mov, FormatName(selectedWfhLog.LastName, selectedWfhLog.FirstName, selectedWfhLog.MiddleName))">@(showMovPreviewWithAttendanceDetail && sidecarPreviewMode == SidecarPreviewMode.Mov ? "Close file" : "Open file")</button>
+                                            @if (selectedWfhLog.MovApprovalStatus == "Approved")
+                                            {
+                                                <i class="fa-solid fa-check verification-status-icon verification-status-approved" title="Approved"></i>
+                                            }
+                                            else if (selectedWfhLog.MovApprovalStatus == "Rejected")
+                                            {
+                                                <i class="fa-solid fa-xmark verification-status-icon verification-status-rejected" title="Rejected"></i>
+                                            }
+                                        </div>
                                     }
                                 </div>
                                 <div class="attendance-detail-field">
-                                    <span class="attendance-detail-label">Photo Verification</span>
-                                    @if (string.IsNullOrWhiteSpace(selectedWfhLog.PhotoVerification))
+                                    <span class="attendance-detail-label">Verification</span>
+                                    @if (string.IsNullOrWhiteSpace(selectedWfhLog.Verification))
                                     {
                                         <strong>-</strong>
                                     }
+                                    else if (IsEmailVerificationValue(selectedWfhLog.Verification))
+                                    {
+                                        <strong>@selectedWfhLog.Verification</strong>
+                                    }
                                     else
                                     {
-                                        <button type="button" class="attendance-detail-text-action attendance-detail-action-button" @onclick="() => TogglePhotoVerificationWithDetailAsync(selectedWfhLog)">@(showMovPreviewWithAttendanceDetail && IsPhotoVerificationSidecar ? "Close file" : "Open file")</button>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                            <button type="button" class="attendance-detail-text-action attendance-detail-action-button" @onclick="() => TogglePhotoVerificationWithDetailAsync(selectedWfhLog)">@(showMovPreviewWithAttendanceDetail && IsPhotoVerificationSidecar ? "Close file" : "Open file")</button>
+                                            @if (selectedWfhLog.PhotoVerificationApprovalStatus == "Approved")
+                                            {
+                                                <i class="fa-solid fa-check verification-status-icon verification-status-approved" title="Approved"></i>
+                                            }
+                                            else if (selectedWfhLog.PhotoVerificationApprovalStatus == "Rejected")
+                                            {
+                                                <i class="fa-solid fa-xmark verification-status-icon verification-status-rejected" title="Rejected"></i>
+                                            }
+                                        </div>
                                     }
                                 </div>
                             </div>
@@ -888,7 +977,7 @@
                         <div class="attendance-input-mode-grid">
                             <button type="button" class="attendance-input-mode-card @(inputLogMode == InputLogMode.Onsite ? "selected" : null)" @onclick='() => SelectInputLogMode(InputLogMode.Onsite)'>
                                 <span class="attendance-input-mode-title">Onsite</span>
-                                <span class="attendance-input-mode-sub">AM / PM biometric-style logs</span>
+                                <span class="attendance-input-mode-sub">AM / PM onsite logs</span>
                             </button>
                             <button type="button" class="attendance-input-mode-card @(inputLogMode == InputLogMode.Wfh ? "selected" : null)" @onclick='() => SelectInputLogMode(InputLogMode.Wfh)'>
                                 <span class="attendance-input-mode-title">WFH</span>
@@ -1110,9 +1199,9 @@
                     </div>
                 </div>
 
-                <div class="attendance-detail-footer">
+                    <div class="attendance-detail-footer">
                     <button type="button" class="attendance-detail-text-action" @onclick="CloseExportLogsModal" disabled="@isExportingLogs">Cancel</button>
-                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@isExportingLogs">@(isExportingLogs ? "Exporting..." : "Export")</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@isExportingLogs">@(isExportingLogs ? "Exporting..." : "Export CSV")</button>
                 </div>
             </div>
         </div>
@@ -1127,13 +1216,40 @@
                         <h2 class="attendance-detail-title">Means of Verification</h2>
                         <div class="attendance-detail-meta">@movPreviewTitle</div>
                     </div>
+                    @if (selectedWfhLog is not null && CurrentUser.HasAccess(AccessPolicy.ApproveVerifications))
+                    {
+                        <div class="attendance-detail-header-actions">
+                            <button type="button"
+                                    class="btn btn-sm btn-success attendance-detail-header-button"
+                                    @onclick="() => ApproveMovVerificationAsync(selectedWfhLog)"
+                                    disabled="@isApprovingVerification">
+                                <i class="fa-solid fa-check" aria-hidden="true"></i> Accept
+                            </button>
+                            <button type="button"
+                                    class="btn btn-sm btn-danger attendance-detail-header-button"
+                                    @onclick="() => RejectMovVerificationAsync(selectedWfhLog)"
+                                    disabled="@isApprovingVerification">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i> Reject
+                            </button>
+                        </div>
+                    }
                 </div>
 
                 <div class="attendance-detail-body attendance-mov-preview-body">
                     <div class="attendance-mov-preview-card">
-                        <iframe class="attendance-mov-preview-frame"
-                                src="@MovPreviewFrameUrl"
-                                title="Means of verification PDF preview"></iframe>
+                        @if (IsPdfUrl(movPreviewUrl))
+                        {
+                            <iframe class="attendance-mov-preview-frame"
+                                    src="@MovPreviewFrameUrl"
+                                    title="Means of verification PDF preview"></iframe>
+                        }
+                        else
+                        {
+                            <div class="attendance-mov-preview-fallback">
+                                <p>Means of Verification preview is only available for PDF files.</p>
+                                <a href="@movPreviewUrl" target="_blank" rel="noopener noreferrer">Open file</a>
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -1156,9 +1272,19 @@
 
                         <div class="attendance-detail-body attendance-mov-preview-body">
                             <div class="attendance-mov-preview-card">
-                                <iframe class="attendance-mov-preview-frame"
-                                        src="@MovPreviewFrameUrl"
-                                        title="Means of verification PDF preview"></iframe>
+                                @if (IsPdfUrl(movPreviewUrl))
+                                {
+                                    <iframe class="attendance-mov-preview-frame"
+                                            src="@MovPreviewFrameUrl"
+                                            title="Means of verification PDF preview"></iframe>
+                                }
+                                else
+                                {
+                                    <div class="attendance-mov-preview-fallback">
+                                        <p>Means of Verification preview is only available for PDF files.</p>
+                                        <a href="@movPreviewUrl" target="_blank" rel="noopener noreferrer">Open file</a>
+                                    </div>
+                                }
                             </div>
                         </div>
                     </div>
@@ -1200,7 +1326,7 @@
                                 <input class="form-control attendance-input-control attendance-input-control-readonly" value="@FormatDate(editLogForm.AttendanceDate)" readonly />
                             </div>
                             <div class="attendance-input-field">
-                                <span class="attendance-detail-label">Late/Undertime</span>
+                                <span class="attendance-detail-label">LATE/UNDERTIME</span>
                                 <div class="attendance-filter-select-wrap attendance-input-select-wrap" @onclick:stopPropagation="true">
                                     <button type="button"
                                             class="attendance-filter-select-trigger attendance-input-control @(showEditTardinessMenu ? "active" : null)"
@@ -2604,6 +2730,40 @@
         letter-spacing: 0.04em;
     }
 
+    .attendance-time-rejected {
+        text-decoration: line-through;
+        text-decoration-thickness: 1.5px;
+        color: var(--etrs-gray-500);
+    }
+
+    .verification-status {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .verification-status-icon {
+        display: inline-flex;
+        font-size: 1rem;
+        width: 1.2rem;
+        height: 1.2rem;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .verification-status-approved {
+        color: #17643a;
+    }
+
+    .verification-status-rejected {
+        color: #b42318;
+    }
+
     .attendance-detail-section-primary .attendance-detail-label {
         font-weight: 500;
     }
@@ -3804,7 +3964,70 @@
     private bool suppressAttendanceDetailEnterAnimation;
     private string movPreviewUrl = string.Empty;
     private string movPreviewTitle = string.Empty;
+    private bool isApprovingVerification;
     private string MovPreviewFrameUrl => BuildPdfPreviewUrl(movPreviewUrl);
+
+    private static bool IsImageUrl(string url)
+        => !string.IsNullOrWhiteSpace(url)
+            && (url.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                || url.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                || url.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)
+                || url.EndsWith(".gif", StringComparison.OrdinalIgnoreCase)
+                || url.EndsWith(".bmp", StringComparison.OrdinalIgnoreCase)
+                || url.EndsWith(".webp", StringComparison.OrdinalIgnoreCase)
+                || url.EndsWith(".tif", StringComparison.OrdinalIgnoreCase)
+                || url.EndsWith(".tiff", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsPdfUrl(string url)
+        => !string.IsNullOrWhiteSpace(url)
+            && url.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+
+    private static string GetMimeType(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return "application/octet-stream";
+        }
+
+        if (url.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return "application/pdf";
+        }
+
+        if (url.EndsWith(".doc", StringComparison.OrdinalIgnoreCase)
+            || url.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+        {
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        }
+
+        if (url.EndsWith(".xls", StringComparison.OrdinalIgnoreCase)
+            || url.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        }
+
+        if (url.EndsWith(".ppt", StringComparison.OrdinalIgnoreCase)
+            || url.EndsWith(".pptx", StringComparison.OrdinalIgnoreCase))
+        {
+            return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        }
+
+        if (url.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            return "text/csv";
+        }
+
+        if (IsImageUrl(url))
+        {
+            return "image/*";
+        }
+
+        return "application/octet-stream";
+    }
+
+    private static string GetMovPreviewUrl(string url)
+        => IsPdfUrl(url) ? BuildPdfPreviewUrl(url) : url;
+
     private int movPreviewOpenVersion;
     private SidecarPreviewMode sidecarPreviewMode = SidecarPreviewMode.Mov;
     private string photoVerificationTimeInUrl = string.Empty;
@@ -4226,14 +4449,55 @@
     private int OnsiteTotalPages => Math.Max(1, (int)Math.Ceiling(filteredOnsiteLogs.Count / (double)pageSize));
     private int WfhTotalPages => Math.Max(1, (int)Math.Ceiling(filteredWfhLogs.Count / (double)pageSize));
 
+    private IQueryable<Employee> ApplyDivisionScope(IQueryable<Employee> query)
+    {
+        if (string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return query;
+        }
+
+        var scope = CurrentUser.DivisionScope.ToArray();
+        return scope.Length == 0
+            ? query.Where(employee => false)
+            : query.Where(employee => scope.Contains(employee.DivisionCenterUnit));
+    }
+
+    private IQueryable<AttendanceLog> ApplyDivisionScope(IQueryable<AttendanceLog> query)
+    {
+        if (string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return query;
+        }
+
+        var scope = CurrentUser.DivisionScope.ToArray();
+        return scope.Length == 0
+            ? query.Where(log => false)
+            : query.Where(log => scope.Contains(log.DivisionCenterUnit));
+    }
+
+    private IQueryable<AttendanceLogWfh> ApplyDivisionScope(IQueryable<AttendanceLogWfh> query)
+    {
+        if (string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return query;
+        }
+
+        var scope = CurrentUser.DivisionScope.ToArray();
+        return scope.Length == 0
+            ? query.Where(log => false)
+            : query.Where(log => scope.Contains(log.DivisionCenterUnit));
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        employeeCount = await Db.Employees.CountAsync();
+        await CurrentUser.InitializeAsync();
+
+        employeeCount = await ApplyDivisionScope(Db.Employees).CountAsync();
         await RefreshAvailablePeriodsAsync(preserveSelections: false);
         await LoadLogsAsync();
 
         // Exceptions Today should reflect today's data across all records
-        var todayWfh = await Db.AttendanceLogsWfh
+        var todayWfh = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Include(l => l.ExceptionCondition)
             .Where(l => l.AttendanceDate.Date == DateTime.Today)
@@ -4315,13 +4579,13 @@
 
     private async Task<List<Period>> GetAvailablePeriodsAsync(DateTime now)
     {
-        var onsiteDates = await Db.AttendanceLogs
+        var onsiteDates = await ApplyDivisionScope(Db.AttendanceLogs)
             .AsNoTracking()
             .Select(l => l.AttendanceDate)
             .Distinct()
             .ToListAsync();
 
-        var wfhDates = await Db.AttendanceLogsWfh
+        var wfhDates = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Where(l => l.ExceptionConditionId == null
                 && l.WorkArrangement == "WFH"
@@ -4460,7 +4724,7 @@
         var endExclusive = filterEnd.Date.AddDays(1);
         await RefreshEmployeeStatusLookupAsync();
 
-        onsiteLogs = await Db.AttendanceLogs
+        onsiteLogs = await ApplyDivisionScope(Db.AttendanceLogs)
             .AsNoTracking()
             .Include(l => l.Employee)
             .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
@@ -4471,12 +4735,12 @@
 
         await PersistCreditedOnsiteTimeInPmAsync(onsiteLogs);
 
-        wfhTaggedCount = await Db.AttendanceLogsWfh
+        wfhTaggedCount = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Where(l => l.AttendanceDate >= start && l.AttendanceDate < endExclusive)
             .CountAsync(l => (l.WorkArrangement ?? "WFH") == "WFH" && l.ExceptionConditionId == null);
 
-        wfhLogs = await Db.AttendanceLogsWfh
+        wfhLogs = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Include(l => l.Employee)
             .Include(l => l.ExceptionCondition)
@@ -4500,7 +4764,7 @@
 
     private async Task RefreshEmployeeStatusLookupAsync()
     {
-        var employees = await Db.Employees
+        var employees = await ApplyDivisionScope(Db.Employees)
             .AsNoTracking()
             .Where(e => !string.IsNullOrWhiteSpace(e.IdNumber))
             .Select(e => new { e.IdNumber, e.Status })
@@ -5052,7 +5316,7 @@
 
     private async Task OpenPhotoVerificationWithDetailAsync(AttendanceLogWfh log)
     {
-        if (string.IsNullOrWhiteSpace(log.PhotoVerification))
+        if (string.IsNullOrWhiteSpace(log.Verification) || IsEmailVerificationValue(log.Verification))
         {
             return;
         }
@@ -5277,21 +5541,76 @@
 
     private static (string TimeInPhoto, string TimeOutPhoto) GetPhotoVerificationImages(AttendanceLogWfh log)
     {
-        var values = SplitPhotoVerificationValue(log.PhotoVerification);
-        if (values.Count >= 2)
+        var values = SplitPhotoVerificationValue(log.Verification);
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var value in values)
         {
-            return (values[0], values[1]);
+            var trimmed = value.Trim();
+            if (trimmed.StartsWith("time-in:", StringComparison.OrdinalIgnoreCase))
+            {
+                result["time-in"] = NormalizePhotoVerificationUrl(trimmed["time-in:".Length..].Trim());
+            }
+            else if (trimmed.StartsWith("time-out:", StringComparison.OrdinalIgnoreCase))
+            {
+                result["time-out"] = NormalizePhotoVerificationUrl(trimmed["time-out:".Length..].Trim());
+            }
+            else if (!result.ContainsKey("time-in"))
+            {
+                result["time-in"] = NormalizePhotoVerificationUrl(trimmed);
+            }
+            else if (!result.ContainsKey("time-out"))
+            {
+                result["time-out"] = NormalizePhotoVerificationUrl(trimmed);
+            }
         }
 
-        if (values.Count == 1)
+        var timeIn = result.TryGetValue("time-in", out var inUrl) ? inUrl : string.Empty;
+        var timeOut = result.TryGetValue("time-out", out var outUrl) ? outUrl : string.Empty;
+
+        if (string.IsNullOrWhiteSpace(timeIn) && string.IsNullOrWhiteSpace(timeOut) && values.Count == 1)
         {
+            var singleValue = NormalizePhotoVerificationUrl(values[0]);
             return log.TimeOut.HasValue
-                ? (string.Empty, values[0])
-                : (values[0], string.Empty);
+                ? (string.Empty, singleValue)
+                : (singleValue, string.Empty);
         }
 
-        return (string.Empty, string.Empty);
+        return (timeIn, timeOut);
     }
+
+    private static string NormalizePhotoVerificationUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return string.Empty;
+        }
+
+        var normalized = url.Trim();
+        if (normalized.StartsWith("time-in:", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized["time-in:".Length..].Trim();
+        }
+
+        if (normalized.StartsWith("time-out:", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized["time-out:".Length..].Trim();
+        }
+
+        normalized = normalized.Replace('\\', '/');
+        if (normalized.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = "/" + normalized;
+        }
+
+        return normalized;
+    }
+
+    private static bool IsEmailVerificationValue(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+            && value.Contains('@', StringComparison.Ordinal)
+            && !value.Contains('/', StringComparison.Ordinal)
+            && !value.Contains('\\', StringComparison.Ordinal);
 
     private static List<string> SplitPhotoVerificationValue(string? value)
     {
@@ -5832,7 +6151,7 @@
             return;
         }
 
-        var employee = await Db.Employees.FirstOrDefaultAsync(e => e.EmployeeId == inputForm.EmployeeId);
+        var employee = await ApplyDivisionScope(Db.Employees).FirstOrDefaultAsync(e => e.EmployeeId == inputForm.EmployeeId);
         if (employee is null)
         {
             ShowToast(ToastType.Warning, "Employee not found", "The selected employee no longer exists.");
@@ -5894,7 +6213,7 @@
             throw new InvalidOperationException("Enter at least one onsite time value.");
         }
 
-        var wfhTag = await Db.AttendanceLogsWfh
+        var wfhTag = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .AsNoTracking()
             .Include(l => l.ExceptionCondition)
             .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == attendanceDate);
@@ -5904,7 +6223,7 @@
             throw new InvalidOperationException($"{FormatInputEmployeeName(employee)} is tagged as WFH for {attendanceDate:MMMM dd, yyyy} and cannot be manually encoded as onsite.");
         }
 
-        var log = await Db.AttendanceLogs
+        var log = await ApplyDivisionScope(Db.AttendanceLogs)
             .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == attendanceDate);
 
         if (log is null)
@@ -5948,7 +6267,7 @@
             throw new InvalidOperationException("Enter at least time in, time out, target, accomplishment, or means of verification for the WFH log.");
         }
 
-        var log = await Db.AttendanceLogsWfh
+        var log = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == attendanceDate);
 
         if (log is null)
@@ -5983,7 +6302,7 @@
 
     private async Task SaveEditedOnsiteLogAsync()
     {
-        var log = await Db.AttendanceLogs.FirstOrDefaultAsync(l => l.AttendanceLogId == editLogForm.AttendanceLogId);
+        var log = await ApplyDivisionScope(Db.AttendanceLogs).FirstOrDefaultAsync(l => l.AttendanceLogId == editLogForm.AttendanceLogId);
         if (log is null)
         {
             throw new InvalidOperationException("The onsite log no longer exists.");
@@ -6011,7 +6330,7 @@
 
     private async Task SaveEditedWfhLogAsync()
     {
-        var log = await Db.AttendanceLogsWfh
+        var log = await ApplyDivisionScope(Db.AttendanceLogsWfh)
             .Include(l => l.ExceptionCondition)
             .FirstOrDefaultAsync(l => l.AttendanceLogWfhId == editLogForm.AttendanceLogWfhId);
         if (log is null)
@@ -6360,7 +6679,7 @@
 
         pendingRegisterInputEmployeeOutsideClick = true;
 
-        inputEmployeeSearchResults = await Db.Employees
+        inputEmployeeSearchResults = await ApplyDivisionScope(Db.Employees)
             .AsNoTracking()
             .Where(e => e.IdNumber.Contains(query))
             .Where(e => e.Status.StartsWith("Active"))
@@ -7027,7 +7346,7 @@
         }
 
         var idsToUpdate = logsToUpdate.Select(log => log.AttendanceLogId).ToList();
-        var trackedLogs = await Db.AttendanceLogs
+        var trackedLogs = await ApplyDivisionScope(Db.AttendanceLogs)
             .Where(log => idsToUpdate.Contains(log.AttendanceLogId))
             .ToListAsync();
 
@@ -7353,7 +7672,7 @@
         {
             await RefreshEmployeeStatusLookupAsync();
 
-            var exportOnsiteLogs = await Db.AttendanceLogs
+            var exportOnsiteLogs = await ApplyDivisionScope(Db.AttendanceLogs)
                 .AsNoTracking()
                 .Include(l => l.Employee)
                 .Where(l => l.AttendanceDate >= startDate && l.AttendanceDate < endExclusive)
@@ -7362,7 +7681,7 @@
                 .ThenBy(l => l.FirstName)
                 .ToListAsync();
 
-            var exportWfhLogs = await Db.AttendanceLogsWfh
+            var exportWfhLogs = await ApplyDivisionScope(Db.AttendanceLogsWfh)
                 .AsNoTracking()
                 .Include(l => l.Employee)
                 .Include(l => l.ExceptionCondition)
@@ -7447,41 +7766,29 @@
         {
             string.Join(",", new[]
             {
-                "AttendanceLogId",
-                "EmployeeId",
-                "BiometricDeviceId",
-                "IdNumber",
-                "LastName",
-                "FirstName",
-                "MiddleName",
-                "DivisionCenterUnit",
+                "ID Number",
+                "Employee",
+                "Division/Center/Admin Unit",
                 "Designation",
-                "TimeInAm",
-                "TimeOutAm",
-                "TimeInPm",
-                "TimeOutPm",
-                "Late/Undertime",
-                "AttendanceDate"
+                "Status",
+                "Attendance Date",
+                "Time In (AM)",
+                "Time Out (PM)",
+                "Late/Undertime"
             })
         };
 
         rows.AddRange(logs.Select(log => string.Join(",", new[]
         {
-            CsvValue(log.AttendanceLogId),
-            CsvValue(log.EmployeeId),
-            CsvValue(log.BiometricDeviceId),
             CsvValue(log.IdNumber),
-            CsvValue(log.LastName),
-            CsvValue(log.FirstName),
-            CsvValue(log.MiddleName),
+            CsvValue(FormatName(log.LastName, log.FirstName, log.MiddleName)),
             CsvValue(log.DivisionCenterUnit),
             CsvValue(log.Designation),
+            CsvValue(GetOnsiteAttendanceStatus(log)),
+            CsvValue(log.AttendanceDate.ToString("yyyy-MM-dd")),
             CsvValue(log.TimeInAm),
-            CsvValue(log.TimeOutAm),
-            CsvValue(GetCreditedOnsiteTimeInPm(log)),
             CsvValue(log.TimeOutPm),
-            CsvValue(DisplayTardiness(log.Tardiness)),
-            CsvValue(log.AttendanceDate)
+            CsvValue(DisplayTardiness(log.Tardiness))
         })));
 
         return string.Join(global::System.Environment.NewLine, rows);
@@ -7493,45 +7800,33 @@
         {
             string.Join(",", new[]
             {
-                "AttendanceLogWfhId",
-                "EmployeeId",
-                "IdNumber",
-                "LastName",
-                "FirstName",
-                "MiddleName",
-                "DivisionCenterUnit",
+                "ID Number",
+                "Employee",
+                "Division/Center/Admin Unit",
                 "Designation",
+                "Status",
+                "Attendance Date",
                 "Target",
                 "Accomplishment",
-                "Mov",
-                "WorkArrangement",
-                "AttendanceStatus",
-                "TimeIn",
-                "TimeOut",
-                "Late/Undertime",
-                "AttendanceDate"
+                "Time In",
+                "Time Out",
+                "Late/Undertime"
             })
         };
 
         rows.AddRange(logs.Select(log => string.Join(",", new[]
         {
-            CsvValue(log.AttendanceLogWfhId),
-            CsvValue(log.EmployeeId),
             CsvValue(log.IdNumber),
-            CsvValue(log.LastName),
-            CsvValue(log.FirstName),
-            CsvValue(log.MiddleName),
+            CsvValue(FormatName(log.LastName, log.FirstName, log.MiddleName)),
             CsvValue(log.DivisionCenterUnit),
             CsvValue(log.Designation),
+            CsvValue(GetWfhAttendanceStatus(log)),
+            CsvValue(log.AttendanceDate.ToString("yyyy-MM-dd")),
             CsvValue(log.Target),
             CsvValue(log.Accomplishment),
-            CsvValue(log.Mov),
-            CsvValue(GetWorkArrangement(log)),
-            CsvValue(GetWfhAttendanceStatus(log)),
             CsvValue(log.TimeIn),
             CsvValue(log.TimeOut),
-            CsvValue(DisplayTardiness(log.Tardiness)),
-            CsvValue(log.AttendanceDate)
+            CsvValue(DisplayTardiness(log.Tardiness))
         })));
 
         return string.Join(global::System.Environment.NewLine, rows);
@@ -7600,6 +7895,269 @@
         activeFilterField = null;
         _ = InvokeAsync(StateHasChanged);
     }
+
+    private async Task ApproveMovVerificationAsync(AttendanceLogWfh log)
+    {
+        if (isApprovingVerification || log == null)
+        {
+            return;
+        }
+
+        isApprovingVerification = true;
+
+        try
+        {
+            // Fetch a fresh instance to avoid tracking conflicts
+            var dbLog = await Db.AttendanceLogsWfh.FirstOrDefaultAsync(l => l.AttendanceLogWfhId == log.AttendanceLogWfhId);
+            if (dbLog == null)
+            {
+                ShowToast(ToastType.Error, "Error", "Log not found in database.");
+                return;
+            }
+
+            dbLog.MovApprovalStatus = "Approved";
+            dbLog.MovApprovedAt = DateTime.UtcNow;
+            dbLog.MovRejectedAt = null;
+            // clear any manual tardiness override so default/computed tardiness is used
+            dbLog.Tardiness = string.Empty;
+
+            // optimistic UI update so modal/table reflect change immediately
+            if (selectedWfhLog is not null && selectedWfhLog.AttendanceLogWfhId == dbLog.AttendanceLogWfhId)
+            {
+                selectedWfhLog.MovApprovalStatus = dbLog.MovApprovalStatus;
+                selectedWfhLog.MovApprovedAt = dbLog.MovApprovedAt;
+                selectedWfhLog.MovRejectedAt = dbLog.MovRejectedAt;
+                selectedWfhLog.Tardiness = dbLog.Tardiness;
+            }
+
+            Db.AttendanceLogsWfh.Update(dbLog);
+            await Db.SaveChangesAsync();
+
+            await LoadLogsAsync();
+            // refresh selected WFH log reference so detail modal and table reflect changes immediately
+            selectedWfhLog = wfhLogs.FirstOrDefault(l => l.AttendanceLogWfhId == dbLog.AttendanceLogWfhId);
+            _ = InvokeAsync(StateHasChanged);
+            ShowToast(ToastType.Success, "MOV Approved", "MOV has been approved successfully.");
+            CloseMovPreview();
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Error", $"Error saving MOV approval: {ex.Message}");
+        }
+        finally
+        {
+            isApprovingVerification = false;
+        }
+    }
+
+    private async Task RejectMovVerificationAsync(AttendanceLogWfh log)
+    {
+        if (isApprovingVerification || log == null)
+        {
+            return;
+        }
+
+        isApprovingVerification = true;
+
+        try
+        {
+            // Fetch a fresh instance to avoid tracking conflicts
+            var dbLog = await Db.AttendanceLogsWfh.FirstOrDefaultAsync(l => l.AttendanceLogWfhId == log.AttendanceLogWfhId);
+            if (dbLog == null)
+            {
+                ShowToast(ToastType.Error, "Error", "Log not found in database.");
+                return;
+            }
+
+            dbLog.MovApprovalStatus = "Rejected";
+            dbLog.MovRejectedAt = DateTime.UtcNow;
+            dbLog.MovApprovedAt = null;
+            // store as a manual tardiness override so the UI treats this as an explicit "Absent"
+            dbLog.Tardiness = ManualTardinessPrefix + "Absent";
+
+            // optimistic UI update so modal/table reflect change immediately
+            if (selectedWfhLog is not null && selectedWfhLog.AttendanceLogWfhId == dbLog.AttendanceLogWfhId)
+            {
+                selectedWfhLog.MovApprovalStatus = dbLog.MovApprovalStatus;
+                selectedWfhLog.MovRejectedAt = dbLog.MovRejectedAt;
+                selectedWfhLog.MovApprovedAt = dbLog.MovApprovedAt;
+                selectedWfhLog.Tardiness = dbLog.Tardiness;
+            }
+
+            Db.AttendanceLogsWfh.Update(dbLog);
+            await Db.SaveChangesAsync();
+
+            await LoadLogsAsync();
+            // refresh selected WFH log reference so detail modal and table reflect changes immediately
+            selectedWfhLog = wfhLogs.FirstOrDefault(l => l.AttendanceLogWfhId == dbLog.AttendanceLogWfhId);
+            _ = InvokeAsync(StateHasChanged);
+            ShowToast(ToastType.Success, "MOV Rejected", "MOV has been rejected and attendance marked as Absent.");
+            CloseMovPreview();
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Error", $"Error saving MOV rejection: {ex.Message}");
+        }
+        finally
+        {
+            isApprovingVerification = false;
+        }
+    }
+
+    private async Task ApproveVerificationSidecarAsync()
+    {
+        if (selectedWfhLog == null)
+        {
+            return;
+        }
+
+        if (IsPhotoVerificationSidecar)
+        {
+            await ApprovePhotoVerificationAsync(selectedWfhLog);
+        }
+        else
+        {
+            await ApproveMovVerificationAsync(selectedWfhLog);
+        }
+    }
+
+    private async Task RejectVerificationSidecarAsync()
+    {
+        if (selectedWfhLog == null)
+        {
+            return;
+        }
+
+        if (IsPhotoVerificationSidecar)
+        {
+            await RejectPhotoVerificationAsync(selectedWfhLog);
+        }
+        else
+        {
+            await RejectMovVerificationAsync(selectedWfhLog);
+        }
+    }
+
+    private async Task ApprovePhotoVerificationAsync(AttendanceLogWfh log)
+    {
+        if (isApprovingVerification || log == null)
+        {
+            return;
+        }
+
+        isApprovingVerification = true;
+
+        try
+        {
+            // Fetch a fresh instance to avoid tracking conflicts
+            var dbLog = await Db.AttendanceLogsWfh.FirstOrDefaultAsync(l => l.AttendanceLogWfhId == log.AttendanceLogWfhId);
+            if (dbLog == null)
+            {
+                ShowToast(ToastType.Error, "Error", "Log not found in database.");
+                return;
+            }
+
+            dbLog.PhotoVerificationApprovalStatus = "Approved";
+            dbLog.PhotoVerificationApprovedAt = DateTime.UtcNow;
+            dbLog.PhotoVerificationRejectedAt = null;
+            // clear any manual tardiness override so default/computed tardiness is used
+            dbLog.Tardiness = string.Empty;
+
+            // optimistic UI update so modal/table reflect change immediately
+            if (selectedWfhLog is not null && selectedWfhLog.AttendanceLogWfhId == dbLog.AttendanceLogWfhId)
+            {
+                selectedWfhLog.PhotoVerificationApprovalStatus = dbLog.PhotoVerificationApprovalStatus;
+                selectedWfhLog.PhotoVerificationApprovedAt = dbLog.PhotoVerificationApprovedAt;
+                selectedWfhLog.PhotoVerificationRejectedAt = dbLog.PhotoVerificationRejectedAt;
+                selectedWfhLog.Tardiness = dbLog.Tardiness;
+            }
+
+            Db.AttendanceLogsWfh.Update(dbLog);
+            await Db.SaveChangesAsync();
+
+            await LoadLogsAsync();
+            // refresh selected WFH log reference so detail modal and table reflect changes immediately
+            selectedWfhLog = wfhLogs.FirstOrDefault(l => l.AttendanceLogWfhId == dbLog.AttendanceLogWfhId);
+            _ = InvokeAsync(StateHasChanged);
+            ShowToast(ToastType.Success, "Photo Verification Approved", "Photo verification has been approved successfully.");
+            CloseMovPreview();
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Error", $"Error saving photo verification approval: {ex.Message}");
+        }
+        finally
+        {
+            isApprovingVerification = false;
+        }
+    }
+
+    private async Task RejectPhotoVerificationAsync(AttendanceLogWfh log)
+    {
+        if (isApprovingVerification || log == null)
+        {
+            return;
+        }
+
+        isApprovingVerification = true;
+
+        try
+        {
+            // Fetch a fresh instance to avoid tracking conflicts
+            var dbLog = await Db.AttendanceLogsWfh.FirstOrDefaultAsync(l => l.AttendanceLogWfhId == log.AttendanceLogWfhId);
+            if (dbLog == null)
+            {
+                ShowToast(ToastType.Error, "Error", "Log not found in database.");
+                return;
+            }
+
+            dbLog.PhotoVerificationApprovalStatus = "Rejected";
+            dbLog.PhotoVerificationRejectedAt = DateTime.UtcNow;
+            dbLog.PhotoVerificationApprovedAt = null;
+            // store as a manual tardiness override so the UI treats this as an explicit "Absent"
+            dbLog.Tardiness = ManualTardinessPrefix + "Absent";
+
+            Db.AttendanceLogsWfh.Update(dbLog);
+            await Db.SaveChangesAsync();
+
+            await LoadLogsAsync();
+            // refresh selected WFH log reference so detail modal and table reflect changes immediately
+            selectedWfhLog = wfhLogs.FirstOrDefault(l => l.AttendanceLogWfhId == dbLog.AttendanceLogWfhId);
+            _ = InvokeAsync(StateHasChanged);
+            ShowToast(ToastType.Success, "Photo Verification Rejected", "Photo verification has been rejected and attendance marked as Absent.");
+            CloseMovPreview();
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Error", $"Error saving photo verification rejection: {ex.Message}");
+        }
+        finally
+        {
+            isApprovingVerification = false;
+        }
+    }
+
+    private string GetVerificationStatusClass(string? status)
+    {
+        return status switch
+        {
+            "Approved" => "badge badge-success verification-status",
+            "Rejected" => "badge badge-danger verification-status",
+            _ => "badge badge-secondary verification-status"
+        };
+    }
+
+    private string GetVerificationStatusLabel(string? status)
+    {
+        return status switch
+        {
+            "Approved" => "Approved",
+            "Rejected" => "Rejected",
+            _ => "Pending"
+        };
+    }
+
+    private bool IsVerificationRejected(string? status) => status == "Rejected";
 
     private async Task SyncPeriodDismissRegistrationAsync()
     {

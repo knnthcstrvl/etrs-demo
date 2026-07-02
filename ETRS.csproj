@@ -8,6 +8,7 @@
 		<UseAppHost>false</UseAppHost>
 		<AssemblyName>Financial</AssemblyName>
 		<RootNamespace>Financial</RootNamespace>
+		<UserSecretsId>etrs-local-dev-secrets</UserSecretsId>
 	</PropertyGroup>
 
 	<ItemGroup>

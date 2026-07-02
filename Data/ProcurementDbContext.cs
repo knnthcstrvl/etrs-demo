@@ -20,7 +20,6 @@ namespace Financial.Data
 
         // DTR (attendance)
         public DbSet<Employee> Employees { get; set; }
-        public DbSet<BiometricDevice> BiometricDevices { get; set; }
         public DbSet<AttendanceLog> AttendanceLogs { get; set; }
         public DbSet<AttendanceLogWfh> AttendanceLogsWfh { get; set; }
         public DbSet<ExceptionCondition> ExceptionConditions { get; set; }
@@ -44,21 +43,36 @@ namespace Financial.Data
                 .HasIndex(e => e.IdNumber)
                 .IsUnique();
 
-            modelBuilder.Entity<BiometricDevice>()
-                .HasIndex(d => d.SerialNumber)
-                .IsUnique();
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.DivisionCenterUnit)
+                .HasColumnName("DivisionCenterAdminUnit");
+
+            modelBuilder.Entity<AttendanceLog>()
+                .Property(l => l.DivisionCenterUnit)
+                .HasColumnName("DivisionCenterAdminUnit");
+
+            modelBuilder.Entity<AttendanceLog>()
+                .Property(l => l.Tardiness)
+                .HasColumnName("LateUndertime");
+
+            modelBuilder.Entity<AttendanceLogWfh>()
+                .Property(l => l.DivisionCenterUnit)
+                .HasColumnName("DivisionCenterAdminUnit");
+
+            modelBuilder.Entity<AttendanceLogWfh>()
+                .Property(l => l.Tardiness)
+                .HasColumnName("LateUndertime");
+
+            modelBuilder.Entity<UserAccount>()
+                .Property(u => u.DivisionCenterUnit)
+                .HasColumnName("DivisionCenterAdminUnit")
+                .HasMaxLength(1000);
 
             modelBuilder.Entity<AttendanceLog>()
                 .HasOne(l => l.Employee)
                 .WithMany(e => e.AttendanceLogs)
                 .HasForeignKey(l => l.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<AttendanceLog>()
-                .HasOne(l => l.BiometricDevice)
-                .WithMany(d => d.AttendanceLogs)
-                .HasForeignKey(l => l.BiometricDeviceId)
-                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<AttendanceLogWfh>()
                 .HasOne(l => l.Employee)

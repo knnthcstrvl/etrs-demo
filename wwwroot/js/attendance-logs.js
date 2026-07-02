@@ -259,6 +259,11 @@ window.attendanceLogs = (function () {
         }, 0);
     }
 
+    function downloadZipFromBase64(fileName, contentBase64) {
+        // contentBase64 should be base64-encoded ZIP
+        downloadFileFromBase64(fileName, contentBase64, "application/zip");
+    }
+
     function downloadFileFromBase64(fileName, contentBase64, contentType) {
         if (!contentBase64) {
             return;
@@ -299,6 +304,7 @@ window.attendanceLogs = (function () {
         getAccessChildMenuPlacement: getAccessChildMenuPlacement,
         getRowMenuPosition: getRowMenuPosition,
         downloadCsv: downloadCsv,
-        downloadFileFromBase64: downloadFileFromBase64
+        downloadFileFromBase64: downloadFileFromBase64,
+        downloadZipFromBase64: downloadZipFromBase64
     };
 })();

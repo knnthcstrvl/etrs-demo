@@ -101,9 +101,15 @@ namespace Financial.Data
                     ALTER TABLE {qualifiedTable} ADD [Mov] nvarchar(500) NOT NULL CONSTRAINT [DF_{tableName}_Mov] DEFAULT N'';
                 END
 
-                IF COL_LENGTH('{schema}.{tableName}', 'PhotoVerification') IS NULL
+                IF COL_LENGTH('{schema}.{tableName}', 'Verification') IS NULL
+                    AND COL_LENGTH('{schema}.{tableName}', 'PhotoVerification') IS NOT NULL
                 BEGIN
-                    ALTER TABLE {qualifiedTable} ADD [PhotoVerification] nvarchar(500) NOT NULL CONSTRAINT [DF_{tableName}_PhotoVerification] DEFAULT N'';
+                    EXEC sp_rename N'{schema}.{tableName}.PhotoVerification', N'Verification', N'COLUMN';
+                END
+
+                IF COL_LENGTH('{schema}.{tableName}', 'Verification') IS NULL
+                BEGIN
+                    ALTER TABLE {qualifiedTable} ADD [Verification] nvarchar(500) NOT NULL CONSTRAINT [DF_{tableName}_Verification] DEFAULT N'';
                 END
 
                 IF COL_LENGTH('{schema}.{tableName}', 'WorkArrangement') IS NULL
