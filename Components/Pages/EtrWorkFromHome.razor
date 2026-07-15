@@ -639,6 +639,7 @@
         }
 
         .etr-logo-row {
+            justify-content: space-between;
             margin-bottom: 1rem;
         }
 
@@ -648,6 +649,57 @@
     }
 
     @@media (max-width: 640px) {
+        body:has(.etr-shell) .toast-wrapper {
+            top: 0.75rem;
+            right: 0.75rem;
+            left: auto;
+            width: min(calc(100vw - 2rem), 320px);
+            max-width: none;
+            gap: 0.5rem;
+            transform: none;
+        }
+
+        body:has(.etr-shell) .toast-item {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.65rem 0.75rem;
+            border-left-width: 5px;
+            border-radius: 10px;
+        }
+
+        body:has(.etr-shell) .toast-left {
+            width: 40px;
+            min-width: 40px;
+            height: 40px;
+            margin-right: 0.6rem;
+            border-radius: 9px;
+        }
+
+        body:has(.etr-shell) .toast-icon svg {
+            width: 17px;
+            height: 17px;
+        }
+
+        body:has(.etr-shell) .toast-title {
+            margin-bottom: 0.15rem;
+            padding-right: 1rem;
+            font-size: 0.84rem;
+            line-height: 1.25;
+        }
+
+        body:has(.etr-shell) .toast-message {
+            padding-right: 0.75rem;
+            font-size: 0.76rem;
+            line-height: 1.35;
+        }
+
+        body:has(.etr-shell) .toast-close {
+            top: 0.25rem;
+            right: 0.25rem;
+            padding: 0.2rem 0.35rem;
+            font-size: 0.9rem;
+        }
+
         .etr-shell {
             align-items: flex-start;
             padding: 1rem;
