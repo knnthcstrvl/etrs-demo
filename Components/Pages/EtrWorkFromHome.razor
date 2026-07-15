@@ -32,8 +32,8 @@
             <div class="etr-copy-content">
                 <h1 id="etrWfhTitle" class="etr-title">Electronic Time Record<br>Work From Home</h1>
                 <div class="etr-sub">
-                    <p>Log your WFH attendance using your employee ID number.</p>
-                    <p>Time in records target, while time out records accomplishment and optional MOV upload.</p>
+                    <p>Log your WFH attendance using your employee ID number and complete photo verification.</p>
+                    <p>Time in records your target, while time out records your accomplishment and optional MOV upload.</p>
                 </div>
             </div>
         </section>
@@ -247,100 +247,7 @@
         </div>
     }
 
-    @if (showVerificationChoiceModal)
-    {
-        <div class="attendance-detail-overlay" @onclick="CloseVerificationChoiceModal">
-            <div class="attendance-detail-modal etr-verification-choice-modal" @onclick:stopPropagation="true">
-                <div class="attendance-detail-header">
-                    <div>
-                        <h2 class="attendance-detail-title">Verification</h2>
-                    </div>
-                    <button type="button" class="attendance-detail-close" @onclick="CloseVerificationChoiceModal" aria-label="Close verification choices">
-                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                    </button>
-                </div>
-
-                <div class="attendance-detail-body">
-                    <div class="etr-verification-choice-stack">
-                        <button type="button" class="etr-verification-choice-card" @onclick="ChoosePhotoVerificationAsync" disabled="@RequiresEmailVerificationForTimeOut">
-                            <i class="fa-solid fa-camera" aria-hidden="true"></i>
-                            <span>Photo</span>
-                        </button>
-                        <div class="etr-verification-choice-divider">Or</div>
-                        <button type="button" class="etr-verification-choice-card" @onclick="ChooseEmailVerificationAsync">
-                            <i class="fa-solid fa-envelope" aria-hidden="true"></i>
-                            <span>Email</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-
-    @if (showEmailVerificationModal)
-    {
-        <div class="attendance-detail-overlay" @onclick="CloseEmailVerificationModal">
-            <div class="attendance-detail-modal etr-email-modal" @onclick:stopPropagation="true">
-                <div class="attendance-detail-header">
-                    <div>
-                        <h2 class="attendance-detail-title">Email Verification</h2>
-                    </div>
-                    <button type="button" class="attendance-detail-close" @onclick="CloseEmailVerificationModal" aria-label="Close email verification" disabled="@isSendingEmailCode">
-                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                    </button>
-                </div>
-
-                <div class="attendance-detail-body">
-                    <div class="attendance-detail-section attendance-detail-hero">
-                        <div>
-                            <div class="attendance-detail-eyebrow">Code Check</div>
-                            <div class="attendance-detail-person">@EmailVerificationStatusText</div>
-                            <div class="attendance-detail-meta">Enter an email address, send a code, then submit the code within 5 minutes.</div>
-                        </div>
-                        <div class="attendance-detail-status">WFH @entryModel.LogType</div>
-                    </div>
-
-                    <div class="attendance-detail-section etr-email-section">
-                        <label class="attendance-detail-label" for="emailVerificationAddress">Email Address</label>
-                        <div class="etr-email-send-row">
-                            <input id="emailVerificationAddress"
-                                   value="@emailVerificationAddress"
-                                   @oninput="HandleEmailVerificationAddressChanged"
-                                   class="etr-input field-control"
-                                   type="email"
-                                   autocomplete="email"
-                                   disabled="@isSendingEmailCode" />
-                            <button type="button" class="btn btn-primary attendance-detail-done etr-email-action-button" @onclick="SendEmailVerificationCodeAsync" disabled="@isSendingEmailCode">
-                                @(isSendingEmailCode ? "Sending..." : "Send Code")
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="attendance-detail-section etr-email-section">
-                        <label class="attendance-detail-label" for="emailVerificationCode">Verification Code</label>
-                        <div class="etr-email-send-row">
-                            <input id="emailVerificationCode"
-                                   value="@emailVerificationCodeInput"
-                                   @oninput="HandleEmailVerificationCodeChanged"
-                                   class="etr-input field-control etr-code-input"
-                                   inputmode="numeric"
-                                   maxlength="6"
-                                   autocomplete="one-time-code"
-                                   disabled="@isSendingEmailCode" />
-                            <button type="button" class="btn btn-primary attendance-detail-done etr-email-action-button" @onclick="VerifyEmailCodeAsync" disabled="@isSendingEmailCode">
-                                Verify
-                            </button>
-                        </div>
-                        <div class="attendance-detail-meta">@EmailVerificationHelpText</div>
-                    </div>
-                </div>
-
-                <div class="attendance-detail-footer">
-                    <button type="button" class="attendance-detail-text-action" @onclick="CloseEmailVerificationModal" disabled="@isSendingEmailCode">Close</button>
-                </div>
-            </div>
-        </div>
-    }
+    @* Email verification UI removed — only photo verification is available *@
 
     @if (showPhotoVerificationModal)
     {
@@ -381,6 +288,7 @@
                                 <div class="etr-camera-guide" aria-hidden="true">
                                     <span class="etr-face-oval"></span>
                                     <span class="etr-face-center"></span>
+                                    <span class="etr-face-guidance">Position your face inside the oval</span>
                                 </div>
                                 @if (!string.IsNullOrWhiteSpace(photoCameraMessage))
                                 {
@@ -400,7 +308,9 @@
                         }
                         else
                         {
-                            <button type="button" class="btn btn-primary attendance-detail-done etr-photo-action-button" @onclick="CapturePhotoAsync" disabled="@isPhotoCaptureClosing">Capture</button>
+                            <button type="button" class="btn btn-primary attendance-detail-done etr-photo-action-button" @onclick="CapturePhotoAsync" disabled="@(isPhotoCaptureClosing || isPhotoValidating)">
+                                @(isPhotoValidating ? "Checking..." : "Capture")
+                            </button>
                         }
                     </div>
                 </div>
@@ -463,8 +373,16 @@
 
     body.etrs-dark-theme:has(.etr-shell) .toast-item {
         background: #ffffff !important;
+        border-top-color: transparent !important;
+        border-right-color: transparent !important;
+        border-bottom-color: transparent !important;
         color: #1e2939 !important;
         box-shadow: 0 10px 30px rgba(0,0,0,0.06) !important;
+        color-scheme: light;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-title {
+        color: #1e2939 !important;
     }
 
     body.etrs-dark-theme:has(.etr-shell) .toast-message {
@@ -473,6 +391,42 @@
 
     body.etrs-dark-theme:has(.etr-shell) .toast-close {
         color: #64748b !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-info {
+        border-left-color: #cfe9ff !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-info .toast-left {
+        background: #e6f3ff !important;
+        color: #1762a6 !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-success {
+        border-left-color: #cfead6 !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-success .toast-left {
+        background: #e8fbec !important;
+        color: #2e8b4a !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-warning {
+        border-left-color: #ffefc6 !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-warning .toast-left {
+        background: #fff7e6 !important;
+        color: #b97a00 !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-error {
+        border-left-color: #ffd6d6 !important;
+    }
+
+    body.etrs-dark-theme:has(.etr-shell) .toast-error .toast-left {
+        background: #fdecec !important;
+        color: #b32a2a !important;
     }
 
     body.etrs-dark-theme .etr-shell .etr-copy-panel,
@@ -604,6 +558,7 @@
         display: flex;
         flex-direction: column;
         justify-content: center;
+        align-items: flex-start;
         color: #ffffff;
     }
 
@@ -611,7 +566,7 @@
         width: 100%;
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-start;
         gap: 1.25rem;
         margin-bottom: clamp(1rem, 3vh, 1.75rem);
     }
@@ -630,7 +585,7 @@
     .etr-copy-content {
         width: 100%;
         text-align: left;
-        margin-inline: auto;
+        margin-inline: 0;
     }
 
     .etr-title {
@@ -1150,6 +1105,11 @@
 
     .etr-photo-modal.photo-capture-success {
         position: relative;
+        overflow: visible;
+    }
+
+    .etr-photo-modal.photo-capture-success .attendance-detail-body {
+        overflow: visible;
     }
 
     .etr-photo-spotlight {
@@ -1437,6 +1397,43 @@
         transform: translate(-50%, -50%);
     }
 
+    .etr-face-guidance {
+        position: absolute;
+        left: 50%;
+        bottom: 1rem;
+        max-width: calc(100% - 2rem);
+        padding: 0.4rem 0.75rem;
+        border-radius: 999px;
+        color: #ffffff;
+        background: rgba(15, 23, 42, 0.72);
+        font-size: 0.78rem;
+        font-weight: 600;
+        line-height: 1.25;
+        text-align: center;
+        transform: translateX(-50%);
+        transition: background-color 160ms ease, color 160ms ease;
+    }
+
+    .etr-camera-guide.face-aligned .etr-face-oval {
+        border-color: #22c55e;
+        box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.08), 0 0 0 3px rgba(34, 197, 94, 0.24), 0 0 24px rgba(34, 197, 94, 0.62);
+    }
+
+    .etr-camera-guide.face-aligned .etr-face-center {
+        border-color: #22c55e;
+        background: #22c55e;
+    }
+
+    .etr-camera-guide.face-aligned .etr-face-guidance {
+        color: #052e16;
+        background: rgba(134, 239, 172, 0.94);
+    }
+
+    .etr-camera-guide.face-misaligned .etr-face-oval,
+    .etr-camera-guide.multiple-faces .etr-face-oval {
+        border-color: #facc15;
+    }
+
     .etr-camera-message {
         position: absolute;
         inset: 0;
@@ -1664,6 +1661,7 @@
     private bool showEmailVerificationModal;
     private bool pendingStartPhotoCamera;
     private bool isPhotoCaptureClosing;
+    private bool isPhotoValidating;
     private ElementReference photoVideoRef;
     private string photoVerificationImage = string.Empty;
     private string photoCameraMessage = string.Empty;
@@ -1676,6 +1674,14 @@
     private int emailVerificationAttempts;
     private bool isSendingEmailCode;
     private bool timeOutRequiresEmailVerification = false;
+
+    private sealed class PhotoCaptureValidationResult
+    {
+        public bool IsValid { get; set; }
+        public string DataUrl { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
 
     private class EtrEntryModel
         : IValidatableObject
@@ -1730,7 +1736,7 @@
                 ? "Email Verified"
                 : RequiresEmailVerificationForTimeOut
                     ? "Email Verification Required"
-                    : "Verification";
+                    : "Not Verified";
 
     private string VerificationStatusLabel
         => HasCompletedVerification ? "Verified" : "Not verified";
@@ -1800,7 +1806,13 @@
 
         var todayLog = await Db.AttendanceLogsWfh
             .AsNoTracking()
+            .Include(l => l.ExceptionCondition)
             .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == DateTime.Today);
+
+        if (!CanSubmitWfhLog(todayLog, employee))
+        {
+            return false;
+        }
 
         ApplyTimeOutVerificationRequirement(todayLog);
 
@@ -1887,18 +1899,19 @@
                 return;
             }
 
-            await RefreshTimeOutVerificationRequirementAsync();
-            if (RequiresEmailVerificationForTimeOut && string.IsNullOrWhiteSpace(emailVerificationVerifiedEmail))
+            var today = DateTime.Today;
+            var log = await Db.AttendanceLogsWfh
+                .Include(l => l.ExceptionCondition)
+                .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == today);
+
+            if (!CanSubmitWfhLog(log, employee))
             {
-                ToastService.Show(new ToastMessage
-                {
-                    Type = ToastType.Warning,
-                    Title = "Email verification required",
-                    Message = "Your WFH time IN used email verification, so time OUT must also use email verification.",
-                    Duration = 5000
-                });
                 return;
             }
+
+            var scheduledLog = log!;
+
+            await RefreshTimeOutVerificationRequirementAsync();
 
             if (!HasCompletedVerification)
             {
@@ -1912,12 +1925,7 @@
                 return;
             }
 
-            var today = DateTime.Today;
             var now = submissionTime ?? DateTime.Now;
-
-            var log = await Db.AttendanceLogsWfh
-                .Include(l => l.ExceptionCondition)
-                .FirstOrDefaultAsync(l => l.EmployeeId == employee.EmployeeId && l.AttendanceDate == today);
 
             var verificationValue = string.Empty;
             if (!string.IsNullOrWhiteSpace(photoVerificationImage))
@@ -1928,14 +1936,14 @@
                     return;
                 }
 
-                verificationValue = BuildPhotoVerificationValue(log?.Verification ?? string.Empty, photoPath, entryModel.LogType);
+                verificationValue = BuildPhotoVerificationValue(scheduledLog.Verification, photoPath, entryModel.LogType);
             }
             else
             {
                 verificationValue = emailVerificationVerifiedEmail.Trim();
             }
 
-            if (entryModel.LogType == "OUT" && (log is null || !log.TimeIn.HasValue))
+            if (entryModel.LogType == "OUT" && !scheduledLog.TimeIn.HasValue)
             {
                 ToastService.Show(new ToastMessage
                 {
@@ -1947,44 +1955,10 @@
                 return;
             }
 
-            if (log is null)
-            {
-                log = new AttendanceLogWfh
-                {
-                    EmployeeId = employee.EmployeeId,
-                    AttendanceDate = today,
-                    IdNumber = employee.IdNumber,
-                    LastName = employee.LastName,
-                    FirstName = employee.FirstName,
-                    MiddleName = employee.MiddleName,
-                    DivisionCenterUnit = employee.DivisionCenterUnit,
-                    Designation = employee.Designation,
-                    WorkArrangement = "WFH",
-                    TagUpdatedAt = now
-                };
-                Db.AttendanceLogsWfh.Add(log);
-            }
-
-            if (!string.Equals(log.WorkArrangement, "WFH", StringComparison.OrdinalIgnoreCase))
-            {
-                var arrangementLabel = string.IsNullOrWhiteSpace(log.ExceptionCondition?.ConditionName)
-                    ? log.WorkArrangement
-                    : log.ExceptionCondition.ConditionName;
-
-                ToastService.Show(new ToastMessage
-                {
-                    Type = ToastType.Warning,
-                    Title = "WFH blocked",
-                    Message = $"{FormatEmployeeName(employee)} is tagged as {arrangementLabel} for today and cannot submit a WFH log.",
-                    Duration = 5000
-                });
-                return;
-            }
-
             if (entryModel.LogType == "IN")
             {
                 // Prevent multiple time-in records for the same day
-                if (log.TimeIn.HasValue)
+                if (scheduledLog.TimeIn.HasValue)
                 {
                     ToastService.Show(new ToastMessage
                     {
@@ -1996,13 +1970,13 @@
                     return;
                 }
 
-                log.TimeIn = now;
-                log.Target = entryModel.Target.Trim();
+                scheduledLog.TimeIn = now;
+                scheduledLog.Target = entryModel.Target.Trim();
             }
             else
             {
                 // Prevent multiple time-out records for the same day
-                if (log.TimeOut.HasValue)
+                if (scheduledLog.TimeOut.HasValue)
                 {
                     ToastService.Show(new ToastMessage
                     {
@@ -2014,14 +1988,14 @@
                     return;
                 }
 
-                log.TimeOut = now;
-                log.Accomplishment = entryModel.Accomplishment.Trim();
-                log.Mov = await SaveMovFilesAsync(entryModel.MovFiles, employee) ?? log.Mov;
+                scheduledLog.TimeOut = now;
+                scheduledLog.Accomplishment = entryModel.Accomplishment.Trim();
+                scheduledLog.Mov = await SaveMovFilesAsync(entryModel.MovFiles, employee) ?? scheduledLog.Mov;
             }
 
-            log.Tardiness = CalculateWfhTardiness(log.TimeIn);
-            log.Verification = string.IsNullOrWhiteSpace(verificationValue)
-                ? log.Verification
+            scheduledLog.Tardiness = CalculateWfhTardiness(scheduledLog.TimeIn);
+            scheduledLog.Verification = string.IsNullOrWhiteSpace(verificationValue)
+                ? scheduledLog.Verification
                 : verificationValue;
 
             await Db.SaveChangesAsync();
@@ -2304,23 +2278,43 @@
         }
     }
 
-    private async Task OpenVerificationAsync()
+    private bool CanSubmitWfhLog(AttendanceLogWfh? log, Employee employee)
     {
-        await RefreshTimeOutVerificationRequirementAsync();
-        if (RequiresEmailVerificationForTimeOut)
+        if (log is null)
         {
             ToastService.Show(new ToastMessage
             {
-                Type = ToastType.Information,
-                Title = "Email verification required",
-                Message = "Your WFH time IN used email verification, so time OUT must also use email verification.",
-                Duration = 4500
+                Type = ToastType.Warning,
+                Title = "WFH not scheduled",
+                Message = $"{FormatEmployeeName(employee)} is not tagged as WFH for today. Ask an administrator to set the date in Exceptions before recording time IN or OUT.",
+                Duration = 5500
             });
-            await ChooseEmailVerificationAsync();
-            return;
+            return false;
         }
 
-        OpenVerificationChoiceModal();
+        if (string.Equals(log.WorkArrangement, "WFH", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var arrangementLabel = string.IsNullOrWhiteSpace(log.ExceptionCondition?.ConditionName)
+            ? log.WorkArrangement
+            : log.ExceptionCondition.ConditionName;
+
+        ToastService.Show(new ToastMessage
+        {
+            Type = ToastType.Warning,
+            Title = "WFH blocked",
+            Message = $"{FormatEmployeeName(employee)} is tagged as {arrangementLabel} for today and cannot submit a WFH log.",
+            Duration = 5000
+        });
+        return false;
+    }
+
+    private async Task OpenVerificationAsync()
+    {
+        // Email verification option hidden from UI; always use photo verification flow.
+        await ChoosePhotoVerificationAsync();
     }
 
     private void OpenVerificationChoiceModal()
@@ -2335,20 +2329,7 @@
 
     private async Task ChoosePhotoVerificationAsync()
     {
-        await RefreshTimeOutVerificationRequirementAsync();
-        if (RequiresEmailVerificationForTimeOut)
-        {
-            ToastService.Show(new ToastMessage
-            {
-                Type = ToastType.Warning,
-                Title = "Email verification required",
-                Message = "Photo verification cannot be used for time OUT because time IN used email verification.",
-                Duration = 5000
-            });
-            await ChooseEmailVerificationAsync();
-            return;
-        }
-
+        // Open photo verification modal. Email verification is not offered in this view.
         showVerificationChoiceModal = false;
         ResetEmailVerification(keepModalState: false);
         await OpenPhotoVerificationModal();
@@ -2611,6 +2592,7 @@
         showPhotoVerificationModal = false;
         pendingStartPhotoCamera = false;
         isPhotoCaptureClosing = false;
+        isPhotoValidating = false;
         await StopPhotoCameraAsync();
     }
 
@@ -2628,7 +2610,14 @@
         }
         catch
         {
-            photoCameraMessage = "Camera access is unavailable. Check browser permissions and try again.";
+            photoCameraMessage = "Camera or face validation is unavailable. Check browser permissions and try again.";
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Error,
+                Title = "Camera unavailable",
+                Message = photoCameraMessage,
+                Duration = 5000
+            });
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -2644,14 +2633,30 @@
 
     private async Task CapturePhotoAsync()
     {
-        if (!showPhotoVerificationModal || !string.IsNullOrWhiteSpace(photoVerificationImage))
+        if (!showPhotoVerificationModal || isPhotoValidating || !string.IsNullOrWhiteSpace(photoVerificationImage))
         {
             return;
         }
 
+        isPhotoValidating = true;
+        await InvokeAsync(StateHasChanged);
+
         try
         {
-            photoVerificationImage = await JS.InvokeAsync<string>("etrWorkFromHome.capturePhoto", photoVideoRef);
+            var result = await JS.InvokeAsync<PhotoCaptureValidationResult>("etrWorkFromHome.capturePhoto", photoVideoRef);
+            if (!result.IsValid || string.IsNullOrWhiteSpace(result.DataUrl))
+            {
+                ToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Warning,
+                    Title = string.IsNullOrWhiteSpace(result.Title) ? "Photo validation failed" : result.Title,
+                    Message = string.IsNullOrWhiteSpace(result.Message) ? "Adjust the camera and try again." : result.Message,
+                    Duration = 5000
+                });
+                return;
+            }
+
+            photoVerificationImage = result.DataUrl;
             ResetEmailVerification(keepModalState: false);
             photoCameraMessage = string.Empty;
             await StopPhotoCameraAsync();
@@ -2666,7 +2671,18 @@
         }
         catch
         {
-            photoCameraMessage = "Could not capture a photo. Try again after the camera preview appears.";
+            ToastService.Show(new ToastMessage
+            {
+                Type = ToastType.Error,
+                Title = "Photo validation unavailable",
+                Message = "The photo could not be validated. Wait for the camera preview and face guide, then try again.",
+                Duration = 5000
+            });
+        }
+        finally
+        {
+            isPhotoValidating = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -2675,6 +2691,7 @@
         photoVerificationImage = string.Empty;
         photoCameraMessage = string.Empty;
         isPhotoCaptureClosing = false;
+        isPhotoValidating = false;
         pendingStartPhotoCamera = true;
         await InvokeAsync(StateHasChanged);
     }
@@ -2686,6 +2703,7 @@
         showPhotoVerificationModal = false;
         pendingStartPhotoCamera = false;
         isPhotoCaptureClosing = false;
+        isPhotoValidating = false;
         ResetEmailVerification(keepModalState: false);
         showVerificationChoiceModal = false;
     }
