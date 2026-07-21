@@ -77,6 +77,8 @@ builder.Services.AddScoped<CustomAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
 // Current user helper
 builder.Services.AddScoped<Financial.Services.CurrentUserService>();
+builder.Services.Configure<Financial.Services.EtrsMailerOptions>(builder.Configuration.GetSection("Email:Smtp"));
+builder.Services.AddScoped<Financial.Services.IAttendanceEmailService, Financial.Services.AttendanceEmailService>();
 builder.Services.AddScoped(sp => new HttpClient());
 // Toast notifications (scoped so JS interop can be used per-circuit)
 builder.Services.AddScoped<Financial.Services.IToastService, Financial.Services.ToastService>();

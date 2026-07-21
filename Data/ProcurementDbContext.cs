@@ -23,6 +23,7 @@ namespace Financial.Data
         public DbSet<AttendanceLog> AttendanceLogs { get; set; }
         public DbSet<AttendanceLogWfh> AttendanceLogsWfh { get; set; }
         public DbSet<ExceptionCondition> ExceptionConditions { get; set; }
+        public DbSet<AttendanceEmailRequest> AttendanceEmailRequests { get; set; }
 
         // Removed procurement/financial DbSet properties as these types belong to another project
         // and were accidentally mixed into this repository. Keep only attendance/auth entities here.
@@ -81,6 +82,15 @@ namespace Financial.Data
                 .WithMany(c => c.AttendanceLogsWfh)
                 .HasForeignKey(l => l.ExceptionConditionId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<AttendanceEmailRequest>()
+                .HasOne(request => request.Employee)
+                .WithMany(employee => employee.AttendanceEmailRequests)
+                .HasForeignKey(request => request.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AttendanceEmailRequest>()
+                .HasIndex(request => new { request.Status, request.RequestedAt });
 
             modelBuilder.Entity<AttendanceLog>()
                 .HasIndex(l => new { l.EmployeeId, l.AttendanceDate });

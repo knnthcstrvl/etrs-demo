@@ -30,5 +30,6 @@ namespace Financial.Model.Dtr
 
         public ICollection<AttendanceLog> AttendanceLogs { get; set; } = new List<AttendanceLog>();
         public ICollection<AttendanceLogWfh> AttendanceLogsWfh { get; set; } = new List<AttendanceLogWfh>();
+        public ICollection<AttendanceEmailRequest> AttendanceEmailRequests { get; set; } = new List<AttendanceEmailRequest>();
     }
 }

@@ -1,0 +1,418 @@
+/* Header notification controls are global because component-isolated CSS is not loaded by App.razor. */
+.finance-header-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+}
+
+.attendance-notification-wrap {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+}
+
+.attendance-notification-toggle {
+    position: relative;
+}
+
+.attendance-notification-toggle.active {
+    border-radius: 10px;
+    background: var(--finance-surface-soft, #f5f7fa);
+    color: var(--finance-brand-strong, #1e2939);
+}
+
+.attendance-notification-badge {
+    position: absolute;
+    top: 4px;
+    right: 2px;
+    min-width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid var(--finance-header-bg, #fff);
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.attendance-notification-dismiss {
+    position: fixed;
+    inset: 0;
+    z-index: 1090;
+    width: 100vw;
+    height: 100vh;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: default;
+}
+
+.attendance-notification-panel {
+    position: absolute;
+    z-index: 1100;
+    top: calc(100% + 12px);
+    right: 0;
+    width: min(420px, calc(100vw - 2rem));
+    max-height: min(600px, calc(100vh - 100px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+    border: 1px solid var(--finance-border, #e2e8f0);
+    border-radius: 14px;
+    background: var(--finance-surface, #fff);
+    color: var(--finance-text, #1e2939);
+    box-shadow: 0 26px 65px rgba(15, 23, 42, 0.24);
+    animation: attendance-notification-enter 160ms ease-out;
+}
+
+.attendance-notification-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem 0.75rem;
+    border-bottom: 1px solid var(--finance-border-soft, #edf2f7);
+}
+
+.attendance-notification-heading h2 {
+    margin: 0.12rem 0 0;
+    color: var(--finance-text, #1e2939);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.attendance-notification-eyebrow {
+    color: var(--finance-text-muted, #64748b);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.attendance-notification-count {
+    flex: 0 0 auto;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, #ebca4a 22%, var(--finance-surface, #fff));
+    color: #6f5200;
+    font-size: 0.65rem;
+    font-weight: 700;
+}
+
+.attendance-notification-list {
+    min-height: 120px;
+    overflow-y: auto;
+    padding: 0.3rem 0.55rem 0.55rem;
+}
+
+.attendance-notification-item {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 0.6rem;
+    padding: 0.7rem 0.45rem;
+    border-bottom: 1px solid var(--finance-border-soft, #edf2f7);
+}
+
+.attendance-notification-item:last-child {
+    border-bottom: 0;
+}
+
+.attendance-notification-avatar {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #ebca4a;
+    color: #6f5200;
+    font-size: 0.82rem;
+}
+
+.attendance-notification-content {
+    min-width: 0;
+}
+
+.attendance-notification-item-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.attendance-notification-item-top > div {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.attendance-notification-item-top strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--finance-text, #1e2939);
+    font-size: 0.8rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attendance-notification-item-top span,
+.attendance-notification-item-top time {
+    flex: 0 0 auto;
+    color: var(--finance-text-muted, #64748b);
+    font-size: 0.62rem;
+}
+
+.attendance-notification-meta {
+    display: grid;
+    gap: 0.18rem;
+    margin-top: 0.3rem;
+    color: var(--finance-text-muted, #64748b);
+    font-size: 0.68rem;
+}
+
+.attendance-notification-meta span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attendance-notification-meta i {
+    width: 1rem;
+    margin-right: 0.2rem;
+    text-align: center;
+}
+
+.attendance-notification-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.attendance-notification-actions button {
+    min-height: 30px;
+    padding: 0.3rem 0.65rem;
+    border-radius: 7px;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+
+.notification-reject {
+    border: 0;
+    background: transparent;
+    color: var(--finance-text, #1e2939);
+}
+
+.notification-accept {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border: 1px solid #ebca4a;
+    background: #ebca4a;
+    color: #6f5200;
+}
+
+.attendance-notification-actions button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.attendance-notification-error {
+    margin-top: 0.4rem;
+    color: #b91c1c;
+    font-size: 0.66rem;
+}
+
+.attendance-rejection-composer {
+    display: grid;
+    gap: 0.7rem;
+    padding: 1rem 0.65rem;
+    animation: attendance-rejection-enter 180ms ease-out;
+}
+
+.attendance-rejection-composer.closing {
+    pointer-events: none;
+    animation: attendance-rejection-exit 150ms ease-in forwards;
+}
+
+.attendance-rejection-details {
+    padding: 0 0.1rem 0.65rem;
+    border-bottom: 1px solid var(--finance-border, #e2e8f0);
+}
+
+.attendance-rejection-textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 130px;
+    padding: 0.75rem;
+    resize: vertical;
+    border: 1px solid var(--finance-border, #d1d5db);
+    border-radius: 9px;
+    outline: none;
+    background: var(--finance-surface, #fff);
+    color: var(--finance-text, #1e2939);
+    font: inherit;
+    font-size: 0.76rem;
+    line-height: 1.45;
+}
+
+.attendance-rejection-textarea:hover,
+.attendance-rejection-textarea:focus {
+    border-color: var(--finance-border, #d1d5db);
+    box-shadow: none;
+}
+
+.attendance-rejection-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    justify-self: start;
+    min-height: 32px;
+    padding: 0.38rem 0.75rem;
+    border: 1px solid #ebca4a;
+    border-radius: 8px;
+    background: #ebca4a;
+    color: #6f5200;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.attendance-rejection-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.attendance-rejection-cancel {
+    min-height: 32px;
+    padding: 0.38rem 0.65rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--finance-text-muted, #64748b);
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.attendance-rejection-cancel:hover,
+.notification-reject:hover {
+    border: 0;
+    background: transparent;
+    color: var(--finance-text, #1e2939);
+}
+
+.attendance-rejection-submit:disabled,
+.attendance-rejection-cancel:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.attendance-notification-empty {
+    min-height: 135px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 1rem;
+    color: var(--finance-text-muted, #64748b);
+    font-size: 0.76rem;
+    text-align: center;
+}
+
+.attendance-notification-empty i {
+    color: #16a34a;
+    font-size: 1.25rem;
+}
+
+.attendance-notification-empty strong {
+    color: var(--finance-text, #1e2939);
+}
+
+body.etrs-dark-theme .attendance-notification-panel {
+    border-color: #2b3b52;
+    background: #101827;
+    box-shadow: 0 26px 65px rgba(0, 0, 0, 0.48);
+}
+
+body.etrs-dark-theme .attendance-notification-count,
+body.etrs-dark-theme .attendance-notification-avatar,
+body.etrs-dark-theme .notification-accept {
+    background: #ebca4a;
+    color: #4d3900;
+}
+
+body.etrs-dark-theme .attendance-notification-dismiss {
+    background: transparent;
+}
+
+body.etrs-dark-theme .attendance-rejection-textarea {
+    border-color: #2b3b52;
+    background: #142033;
+    color: #f1f5f9;
+}
+
+body.etrs-dark-theme .attendance-rejection-details {
+    border-bottom-color: #2b3b52;
+}
+
+body.etrs-dark-theme .attendance-rejection-submit {
+    border-color: #ebca4a;
+    background: #ebca4a;
+    color: #4d3900;
+}
+
+@keyframes attendance-notification-enter {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes attendance-rejection-enter {
+    from { opacity: 0; transform: translateX(12px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes attendance-rejection-exit {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(-12px); }
+}
+
+@media (max-width: 991.98px) {
+    .attendance-notification-panel {
+        position: fixed;
+        top: 68px;
+        right: 1rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .attendance-notification-panel {
+        right: 0.75rem;
+        width: calc(100vw - 1.5rem);
+        border-radius: 14px;
+    }
+
+    .attendance-notification-item-top {
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .attendance-notification-item-top > div {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+}

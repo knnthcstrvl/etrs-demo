@@ -140,13 +140,13 @@ window.etrWorkFromHome = (function () {
         }, 250);
     }
 
-    function registerOutsideClick(element, dotNetRef) {
+    function registerOutsideClick(element, dotNetRef, methodName) {
         if (!element) return;
         const el = element instanceof HTMLElement ? element : element;
         const handler = function (ev) {
             try {
                 if (!el.contains(ev.target)) {
-                    dotNetRef.invokeMethodAsync('HideEmployeeResults').catch(() => { });
+                    dotNetRef.invokeMethodAsync(methodName || 'HideEmployeeResults').catch(() => { });
                 }
             }
             catch { }

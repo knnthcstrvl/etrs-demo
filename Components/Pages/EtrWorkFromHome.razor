@@ -13,6 +13,7 @@
 @inject IToastService ToastService
 @inject IWebHostEnvironment Environment
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject IAttendanceEmailService AttendanceEmailService
 @inject IJSRuntime JS
 @inject NavigationManager NavManager
 @layout BlankLayout
@@ -39,6 +40,14 @@
         </section>
 
         <div class="etr-form-wrap">
+            <button type="button"
+                    class="etr-attendance-request-button"
+                    title="Request attendance logs by email"
+                    aria-label="Request attendance logs by email"
+                    @onclick="OpenAttendanceRequestAsync">
+                <i class="fa-regular fa-address-book" aria-hidden="true"></i>
+                <span class="etr-attendance-request-label">Request Logs</span>
+            </button>
             <EditForm EditContext="editContext" OnSubmit="HandleSubmit">
                 <DataAnnotationsValidator />
 
@@ -170,6 +179,150 @@
             </EditForm>
         </div>
     </div>
+
+    @if (showAttendanceRequestModal)
+    {
+        <div class="attendance-detail-overlay" @onclick="CloseAttendanceRequestModal">
+            <div class="attendance-detail-modal etr-attendance-request-modal" @onclick="CloseAttendanceRequestPeriodMenus" @onclick:stopPropagation="true">
+                <div class="attendance-detail-header">
+                    <div>
+                        <h2 class="attendance-detail-title">Request Logs</h2>
+                    </div>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseAttendanceRequestModal" aria-label="Close request" disabled="@isSubmittingAttendanceRequest">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="attendance-detail-body etr-request-body">
+                    <p class="etr-request-intro">Enter your employee details and email address. Use an email address named after you so the Request Approver can verify your identity before ETRS sends your records.</p>
+
+                    <div class="etr-request-field">
+                        <label for="attendanceRequestEmployee">ID Number</label>
+                        <div class="employee-search-wrap" @ref="attendanceRequestSearchWrapRef">
+                            <div class="employee-search-input-wrap">
+                                <input id="attendanceRequestEmployee"
+                                       class="etr-input employee-search-input field-control"
+                                       value="@attendanceRequestSearchText"
+                                       @oninput="HandleAttendanceRequestSearchChanged"
+                                       @onfocus="HandleAttendanceRequestInputFocus"
+                                       autocomplete="off"
+                                       disabled="@isSubmittingAttendanceRequest" />
+                                <span class="employee-search-icon" aria-hidden="true">Search</span>
+                            </div>
+                            @if (showAttendanceRequestResults)
+                            {
+                                <div class="employee-results-overlay active etr-request-results">
+                                    @if (attendanceRequestSearchResults.Count == 0)
+                                    {
+                                        <div class="employee-empty-state">No Employee Found</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="employee-results-grid">
+                                            @foreach (var employee in attendanceRequestSearchResults)
+                                            {
+                                                <button type="button" class="@GetAttendanceRequestEmployeeResultClass(employee)" @onclick="() => SelectAttendanceRequestEmployeeAsync(employee)">
+                                                    <span class="employee-result-id">@employee.IdNumber</span>
+                                                    <span class="employee-result-name">@FormatEmployeeName(employee)</span>
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="etr-request-period-grid">
+                        <div class="etr-request-field">
+                            <label>From</label>
+                            <div class="etr-request-period-dropdown" @onclick:stopPropagation="true">
+                                <button type="button"
+                                        class="etr-request-period-trigger @(showAttendanceRequestFromMenu ? "active" : null)"
+                                        @onclick="ToggleAttendanceRequestFromMenu"
+                                        disabled="@(isSubmittingAttendanceRequest || attendanceRequestPeriods.Count == 0)">
+                                    <span class="etr-request-period-content">
+                                        <span class="etr-request-period-selected">@AttendanceRequestFromLabel</span>
+                                        @if (AttendanceRequestFromPeriod?.IsCurrent == true)
+                                        {
+                                            <span class="etr-request-period-current">(Current)</span>
+                                        }
+                                    </span>
+                                    <i class="fa-solid fa-chevron-down etr-request-period-caret" aria-hidden="true"></i>
+                                </button>
+                                <div class="etr-request-period-menu @(showAttendanceRequestFromMenu ? "show" : null)">
+                                    @foreach (var period in attendanceRequestPeriods)
+                                    {
+                                        <button type="button" class="etr-request-period-option @(attendanceRequestFromKey == period.Key ? "active" : null)" @onclick="() => SelectAttendanceRequestFromPeriod(period)">
+                                            <span>@period.Label</span>
+                                            @if (period.IsCurrent)
+                                            {
+                                                <span class="etr-request-period-current">(Current)</span>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="etr-request-field">
+                            <label>To</label>
+                            <div class="etr-request-period-dropdown" @onclick:stopPropagation="true">
+                                <button type="button"
+                                        class="etr-request-period-trigger @(showAttendanceRequestToMenu ? "active" : null)"
+                                        @onclick="ToggleAttendanceRequestToMenu"
+                                        disabled="@(isSubmittingAttendanceRequest || attendanceRequestPeriods.Count == 0)">
+                                    <span class="etr-request-period-content">
+                                        <span class="etr-request-period-selected">@AttendanceRequestToLabel</span>
+                                        @if (AttendanceRequestToPeriod?.IsCurrent == true)
+                                        {
+                                            <span class="etr-request-period-current">(Current)</span>
+                                        }
+                                    </span>
+                                    <i class="fa-solid fa-chevron-down etr-request-period-caret" aria-hidden="true"></i>
+                                </button>
+                                <div class="etr-request-period-menu @(showAttendanceRequestToMenu ? "show" : null)">
+                                    @foreach (var period in attendanceRequestPeriods)
+                                    {
+                                        <button type="button" class="etr-request-period-option @(attendanceRequestToKey == period.Key ? "active" : null)" @onclick="() => SelectAttendanceRequestToPeriod(period)">
+                                            <span>@period.Label</span>
+                                            @if (period.IsCurrent)
+                                            {
+                                                <span class="etr-request-period-current">(Current)</span>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="etr-request-field">
+                        <label for="attendanceRequestEmail">Email address</label>
+                        <input id="attendanceRequestEmail"
+                               type="email"
+                               class="etr-input field-control"
+                               @bind="attendanceRequestEmail"
+                               autocomplete="email"
+                               disabled="@isSubmittingAttendanceRequest" />
+                    </div>
+                </div>
+
+                <div class="attendance-detail-footer">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseAttendanceRequestModal" disabled="@isSubmittingAttendanceRequest">Cancel</button>
+                    <button type="button" class="btn attendance-detail-done etr-request-submit" @onclick="SubmitAttendanceRequestAsync" disabled="@isSubmittingAttendanceRequest">
+                        @if (isSubmittingAttendanceRequest)
+                        {
+                            <span class="spinner" aria-hidden="true"></span><span>Submitting...</span>
+                        }
+                        else
+                        {
+                            <span>Submit request</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 
     @if (showSubmitConfirmation && selectedEmployee is not null)
     {
@@ -525,7 +678,7 @@
     body.etrs-dark-theme .etr-shell .btn-primary {
         background: #ebca4a !important;
         border-color: #ebca4a !important;
-        color: #111827 !important;
+        color: #6f5200 !important;
     }
 
     body.etrs-dark-theme .etr-shell .attendance-detail-modal,
@@ -617,6 +770,7 @@
     }
 
     .etr-form-wrap {
+        position: relative;
         width: 100%;
         padding: 1.15rem;
         border-radius: 24px;
@@ -625,6 +779,40 @@
         box-shadow: 0 18px 40px rgba(0,0,0,0.24);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
+    }
+
+    .etr-attendance-request-button {
+        position: absolute;
+        z-index: 3;
+        top: -1.175rem;
+        right: -1.175rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        width: 8.25rem;
+        height: 2.35rem;
+        padding: 0;
+        border: 0;
+        border-radius: 999px;
+        background: #ebca4a;
+        color: #6f5200;
+        font-size: 1rem;
+        box-shadow: 0 8px 18px rgba(235, 202, 74, 0.28);
+        white-space: nowrap;
+        transition: box-shadow 0.16s ease;
+    }
+
+    .etr-attendance-request-button:hover,
+    .etr-attendance-request-button:focus-visible {
+        transform: none;
+        box-shadow: 0 10px 22px rgba(235, 202, 74, 0.38);
+        outline: none;
+    }
+
+    .etr-attendance-request-label {
+        font-size: 0.78rem;
+        font-weight: 700;
     }
 
     @@media (max-width: 1024px) {
@@ -1044,7 +1232,7 @@
         border-radius: 12px;
         padding: 0.65rem 0.9rem;
         background: #ebca4a;
-        color: #111827;
+        color: #6f5200;
         font-size: 0.92rem;
         font-weight: 500;
     }
@@ -1076,6 +1264,219 @@
 
     .etr-confirmation-modal {
         width: min(100%, 680px);
+    }
+
+    .etr-attendance-request-modal {
+        width: min(100%, 560px);
+        overflow: visible;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+        border: 1px solid color-mix(in srgb, var(--etrs-gray-300) 88%, white);
+        border-radius: 10px;
+        box-shadow: 0 26px 60px rgba(30, 41, 57, 0.18);
+    }
+
+    .etr-attendance-request-modal .attendance-detail-body {
+        overflow: visible;
+        background: #ffffff;
+    }
+
+    .etr-attendance-request-modal .attendance-detail-header {
+        border-radius: 9px 9px 0 0;
+        background: linear-gradient(180deg, #ffffff 0%, var(--etrs-gray-50) 100%);
+    }
+
+    .etr-attendance-request-modal .attendance-detail-footer {
+        border-radius: 0 0 9px 9px;
+        background: linear-gradient(180deg, rgba(250, 250, 250, 0.92) 0%, var(--etrs-gray-50) 100%);
+    }
+
+    .etr-request-body {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .etr-request-intro {
+        margin: 0;
+        color: var(--etrs-gray-700);
+        line-height: 1.55;
+    }
+
+    .etr-request-field {
+        position: relative;
+        display: grid;
+        gap: 0.4rem;
+    }
+
+    .etr-request-field > label {
+        color: var(--etrs-black) !important;
+        font-size: 0.86rem;
+        font-weight: 600;
+    }
+
+    body .etr-shell .etr-attendance-request-modal .etr-request-field .etr-input,
+    body .etr-shell .etr-attendance-request-modal .etr-request-field .field-control {
+        border: 1px solid #d1d5db !important;
+        background: #ffffff !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+    }
+
+    body .etr-shell .etr-attendance-request-modal .etr-request-field .etr-input:hover,
+    body .etr-shell .etr-attendance-request-modal .etr-request-field .field-control:hover,
+    body .etr-shell .etr-attendance-request-modal .etr-request-field .etr-input:focus,
+    body .etr-shell .etr-attendance-request-modal .etr-request-field .field-control:focus {
+        border-color: #d1d5db !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+        outline: none;
+    }
+
+    .etr-request-period-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.8rem;
+    }
+
+    .etr-request-period-dropdown {
+        position: relative;
+        min-width: 0;
+    }
+
+    .etr-request-period-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.55rem;
+        width: 100%;
+        min-height: 2.625rem;
+        padding: 0.5rem 0.7rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #1e2939;
+        font-size: 0.78rem;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .etr-request-period-trigger.active {
+        border-color: rgba(16, 77, 173, 0.35);
+        box-shadow: 0 0 0 3px rgba(16, 77, 173, 0.08);
+    }
+
+    .etr-request-period-trigger:disabled {
+        cursor: not-allowed;
+        opacity: 0.72;
+    }
+
+    .etr-request-period-content {
+        display: flex;
+        align-items: center;
+        gap: 0.28rem;
+        min-width: 0;
+        flex: 1 1 auto;
+        white-space: nowrap;
+    }
+
+    .etr-request-period-selected {
+        min-width: 0;
+        overflow: hidden;
+        color: #1e2939;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .etr-request-period-current {
+        flex: 0 0 auto;
+        margin-left: 0.15rem;
+        color: #64748b;
+        font-size: 0.7rem;
+        white-space: nowrap;
+    }
+
+    .etr-request-period-caret {
+        flex: 0 0 auto;
+        color: #64748b;
+        font-size: 0.7rem;
+    }
+
+    .etr-request-period-menu {
+        position: absolute;
+        z-index: 60;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        max-height: 220px;
+        padding: 0.3rem;
+        overflow-y: auto;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+        opacity: 0;
+        transform: translateY(-6px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .etr-request-period-menu.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    .etr-request-period-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.55rem;
+        width: 100%;
+        padding: 0.45rem 0.55rem;
+        overflow: hidden;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: #1e2939;
+        font-size: 0.78rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .etr-request-period-option > span:first-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .etr-request-period-option:hover,
+    .etr-request-period-option.active {
+        background: #f5f7fa;
+        color: #1e2939;
+    }
+
+    .etr-request-results {
+        position: absolute;
+        z-index: 50;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+    }
+
+    .etr-attendance-request-modal .etr-request-submit {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        color: var(--finance-text);
+        background: var(--etrs-gray-100);
+        border-color: var(--finance-border);
+    }
+
+    .etr-attendance-request-modal .etr-request-submit:hover,
+    .etr-attendance-request-modal .etr-request-submit:focus-visible {
+        color: var(--finance-text);
+        background: var(--etrs-gray-200);
+        border-color: var(--etrs-gray-300);
     }
 
     .etr-photo-modal {
@@ -1602,6 +2003,10 @@
             border-radius: 10px;
         }
 
+        .etr-request-period-grid {
+            grid-template-columns: 1fr;
+        }
+
         .etr-confirmation-modal .attendance-detail-header,
         .etr-photo-modal .attendance-detail-header {
             position: relative;
@@ -1726,6 +2131,35 @@
     private int emailVerificationAttempts;
     private bool isSendingEmailCode;
     private bool timeOutRequiresEmailVerification = false;
+    private bool showAttendanceRequestModal;
+    private bool isSubmittingAttendanceRequest;
+    private bool showAttendanceRequestResults;
+    private string attendanceRequestSearchText = string.Empty;
+    private ElementReference attendanceRequestSearchWrapRef;
+    private DotNetObjectReference<EtrWorkFromHome>? attendanceRequestDotNetRef;
+    private bool pendingRegisterAttendanceRequestOutsideClick;
+    private bool attendanceRequestOutsideClickRegistered;
+    private string attendanceRequestEmail = string.Empty;
+    private string attendanceRequestFromKey = string.Empty;
+    private string attendanceRequestToKey = string.Empty;
+    private bool showAttendanceRequestFromMenu;
+    private bool showAttendanceRequestToMenu;
+    private Employee? attendanceRequestEmployee;
+    private List<Employee> attendanceRequestSearchResults = new();
+    private List<AttendanceRequestPeriod> attendanceRequestPeriods = new();
+
+    private sealed record AttendanceRequestPeriod(DateTime Start, DateTime End, string Label)
+    {
+        public string Key => Start.ToString("yyyy-MM-dd");
+        public bool IsCurrent => DateTime.Today >= Start.Date && DateTime.Today <= End.Date;
+    }
+
+    private AttendanceRequestPeriod? AttendanceRequestFromPeriod
+        => attendanceRequestPeriods.FirstOrDefault(period => period.Key == attendanceRequestFromKey);
+    private AttendanceRequestPeriod? AttendanceRequestToPeriod
+        => attendanceRequestPeriods.FirstOrDefault(period => period.Key == attendanceRequestToKey);
+    private string AttendanceRequestFromLabel => AttendanceRequestFromPeriod?.Label ?? "No periods available";
+    private string AttendanceRequestToLabel => AttendanceRequestToPeriod?.Label ?? "No periods available";
 
     private sealed class PhotoCaptureValidationResult
     {
@@ -1772,6 +2206,258 @@
     {
         InitializeEditContext();
     }
+
+    private Task OpenAttendanceRequestAsync()
+    {
+        showAttendanceRequestModal = true;
+        isSubmittingAttendanceRequest = false;
+        showAttendanceRequestResults = false;
+        attendanceRequestSearchText = string.Empty;
+        attendanceRequestEmail = string.Empty;
+        attendanceRequestEmployee = null;
+        attendanceRequestSearchResults.Clear();
+        attendanceRequestPeriods.Clear();
+        attendanceRequestFromKey = string.Empty;
+        attendanceRequestToKey = string.Empty;
+        showAttendanceRequestFromMenu = false;
+        showAttendanceRequestToMenu = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task CloseAttendanceRequestModal()
+    {
+        if (!isSubmittingAttendanceRequest)
+        {
+            showAttendanceRequestResults = false;
+            CloseAttendanceRequestPeriodMenus();
+            await UnregisterAttendanceRequestOutsideClickAsync();
+            showAttendanceRequestModal = false;
+        }
+    }
+
+    private async Task HandleAttendanceRequestSearchChanged(ChangeEventArgs e)
+    {
+        attendanceRequestSearchText = e.Value?.ToString() ?? string.Empty;
+        if (attendanceRequestEmployee is not null
+            && !string.Equals(attendanceRequestEmployee.IdNumber, attendanceRequestSearchText.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            attendanceRequestEmployee = null;
+            attendanceRequestPeriods.Clear();
+            attendanceRequestFromKey = string.Empty;
+            attendanceRequestToKey = string.Empty;
+        }
+
+        var search = attendanceRequestSearchText.Trim();
+        if (search.Length < 1)
+        {
+            attendanceRequestSearchResults.Clear();
+            showAttendanceRequestResults = false;
+            await UnregisterAttendanceRequestOutsideClickAsync();
+            return;
+        }
+
+        attendanceRequestSearchResults = await Db.Employees.AsNoTracking()
+            .Where(employee => employee.IdNumber.Contains(search))
+            .Where(employee => employee.Status.StartsWith("Active"))
+            .OrderBy(employee => employee.LastName)
+            .ThenBy(employee => employee.FirstName)
+            .Take(12)
+            .ToListAsync();
+        showAttendanceRequestResults = true;
+        pendingRegisterAttendanceRequestOutsideClick = true;
+    }
+
+    private async Task HandleAttendanceRequestInputFocus(FocusEventArgs _)
+    {
+        var searchText = attendanceRequestEmployee is null
+            ? attendanceRequestSearchText
+            : attendanceRequestEmployee.IdNumber;
+        await SearchAttendanceRequestEmployeesAsync(searchText);
+    }
+
+    private async Task SearchAttendanceRequestEmployeesAsync(string? searchText)
+    {
+        var search = (searchText ?? string.Empty).Trim();
+        if (search.Length < 1)
+        {
+            attendanceRequestSearchResults.Clear();
+            showAttendanceRequestResults = false;
+            await UnregisterAttendanceRequestOutsideClickAsync();
+            return;
+        }
+
+        attendanceRequestSearchResults = await Db.Employees.AsNoTracking()
+            .Where(employee => employee.IdNumber.Contains(search))
+            .Where(employee => employee.Status.StartsWith("Active"))
+            .OrderBy(employee => employee.LastName)
+            .ThenBy(employee => employee.FirstName)
+            .Take(12)
+            .ToListAsync();
+        showAttendanceRequestResults = true;
+        pendingRegisterAttendanceRequestOutsideClick = true;
+    }
+
+    private async Task SelectAttendanceRequestEmployeeAsync(Employee employee)
+    {
+        attendanceRequestEmployee = employee;
+        attendanceRequestSearchText = $"{employee.IdNumber} - {FormatEmployeeName(employee)}";
+        showAttendanceRequestResults = false;
+        await UnregisterAttendanceRequestOutsideClickAsync();
+        await LoadAttendanceRequestPeriodsAsync(employee.EmployeeId);
+    }
+
+    private string GetAttendanceRequestEmployeeResultClass(Employee employee)
+        => attendanceRequestEmployee?.EmployeeId == employee.EmployeeId
+            ? "employee-result-card selected"
+            : "employee-result-card";
+
+    [JSInvokable]
+    public async Task HideAttendanceRequestResults()
+    {
+        if (!showAttendanceRequestResults)
+        {
+            return;
+        }
+
+        showAttendanceRequestResults = false;
+        await UnregisterAttendanceRequestOutsideClickAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAttendanceRequestPeriodsAsync(int employeeId)
+    {
+        var onsiteDates = await Db.AttendanceLogs.AsNoTracking()
+            .Where(log => log.EmployeeId == employeeId)
+            .Select(log => log.AttendanceDate)
+            .Distinct()
+            .ToListAsync();
+        var wfhDates = await Db.AttendanceLogsWfh.AsNoTracking()
+            .Where(log => log.EmployeeId == employeeId)
+            .Select(log => log.AttendanceDate)
+            .Distinct()
+            .ToListAsync();
+
+        attendanceRequestPeriods = onsiteDates.Concat(wfhDates).Append(DateTime.Today)
+            .Select(BuildAttendanceRequestPeriod)
+            .GroupBy(period => period.Start)
+            .Select(group => group.First())
+            .OrderByDescending(period => period.Start)
+            .ToList();
+
+        var current = attendanceRequestPeriods.First();
+        attendanceRequestFromKey = current.Key;
+        attendanceRequestToKey = current.Key;
+    }
+
+    private static AttendanceRequestPeriod BuildAttendanceRequestPeriod(DateTime date)
+    {
+        var start = date.Day <= 15
+            ? new DateTime(date.Year, date.Month, 1)
+            : new DateTime(date.Year, date.Month, 16);
+        var end = date.Day <= 15
+            ? new DateTime(date.Year, date.Month, 15)
+            : new DateTime(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month));
+        return new AttendanceRequestPeriod(start, end, $"{start:MMM dd} - {end:dd}, {end:yyyy}");
+    }
+
+    private void ToggleAttendanceRequestFromMenu()
+    {
+        showAttendanceRequestFromMenu = !showAttendanceRequestFromMenu;
+        showAttendanceRequestToMenu = false;
+    }
+
+    private void ToggleAttendanceRequestToMenu()
+    {
+        showAttendanceRequestToMenu = !showAttendanceRequestToMenu;
+        showAttendanceRequestFromMenu = false;
+    }
+
+    private void SelectAttendanceRequestFromPeriod(AttendanceRequestPeriod period)
+    {
+        attendanceRequestFromKey = period.Key;
+        showAttendanceRequestFromMenu = false;
+    }
+
+    private void SelectAttendanceRequestToPeriod(AttendanceRequestPeriod period)
+    {
+        attendanceRequestToKey = period.Key;
+        showAttendanceRequestToMenu = false;
+    }
+
+    private void CloseAttendanceRequestPeriodMenus()
+    {
+        showAttendanceRequestFromMenu = false;
+        showAttendanceRequestToMenu = false;
+    }
+
+    private async Task SubmitAttendanceRequestAsync()
+    {
+        var employee = attendanceRequestEmployee;
+        var fromPeriod = attendanceRequestPeriods.FirstOrDefault(period => period.Key == attendanceRequestFromKey);
+        var toPeriod = attendanceRequestPeriods.FirstOrDefault(period => period.Key == attendanceRequestToKey);
+        if (employee is null)
+        {
+            ShowAttendanceRequestToast(ToastType.Warning, "Select employee", "Choose an employee from the search results.");
+            return;
+        }
+        if (fromPeriod is null || toPeriod is null)
+        {
+            ShowAttendanceRequestToast(ToastType.Warning, "Select period", "Choose the attendance period to send.");
+            return;
+        }
+        if (!IsValidEmailAddress(attendanceRequestEmail))
+        {
+            ShowAttendanceRequestToast(ToastType.Warning, "Invalid email", "Enter a valid recipient email address.");
+            return;
+        }
+
+        var start = fromPeriod.Start <= toPeriod.Start ? fromPeriod.Start : toPeriod.Start;
+        var end = fromPeriod.End >= toPeriod.End ? fromPeriod.End : toPeriod.End;
+        var recipient = attendanceRequestEmail.Trim();
+        isSubmittingAttendanceRequest = true;
+        try
+        {
+            var duplicate = await Db.AttendanceEmailRequests.AsNoTracking().AnyAsync(request =>
+                request.EmployeeId == employee.EmployeeId
+                && request.RecipientEmail == recipient
+                && request.PeriodStart == start
+                && request.PeriodEnd == end
+                && request.Status == "Pending");
+            if (duplicate)
+            {
+                ShowAttendanceRequestToast(ToastType.Information, "Request already pending", "The same attendance request is already waiting for approval.");
+                return;
+            }
+
+            Db.AttendanceEmailRequests.Add(new AttendanceEmailRequest
+            {
+                EmployeeId = employee.EmployeeId,
+                IdNumber = employee.IdNumber,
+                EmployeeName = FormatEmployeeName(employee),
+                RecipientEmail = recipient,
+                PeriodStart = start,
+                PeriodEnd = end,
+                Status = "Pending",
+                RequestedAt = DateTime.UtcNow
+            });
+            await Db.SaveChangesAsync();
+            showAttendanceRequestResults = false;
+            await UnregisterAttendanceRequestOutsideClickAsync();
+            showAttendanceRequestModal = false;
+            ShowAttendanceRequestToast(ToastType.Success, "Request submitted", "Your attendance request is waiting for approval.");
+        }
+        catch (Exception)
+        {
+            ShowAttendanceRequestToast(ToastType.Error, "Request failed", "The attendance request could not be submitted. Please try again.");
+        }
+        finally
+        {
+            isSubmittingAttendanceRequest = false;
+        }
+    }
+
+    private void ShowAttendanceRequestToast(ToastType type, string title, string message)
+        => ToastService.Show(new ToastMessage { Type = type, Title = title, Message = message, Duration = 5000 });
 
     private bool IsSubmitDisabled => isSubmitting;
     private bool HasCompletedVerification
@@ -2145,9 +2831,11 @@
         {
             await StopPhotoCameraAsync();
             await UnregisterOutsideClickAsync();
+            await UnregisterAttendanceRequestOutsideClickAsync();
         }
         catch { }
         dotNetRef?.Dispose();
+        attendanceRequestDotNetRef?.Dispose();
     }
 
     private Task HandleMovSelected(InputFileChangeEventArgs e)
@@ -2323,6 +3011,12 @@
             await RegisterOutsideClickAsync();
         }
 
+        if (pendingRegisterAttendanceRequestOutsideClick && showAttendanceRequestResults)
+        {
+            pendingRegisterAttendanceRequestOutsideClick = false;
+            await RegisterAttendanceRequestOutsideClickAsync();
+        }
+
         if (pendingStartPhotoCamera && showPhotoVerificationModal)
         {
             pendingStartPhotoCamera = false;
@@ -2484,30 +3178,7 @@
 
     private async Task SendVerificationEmailAsync(string recipient, string code)
     {
-        var senderEmail = Configuration["Email:Smtp:SenderEmail"] ?? "bswmetrmailer@gmail.com";
-        var senderPassword = (Configuration["Email:Smtp:Password"] ?? "BpL84Nd1PpXY").Replace(" ", "");
-        var senderName = Configuration["Email:Smtp:SenderName"] ?? "BSWM ETRS";
-        var host = Configuration["Email:Smtp:Host"] ?? "smtp.gmail.com";
-        var port = int.TryParse(Configuration["Email:Smtp:Port"], out var configuredPort) ? configuredPort : 587;
-
-        using var message = new MailMessage
-        {
-            From = new MailAddress(senderEmail, senderName),
-            Subject = "WFH Verification Code",
-            Body = $"Your WFH verification code is {code}. This code expires in 5 minutes.",
-            IsBodyHtml = false
-        };
-        message.To.Add(recipient);
-
-        using var client = new SmtpClient(host, port)
-        {
-            DeliveryMethod = SmtpDeliveryMethod.Network,
-            EnableSsl = true,
-            UseDefaultCredentials = false,
-            Credentials = new NetworkCredential(senderEmail, senderPassword)
-        };
-
-        await client.SendMailAsync(message);
+        await AttendanceEmailService.SendVerificationCodeAsync(recipient, code);
     }
 
     private static string GetEmailVerificationFailureMessage(Exception ex)
@@ -2517,7 +3188,7 @@
             || message.Contains("not authenticated", StringComparison.OrdinalIgnoreCase)
             || message.Contains("5.7.0", StringComparison.OrdinalIgnoreCase))
         {
-            return "Gmail refused the sender login. Use a Gmail App Password for bswmetrmailer@gmail.com, then put that 16-character app password in Email:Smtp:Password.";
+            return "Gmail refused the sender login. Ask an administrator to verify the configured ETRS mailer app passwords.";
         }
 
         return $"Could not send the verification code: {message}";
@@ -2788,6 +3459,45 @@
             await JS.InvokeVoidAsync("etrWorkFromHome.unregisterOutsideClick", employeeSearchWrapRef);
         }
         catch { }
+    }
+
+    private async Task RegisterAttendanceRequestOutsideClickAsync()
+    {
+        if (attendanceRequestOutsideClickRegistered)
+        {
+            return;
+        }
+
+        try
+        {
+            attendanceRequestDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync(
+                "etrWorkFromHome.registerOutsideClick",
+                attendanceRequestSearchWrapRef,
+                attendanceRequestDotNetRef,
+                nameof(HideAttendanceRequestResults));
+            attendanceRequestOutsideClickRegistered = true;
+        }
+        catch { }
+    }
+
+    private async Task UnregisterAttendanceRequestOutsideClickAsync()
+    {
+        pendingRegisterAttendanceRequestOutsideClick = false;
+        if (!attendanceRequestOutsideClickRegistered)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("etrWorkFromHome.unregisterOutsideClick", attendanceRequestSearchWrapRef);
+        }
+        catch { }
+        finally
+        {
+            attendanceRequestOutsideClickRegistered = false;
+        }
     }
 
     private static string FormatEmployeeName(Employee employee)

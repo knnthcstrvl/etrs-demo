@@ -23,6 +23,12 @@
     width: 100%;
 }
 
+.finance-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
 .finance-header-search {
     display: flex;
     align-items: center;
@@ -54,6 +60,252 @@
 .finance-theme-toggle:hover {
     color: var(--finance-brand-strong);
     transform: translateY(-1px);
+}
+
+.attendance-notification-wrap {
+    position: relative;
+}
+
+.attendance-notification-toggle {
+    position: relative;
+}
+
+.attendance-notification-toggle.active {
+    color: var(--finance-brand-strong);
+    background: var(--finance-surface-soft);
+    border-radius: 10px;
+}
+
+.attendance-notification-badge {
+    position: absolute;
+    top: 5px;
+    right: 3px;
+    min-width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid var(--finance-header-bg, #fff);
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.attendance-notification-dismiss {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    border: 0;
+    background: transparent;
+    cursor: default;
+}
+
+.attendance-notification-panel {
+    position: absolute;
+    z-index: 21;
+    top: calc(100% + 12px);
+    right: 0;
+    width: min(510px, calc(100vw - 2rem));
+    max-height: min(720px, calc(100vh - 100px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--finance-border);
+    border-radius: 20px;
+    background: var(--finance-surface);
+    color: var(--finance-text);
+    box-shadow: 0 26px 65px rgba(15, 23, 42, 0.22);
+    animation: attendance-notification-enter 160ms ease-out;
+}
+
+.attendance-notification-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.35rem 1.4rem 1rem;
+    border-bottom: 1px solid var(--finance-border-soft);
+}
+
+.attendance-notification-heading h2 {
+    margin: 0.2rem 0 0;
+    color: var(--finance-text);
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.attendance-notification-eyebrow {
+    color: var(--finance-text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.attendance-notification-count {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, #ebca4a 22%, var(--finance-surface));
+    color: var(--finance-text);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.attendance-notification-list {
+    min-height: 170px;
+    overflow-y: auto;
+    padding: 0.45rem 0.75rem 0.85rem;
+}
+
+.attendance-notification-item {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 0.8rem;
+    padding: 1rem 0.65rem;
+    border-bottom: 1px solid var(--finance-border-soft);
+}
+
+.attendance-notification-item:last-child {
+    border-bottom: 0;
+}
+
+.attendance-notification-avatar {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #ebca4a;
+    color: #111827;
+    font-size: 1rem;
+}
+
+.attendance-notification-content {
+    min-width: 0;
+}
+
+.attendance-notification-item-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.attendance-notification-item-top > div {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+}
+
+.attendance-notification-item-top strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--finance-text);
+    font-size: 0.92rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attendance-notification-item-top span,
+.attendance-notification-item-top time {
+    flex: 0 0 auto;
+    color: var(--finance-text-muted);
+    font-size: 0.72rem;
+}
+
+.attendance-notification-meta {
+    display: grid;
+    gap: 0.25rem;
+    margin-top: 0.45rem;
+    color: var(--finance-text-muted);
+    font-size: 0.78rem;
+}
+
+.attendance-notification-meta span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attendance-notification-meta i {
+    width: 1rem;
+    margin-right: 0.2rem;
+    text-align: center;
+}
+
+.attendance-notification-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-top: 0.75rem;
+}
+
+.attendance-notification-actions button {
+    min-height: 34px;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.notification-reject {
+    border: 1px solid var(--finance-border);
+    background: var(--finance-surface);
+    color: var(--finance-text);
+}
+
+.notification-accept {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border: 1px solid #ebca4a;
+    background: #ebca4a;
+    color: #111827;
+}
+
+.attendance-notification-actions button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.attendance-notification-error {
+    margin-top: 0.55rem;
+    color: #b91c1c;
+    font-size: 0.75rem;
+}
+
+.attendance-notification-empty {
+    min-height: 190px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 1.5rem;
+    color: var(--finance-text-muted);
+    text-align: center;
+}
+
+.attendance-notification-empty i {
+    color: #16a34a;
+    font-size: 1.65rem;
+}
+
+.attendance-notification-empty strong {
+    color: var(--finance-text);
+}
+
+@keyframes attendance-notification-enter {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .finance-search-icon {
@@ -90,5 +342,30 @@
     .finance-header {
         margin: 0 0 1rem;
         padding: 0 1rem;
+    }
+
+    .attendance-notification-panel {
+        position: fixed;
+        top: 68px;
+        right: 1rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .attendance-notification-panel {
+        right: 0.75rem;
+        width: calc(100vw - 1.5rem);
+        border-radius: 14px;
+    }
+
+    .attendance-notification-item-top {
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .attendance-notification-item-top > div {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.15rem;
     }
 }

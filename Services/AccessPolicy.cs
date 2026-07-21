@@ -19,6 +19,7 @@ namespace Financial.Services
         public const string ExportLogs = "Export Logs";
         public const string ExportEmployees = "Export Employees";
         public const string ApproveVerifications = "Approve Verifications";
+        public const string RequestApprover = "Request Approver";
         public const string ManageAttendanceLogs = "Manage Attendance Logs";
         public const string ManageEmployees = "Manage Employees";
         public const string ManageExceptions = "Manage Exceptions";
@@ -41,7 +42,8 @@ namespace Financial.Services
             Export,
             ExportLogs,
             ExportEmployees,
-            ApproveVerifications
+            ApproveVerifications,
+            RequestApprover
         };
 
         public static readonly IReadOnlyList<string> GeneralAccess = new[]

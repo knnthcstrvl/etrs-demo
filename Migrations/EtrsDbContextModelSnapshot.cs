@@ -22,6 +22,74 @@ namespace Financial.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Financial.Model.Dtr.AttendanceEmailRequest", b =>
+                {
+                    b.Property<int>("AttendanceEmailRequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendanceEmailRequestId"));
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EmployeeName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("FailureReason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("IdNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RecipientEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReviewedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("AttendanceEmailRequestId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("Status", "RequestedAt");
+
+                    b.ToTable("AttendanceEmailRequests");
+                });
+
             modelBuilder.Entity("Financial.Model.Dtr.AttendanceLog", b =>
                 {
                     b.Property<int>("AttendanceLogId")
@@ -343,13 +411,13 @@ namespace Financial.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
-
-                    b.Property<bool>("MustChangePassword")
-                        .HasColumnType("bit");
 
                     b.Property<string>("Password")
                         .IsRequired()
@@ -375,6 +443,17 @@ namespace Financial.Migrations
                         .IsUnique();
 
                     b.ToTable("UserAccounts");
+                });
+
+            modelBuilder.Entity("Financial.Model.Dtr.AttendanceEmailRequest", b =>
+                {
+                    b.HasOne("Financial.Model.Dtr.Employee", "Employee")
+                        .WithMany("AttendanceEmailRequests")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("Financial.Model.Dtr.AttendanceLog", b =>
@@ -408,6 +487,8 @@ namespace Financial.Migrations
 
             modelBuilder.Entity("Financial.Model.Dtr.Employee", b =>
                 {
+                    b.Navigation("AttendanceEmailRequests");
+
                     b.Navigation("AttendanceLogs");
 
                     b.Navigation("AttendanceLogsWfh");

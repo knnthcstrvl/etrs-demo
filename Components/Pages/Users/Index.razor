@@ -2371,7 +2371,9 @@
         new(AccessPolicy.Edit, AccessPolicy.EditLogs, AccessPolicy.EditEmployee, AccessPolicy.EditUser),
         new(AccessPolicy.Delete, AccessPolicy.DeleteEmployee, AccessPolicy.DeleteUser),
         new(AccessPolicy.ImportEmployees),
-        new(AccessPolicy.Export, AccessPolicy.ExportLogs, AccessPolicy.ExportEmployees)
+        new(AccessPolicy.Export, AccessPolicy.ExportLogs, AccessPolicy.ExportEmployees),
+        new(AccessPolicy.ApproveVerifications),
+        new(AccessPolicy.RequestApprover)
     };
     private readonly List<AccessMenuOption> generalAccessOptions = new()
     {

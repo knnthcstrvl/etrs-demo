@@ -1,5 +1,13 @@
 @rendermode InteractiveServer
+@implements IAsyncDisposable
+@using Financial.Data
+@using Financial.Model.Dtr
+@using Microsoft.EntityFrameworkCore
 @inject IJSRuntime JS
+@inject CurrentUserService CurrentUser
+@inject IDbContextFactory<EtrsDbContext> DbFactory
+@inject IAttendanceEmailService AttendanceEmailService
+@inject IToastService HeaderToastService
 
 <header class="finance-header">
     <div class="finance-header-inner">
@@ -13,19 +21,508 @@
                    aria-label="Search" />
         </div>
 
-        <button type="button"
-                class="finance-theme-toggle"
-                title="Dark mode"
-                aria-label="Toggle dark mode"
-                @onclick="ToggleThemeAsync">
-            <i class="fa-solid fa-moon" aria-hidden="true"></i>
-        </button>
+        <div class="finance-header-actions">
+            @if (CanApproveRequests)
+            {
+                <div class="attendance-notification-wrap">
+                    <button type="button"
+                            class="finance-theme-toggle attendance-notification-toggle @(showNotifications ? "active" : null)"
+                            title="Attendance email requests"
+                            aria-label="Attendance email requests"
+                            aria-expanded="@showNotifications"
+                            @onclick="ToggleNotificationsAsync">
+                        <i class="fa-regular fa-bell" aria-hidden="true"></i>
+                        @if (pendingRequests.Count > 0)
+                        {
+                            <span class="attendance-notification-badge">@(pendingRequests.Count > 99 ? "99+" : pendingRequests.Count)</span>
+                        }
+                    </button>
+
+                    @if (showNotifications)
+                    {
+                        <button type="button" class="attendance-notification-dismiss" aria-label="Close notifications" @onclick="CloseNotifications"></button>
+                        <section class="attendance-notification-panel" aria-label="Attendance requests" @onclick:stopPropagation="true">
+                            <div class="attendance-notification-heading">
+                                <div>
+                                    <h2>Your notifications</h2>
+                                </div>
+                                <span class="attendance-notification-count">@pendingRequests.Count pending</span>
+                            </div>
+
+                            <div class="attendance-notification-list">
+                                @if (RejectingRequest is not null)
+                                {
+                                    <div class="attendance-rejection-composer @(isClosingRejectComposer ? "closing" : null)">
+                                        <div class="attendance-rejection-details">
+                                            <div class="attendance-notification-item-top">
+                                                <div>
+                                                    <strong>Requested by @RejectingRequest.EmployeeName</strong>
+                                                    <span>@RejectingRequest.IdNumber</span>
+                                                </div>
+                                                <time datetime="@RejectingRequest.RequestedAt.ToString("O")">@FormatRequestAge(RejectingRequest.RequestedAt)</time>
+                                            </div>
+                                            <div class="attendance-notification-meta">
+                                                <span><i class="fa-regular fa-calendar" aria-hidden="true"></i> @RejectingRequest.PeriodStart.ToString("MMM d") - @RejectingRequest.PeriodEnd.ToString("MMM d, yyyy")</span>
+                                                <span title="@RejectingRequest.RecipientEmail"><i class="fa-regular fa-envelope" aria-hidden="true"></i> Requestor email: @RejectingRequest.RecipientEmail</span>
+                                            </div>
+                                        </div>
+                                        <textarea class="attendance-rejection-textarea"
+                                                  @bind="rejectionRemarks"
+                                                  @bind:event="oninput"
+                                                  maxlength="1000"
+                                                  placeholder="Remarks (optional)"
+                                                  aria-label="Rejection remarks"
+                                                  disabled="@(activeRequestId is not null)"></textarea>
+                                        @if (!string.IsNullOrWhiteSpace(rejectionError))
+                                        {
+                                            <div class="attendance-notification-error">@rejectionError</div>
+                                        }
+                                        <div class="attendance-rejection-actions">
+                                            <button type="button"
+                                                    class="attendance-rejection-cancel"
+                                                    @onclick="CancelRejectComposerAsync"
+                                                    disabled="@(activeRequestId is not null)">
+                                                Cancel
+                                            </button>
+                                            <button type="button"
+                                                    class="attendance-rejection-submit"
+                                                    @onclick="SubmitRejectRequestAsync"
+                                                    disabled="@(activeRequestId is not null)">
+                                                @if (activeRequestId is not null)
+                                                {
+                                                    <span class="spinner" aria-hidden="true"></span><span>Sending...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>Submit</span>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                                else if (isLoadingRequests)
+                                {
+                                    <div class="attendance-notification-empty">
+                                        <span class="spinner" aria-hidden="true"></span>
+                                        <span>Loading requests...</span>
+                                    </div>
+                                }
+                                else if (pendingRequests.Count == 0)
+                                {
+                                    <div class="attendance-notification-empty">
+                                        <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
+                                        <strong>All caught up</strong>
+                                        <span>There are no attendance requests awaiting review.</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var request in pendingRequests)
+                                    {
+                                        <article class="attendance-notification-item">
+                                            <div class="attendance-notification-avatar" aria-hidden="true">
+                                                <i class="fa-regular fa-address-book"></i>
+                                            </div>
+                                            <div class="attendance-notification-content">
+                                                <div class="attendance-notification-item-top">
+                                                    <div>
+                                                        <strong>Requested by @request.EmployeeName</strong>
+                                                        <span>@request.IdNumber</span>
+                                                    </div>
+                                                    <time datetime="@request.RequestedAt.ToString("O")">@FormatRequestAge(request.RequestedAt)</time>
+                                                </div>
+                                                <div class="attendance-notification-meta">
+                                                    <span><i class="fa-regular fa-calendar" aria-hidden="true"></i> @request.PeriodStart.ToString("MMM d") - @request.PeriodEnd.ToString("MMM d, yyyy")</span>
+                                                    <span title="@request.RecipientEmail"><i class="fa-regular fa-envelope" aria-hidden="true"></i> Requestor email: @request.RecipientEmail</span>
+                                                </div>
+                                                @if (requestActionRequestId == request.AttendanceEmailRequestId && !string.IsNullOrWhiteSpace(requestActionMessage))
+                                                {
+                                                    <div class="attendance-notification-error">@requestActionMessage</div>
+                                                }
+                                                <div class="attendance-notification-actions">
+                                                    <button type="button" class="notification-reject" @onclick="() => OpenRejectComposer(request.AttendanceEmailRequestId)" disabled="@(activeRequestId is not null)">
+                                                        Reject
+                                                    </button>
+                                                    <button type="button" class="notification-accept" @onclick="() => ApproveRequestAsync(request.AttendanceEmailRequestId)" disabled="@(activeRequestId is not null)">
+                                                        @if (IsRequestBusy(request) && activeRequestAction == "Approve")
+                                                        {
+                                                            <span class="spinner" aria-hidden="true"></span><span>Sending...</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>Accept</span>
+                                                        }
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </article>
+                                    }
+                                }
+                            </div>
+                        </section>
+                    }
+                </div>
+            }
+
+            <button type="button"
+                    class="finance-theme-toggle"
+                    title="Dark mode"
+                    aria-label="Toggle dark mode"
+                    @onclick="ToggleThemeAsync">
+                <i class="fa-solid fa-moon" aria-hidden="true"></i>
+            </button>
+        </div>
     </div>
 </header>
 
 @code {
+    private readonly PeriodicTimer refreshTimer = new(TimeSpan.FromSeconds(30));
+    private CancellationTokenSource refreshCancellation = new();
+    private List<AttendanceEmailRequest> pendingRequests = new();
+    private bool showNotifications;
+    private bool isLoadingRequests;
+    private int? activeRequestId;
+    private string activeRequestAction = string.Empty;
+    private int? requestActionRequestId;
+    private string requestActionMessage = string.Empty;
+    private int? rejectingRequestId;
+    private string rejectionRemarks = string.Empty;
+    private string rejectionError = string.Empty;
+    private bool isClosingRejectComposer;
+
+    private bool CanApproveRequests => CurrentUser.IsInitialized && CurrentUser.HasAccess(AccessPolicy.RequestApprover);
+    private AttendanceEmailRequest? RejectingRequest => rejectingRequestId is null
+        ? null
+        : pendingRequests.FirstOrDefault(request => request.AttendanceEmailRequestId == rejectingRequestId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentUser.OnChanged += HandleCurrentUserChanged;
+        await CurrentUser.InitializeAsync();
+        if (CanApproveRequests)
+        {
+            await LoadPendingRequestsAsync();
+        }
+        _ = RefreshRequestsLoopAsync(refreshCancellation.Token);
+    }
+
+    private async void HandleCurrentUserChanged()
+    {
+        try
+        {
+            if (CanApproveRequests)
+            {
+                await LoadPendingRequestsAsync();
+            }
+            else
+            {
+                pendingRequests.Clear();
+                showNotifications = false;
+                ResetRejectComposer();
+            }
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // Authentication transitions can dispose the circuit while this callback is running.
+        }
+    }
+
+    private async Task RefreshRequestsLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (await refreshTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (CanApproveRequests && activeRequestId is null && rejectingRequestId is null)
+                {
+                    await InvokeAsync(LoadPendingRequestsAsync);
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task ToggleNotificationsAsync()
+    {
+        showNotifications = !showNotifications;
+        if (!showNotifications)
+        {
+            ResetRejectComposer();
+        }
+        else
+        {
+            await LoadPendingRequestsAsync();
+        }
+    }
+
+    private void CloseNotifications()
+    {
+        showNotifications = false;
+        ResetRejectComposer();
+    }
+
+    private async Task LoadPendingRequestsAsync()
+    {
+        if (!CanApproveRequests)
+        {
+            return;
+        }
+
+        isLoadingRequests = pendingRequests.Count == 0;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            pendingRequests = await db.AttendanceEmailRequests.AsNoTracking()
+                .Where(request => request.Status == "Pending")
+                .OrderByDescending(request => request.RequestedAt)
+                .Take(50)
+                .ToListAsync();
+        }
+        catch
+        {
+            pendingRequests.Clear();
+        }
+        finally
+        {
+            isLoadingRequests = false;
+        }
+    }
+
+    private async Task ApproveRequestAsync(int requestId)
+    {
+        if (activeRequestId is not null || !CanApproveRequests)
+        {
+            return;
+        }
+
+        activeRequestId = requestId;
+        activeRequestAction = "Approve";
+        requestActionRequestId = requestId;
+        requestActionMessage = string.Empty;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var request = await db.AttendanceEmailRequests.FirstOrDefaultAsync(item => item.AttendanceEmailRequestId == requestId);
+            if (request is null || request.Status != "Pending")
+            {
+                requestActionMessage = "This request has already been reviewed.";
+                await LoadPendingRequestsAsync();
+                return;
+            }
+
+            request.Status = "Processing";
+            request.ReviewedBy = CurrentUser.Username;
+            await db.SaveChangesAsync();
+
+            try
+            {
+                await AttendanceEmailService.SendAttendanceLogsAsync(request);
+                request.Status = "Approved";
+                request.ReviewedAt = DateTime.UtcNow;
+                request.FailureReason = string.Empty;
+                await db.SaveChangesAsync();
+                HeaderToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Success,
+                    Title = "Attendance sent",
+                    Message = $"The attendance logs for {request.EmployeeName} were sent to {request.RecipientEmail}."
+                });
+            }
+            catch (Exception ex)
+            {
+                request.Status = "Pending";
+                request.ReviewedBy = string.Empty;
+                request.ReviewedAt = null;
+                request.FailureReason = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
+                await db.SaveChangesAsync();
+                requestActionMessage = GetEmailDeliveryFailureMessage(ex);
+            }
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            requestActionMessage = "Another approver reviewed this request first.";
+        }
+        catch
+        {
+            requestActionMessage = "The request could not be processed. Please try again.";
+        }
+        finally
+        {
+            activeRequestId = null;
+            activeRequestAction = string.Empty;
+            await LoadPendingRequestsAsync();
+        }
+    }
+
+    private void OpenRejectComposer(int requestId)
+    {
+        if (activeRequestId is not null || !CanApproveRequests)
+        {
+            return;
+        }
+
+        rejectingRequestId = requestId;
+        rejectionRemarks = string.Empty;
+        rejectionError = string.Empty;
+        isClosingRejectComposer = false;
+    }
+
+    private void ResetRejectComposer()
+    {
+        rejectingRequestId = null;
+        rejectionRemarks = string.Empty;
+        rejectionError = string.Empty;
+        isClosingRejectComposer = false;
+    }
+
+    private async Task CancelRejectComposerAsync()
+    {
+        if (activeRequestId is not null)
+        {
+            return;
+        }
+
+        isClosingRejectComposer = true;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(160);
+        ResetRejectComposer();
+    }
+
+    private async Task SubmitRejectRequestAsync()
+    {
+        if (rejectingRequestId is not int requestId || activeRequestId is not null || !CanApproveRequests)
+        {
+            return;
+        }
+
+        activeRequestId = requestId;
+        activeRequestAction = "Reject";
+        requestActionRequestId = requestId;
+        requestActionMessage = string.Empty;
+        rejectionError = string.Empty;
+        var rejectionSent = false;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var request = await db.AttendanceEmailRequests.FirstOrDefaultAsync(item => item.AttendanceEmailRequestId == requestId);
+            if (request is null || request.Status != "Pending")
+            {
+                rejectionError = "This request has already been reviewed.";
+                return;
+            }
+
+            request.Status = "Processing";
+            request.ReviewedBy = CurrentUser.Username;
+            await db.SaveChangesAsync();
+
+            try
+            {
+                await AttendanceEmailService.SendRejectionEmailAsync(request, rejectionRemarks);
+                request.Status = "Rejected";
+                request.ReviewedAt = DateTime.UtcNow;
+                request.FailureReason = string.Empty;
+                await db.SaveChangesAsync();
+                rejectionSent = true;
+                HeaderToastService.Show(new ToastMessage
+                {
+                    Type = ToastType.Information,
+                    Title = "Request rejected",
+                    Message = $"The rejection email was sent to {request.RecipientEmail}."
+                });
+            }
+            catch (Exception ex)
+            {
+                request.Status = "Pending";
+                request.ReviewedBy = string.Empty;
+                request.ReviewedAt = null;
+                request.FailureReason = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
+                await db.SaveChangesAsync();
+                rejectionError = GetEmailDeliveryFailureMessage(ex);
+            }
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            rejectionError = "Another approver reviewed this request first.";
+        }
+        catch
+        {
+            rejectionError = "The request could not be processed. Please try again.";
+        }
+        finally
+        {
+            activeRequestId = null;
+            activeRequestAction = string.Empty;
+        }
+
+        if (rejectionSent)
+        {
+            isClosingRejectComposer = true;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(160);
+            await LoadPendingRequestsAsync();
+            ResetRejectComposer();
+        }
+    }
+
+    private bool IsRequestBusy(AttendanceEmailRequest request) => activeRequestId == request.AttendanceEmailRequestId;
+
+    private static string GetEmailDeliveryFailureMessage(Exception exception)
+    {
+        var detail = string.Join(" ", GetExceptionMessages(exception));
+        if (detail.Contains("No ETRS mailer account is configured", StringComparison.OrdinalIgnoreCase))
+        {
+            return "No mailer account was loaded. Restart ETRS in Development or configure Email:Smtp:Accounts on the server.";
+        }
+        if (detail.Contains("rejected the app password", StringComparison.OrdinalIgnoreCase)
+            || detail.Contains("authentication", StringComparison.OrdinalIgnoreCase)
+            || detail.Contains("5.7.8", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Gmail rejected the configured app passwords. Generate new Gmail app passwords and update the ETRS secrets.";
+        }
+        if (detail.Contains("could not connect", StringComparison.OrdinalIgnoreCase)
+            || detail.Contains("timed out", StringComparison.OrdinalIgnoreCase)
+            || detail.Contains("network", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Cannot connect to Gmail SMTP. Allow outbound smtp.gmail.com:587 on the ETRS server.";
+        }
+        return "Email delivery failed. Check the server log for the SMTP response and try again.";
+    }
+
+    private static IEnumerable<string> GetExceptionMessages(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (!string.IsNullOrWhiteSpace(current.Message))
+            {
+                yield return current.Message;
+            }
+        }
+    }
+
+    private static string FormatRequestAge(DateTime requestedAt)
+    {
+        var elapsed = DateTime.UtcNow - DateTime.SpecifyKind(requestedAt, DateTimeKind.Utc);
+        if (elapsed.TotalMinutes < 1) return "Just now";
+        if (elapsed.TotalHours < 1) return $"{(int)elapsed.TotalMinutes}m ago";
+        if (elapsed.TotalDays < 1) return $"{(int)elapsed.TotalHours}h ago";
+        return $"{(int)elapsed.TotalDays}d ago";
+    }
+
     private async Task ToggleThemeAsync()
     {
         await JS.InvokeVoidAsync("etrsLayoutSync.toggleTheme");
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        CurrentUser.OnChanged -= HandleCurrentUserChanged;
+        refreshCancellation.Cancel();
+        refreshCancellation.Dispose();
+        refreshTimer.Dispose();
+        return ValueTask.CompletedTask;
     }
 }
