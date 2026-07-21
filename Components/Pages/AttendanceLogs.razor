@@ -3,6 +3,7 @@
 @inject Financial.Services.CurrentUserService CurrentUser
 @using Financial.Model.Dtr
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Rendering
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
 @using System.ComponentModel.DataAnnotations
@@ -709,21 +710,7 @@
                             }
                             else
                             {
-                                <div class="attendance-mov-preview-card">
-                                    @if (IsPdfUrl(movPreviewUrl))
-                                    {
-                                        <iframe class="attendance-mov-preview-frame"
-                                                src="@MovPreviewFrameUrl"
-                                                title="Means of verification PDF preview"></iframe>
-                                    }
-                                    else
-                                    {
-                                        <div class="attendance-mov-preview-fallback">
-                                            <p>Means of Verification preview is only available for PDF files.</p>
-                                            <a href="@movPreviewUrl" target="_blank" rel="noopener noreferrer">Open file</a>
-                                        </div>
-                                    }
-                                </div>
+                                @MovPreviewContent
                             }
                         </div>
                     </div>
@@ -1236,21 +1223,7 @@
                 </div>
 
                 <div class="attendance-detail-body attendance-mov-preview-body">
-                    <div class="attendance-mov-preview-card">
-                        @if (IsPdfUrl(movPreviewUrl))
-                        {
-                            <iframe class="attendance-mov-preview-frame"
-                                    src="@MovPreviewFrameUrl"
-                                    title="Means of verification PDF preview"></iframe>
-                        }
-                        else
-                        {
-                            <div class="attendance-mov-preview-fallback">
-                                <p>Means of Verification preview is only available for PDF files.</p>
-                                <a href="@movPreviewUrl" target="_blank" rel="noopener noreferrer">Open file</a>
-                            </div>
-                        }
-                    </div>
+                    @MovPreviewContent
                 </div>
 
             </div>
@@ -1271,21 +1244,7 @@
                         </div>
 
                         <div class="attendance-detail-body attendance-mov-preview-body">
-                            <div class="attendance-mov-preview-card">
-                                @if (IsPdfUrl(movPreviewUrl))
-                                {
-                                    <iframe class="attendance-mov-preview-frame"
-                                            src="@MovPreviewFrameUrl"
-                                            title="Means of verification PDF preview"></iframe>
-                                }
-                                else
-                                {
-                                    <div class="attendance-mov-preview-fallback">
-                                        <p>Means of Verification preview is only available for PDF files.</p>
-                                        <a href="@movPreviewUrl" target="_blank" rel="noopener noreferrer">Open file</a>
-                                    </div>
-                                }
-                            </div>
+                            @MovPreviewContent
                         </div>
                     </div>
                 }
@@ -2951,6 +2910,67 @@
         background: #ffffff;
     }
 
+    .attendance-mov-preview-image {
+        display: block;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        object-fit: contain;
+        background: #eef1f5;
+    }
+
+    .attendance-mov-image-card {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        flex-direction: column;
+        gap: 0.65rem;
+        padding: 0.65rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(30, 41, 57, 0.05);
+    }
+
+    .attendance-mov-image-frame {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+        border-radius: 6px;
+        background: var(--etrs-gray-100);
+    }
+
+    .attendance-mov-image-navigation {
+        display: flex;
+        flex: 0 0 auto;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    .attendance-mov-image-navigation button {
+        display: inline-flex;
+        width: 2.25rem;
+        height: 2.25rem;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1px solid var(--etrs-gray-300);
+        border-radius: 7px;
+        background: transparent;
+        color: var(--etrs-gray-800);
+    }
+
+    .attendance-mov-image-navigation button:hover,
+    .attendance-mov-image-navigation button:focus-visible {
+        border-color: var(--etrs-primary);
+        background: var(--etrs-gray-100);
+        outline: none;
+    }
+
     .attendance-input-modal {
         width: min(100%, 900px);
     }
@@ -3365,15 +3385,32 @@
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28) !important;
     }
 
-    body.etrs-dark-theme .attendance-photo-preview-card {
+    body.etrs-dark-theme .attendance-photo-preview-card,
+    body.etrs-dark-theme .attendance-mov-image-card {
         background: #111c2d !important;
         border-color: #2f4058 !important;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28) !important;
     }
 
-    body.etrs-dark-theme .attendance-photo-preview-frame {
+    body.etrs-dark-theme .attendance-photo-preview-frame,
+    body.etrs-dark-theme .attendance-mov-image-frame {
         background: #0f1828 !important;
         color: #9fb0c9 !important;
+    }
+
+    body.etrs-dark-theme .attendance-mov-image-navigation button {
+        border-color: #2f4058 !important;
+        color: #dbe7f6 !important;
+    }
+
+    body.etrs-dark-theme .attendance-mov-image-navigation button:hover,
+    body.etrs-dark-theme .attendance-mov-image-navigation button:focus-visible {
+        background: #1b2a3d !important;
+        border-color: #3a506f !important;
+    }
+
+    body.etrs-dark-theme .attendance-mov-preview-image {
+        background: #0b1220 !important;
     }
 
     body.etrs-dark-theme .attendance-mov-preview-frame {
@@ -3964,8 +4001,123 @@
     private bool suppressAttendanceDetailEnterAnimation;
     private string movPreviewUrl = string.Empty;
     private string movPreviewTitle = string.Empty;
+    private int movImagePreviewIndex;
     private bool isApprovingVerification;
-    private string MovPreviewFrameUrl => BuildPdfPreviewUrl(movPreviewUrl);
+    private RenderFragment MovPreviewContent => builder =>
+    {
+        var sequence = 0;
+        var urls = SplitMovUrls(movPreviewUrl).ToList();
+        if (urls.Count == 0)
+        {
+            return;
+        }
+
+        var currentIndex = Math.Clamp(movImagePreviewIndex, 0, urls.Count - 1);
+        var currentUrl = urls[currentIndex];
+
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "attendance-mov-image-card");
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", "attendance-detail-label");
+        builder.AddContent(sequence++, urls.Count == 1
+            ? GetMovFileName(currentUrl)
+            : $"{GetMovFileName(currentUrl)} ({currentIndex + 1} of {urls.Count})");
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "attendance-mov-image-frame");
+
+        if (IsPdfUrl(currentUrl))
+        {
+            builder.OpenElement(sequence++, "iframe");
+            builder.AddAttribute(sequence++, "class", "attendance-mov-preview-frame");
+            builder.AddAttribute(sequence++, "src", BuildPdfPreviewUrl(currentUrl));
+            builder.AddAttribute(sequence++, "title", $"PDF preview: {GetMovFileName(currentUrl)}");
+            builder.CloseElement();
+        }
+        else if (IsImageUrl(currentUrl))
+        {
+            builder.OpenElement(sequence++, "img");
+            builder.AddAttribute(sequence++, "class", "attendance-mov-preview-image");
+            builder.AddAttribute(sequence++, "src", currentUrl);
+            builder.AddAttribute(sequence++, "alt", $"Means of verification: {GetMovFileName(currentUrl)}");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "attendance-mov-preview-fallback");
+            builder.OpenElement(sequence++, "p");
+            builder.AddContent(sequence++, $"{GetMovFileType(currentUrl)}: {GetMovFileName(currentUrl)}");
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "a");
+            builder.AddAttribute(sequence++, "href", currentUrl);
+            builder.AddAttribute(sequence++, "target", "_blank");
+            builder.AddAttribute(sequence++, "rel", "noopener noreferrer");
+            builder.AddContent(sequence++, "Open file");
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+
+        if (urls.Count > 1)
+        {
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "attendance-mov-image-navigation");
+            AddMovImageNavigationButton(builder, ref sequence, "fa-solid fa-chevron-left", "Previous file", ShowPreviousMovFile);
+            AddMovImageNavigationButton(builder, ref sequence, "fa-solid fa-chevron-right", "Next file", ShowNextMovFile);
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private void AddMovImageNavigationButton(RenderTreeBuilder builder, ref int sequence, string iconClass, string label, Action action)
+    {
+        builder.OpenElement(sequence++, "button");
+        builder.AddAttribute(sequence++, "type", "button");
+        builder.AddAttribute(sequence++, "aria-label", label);
+        builder.AddAttribute(sequence++, "title", label);
+        builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, action));
+        builder.OpenElement(sequence++, "i");
+        builder.AddAttribute(sequence++, "class", iconClass);
+        builder.AddAttribute(sequence++, "aria-hidden", "true");
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    private void ShowPreviousMovFile()
+    {
+        var count = SplitMovUrls(movPreviewUrl).Count();
+        if (count > 1)
+        {
+            movImagePreviewIndex = (movImagePreviewIndex - 1 + count) % count;
+        }
+    }
+
+    private void ShowNextMovFile()
+    {
+        var count = SplitMovUrls(movPreviewUrl).Count();
+        if (count > 1)
+        {
+            movImagePreviewIndex = (movImagePreviewIndex + 1) % count;
+        }
+    }
+
+    private static IEnumerable<string> SplitMovUrls(string? value)
+        => (value ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static string GetMovFileName(string url) => Path.GetFileName(url.Replace('\\', '/'));
+
+    private static string GetMovFileType(string url) => Path.GetExtension(url).ToLowerInvariant() switch
+    {
+        ".doc" or ".docx" => "Word document",
+        ".xls" or ".xlsx" => "Excel workbook",
+        ".csv" => "CSV file",
+        ".ppt" or ".pptx" => "PowerPoint presentation",
+        ".txt" => "Text file",
+        _ => "File"
+    };
 
     private static bool IsImageUrl(string url)
         => !string.IsNullOrWhiteSpace(url)
@@ -4015,6 +4167,11 @@
         if (url.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
         {
             return "text/csv";
+        }
+
+        if (url.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+        {
+            return "text/plain";
         }
 
         if (IsImageUrl(url))
@@ -5240,6 +5397,7 @@
         sidecarPreviewMode = SidecarPreviewMode.Mov;
         ClearPhotoVerificationPreview();
         movPreviewUrl = movUrl;
+        movImagePreviewIndex = 0;
         movPreviewTitle = string.IsNullOrWhiteSpace(employeeName)
             ? "Means of Verification"
             : $"Means of Verification - {employeeName}";
@@ -5259,6 +5417,7 @@
         ClearPhotoVerificationPreview();
         var openVersion = ++movPreviewOpenVersion;
         movPreviewUrl = movUrl;
+        movImagePreviewIndex = 0;
         movPreviewTitle = string.IsNullOrWhiteSpace(employeeName)
             ? "Means of Verification"
             : $"Means of Verification - {employeeName}";
@@ -5292,6 +5451,7 @@
         ClearPhotoVerificationPreview();
         var openVersion = ++movPreviewOpenVersion;
         movPreviewUrl = movUrl;
+        movImagePreviewIndex = 0;
         movPreviewTitle = string.IsNullOrWhiteSpace(employeeName)
             ? "Means of Verification"
             : $"Means of Verification - {employeeName}";
@@ -5323,6 +5483,7 @@
 
         sidecarPreviewMode = SidecarPreviewMode.PhotoVerification;
         movPreviewUrl = string.Empty;
+        movImagePreviewIndex = 0;
         movPreviewTitle = "Photo Verification";
         SetPhotoVerificationPreview(log);
 
@@ -5426,6 +5587,7 @@
         showMovPreviewWithAttendanceDetail = false;
         showMovPreviewWithEditLog = false;
         movPreviewUrl = string.Empty;
+        movImagePreviewIndex = 0;
         movPreviewTitle = string.Empty;
         ClearPhotoVerificationPreview();
         sidecarPreviewMode = SidecarPreviewMode.Mov;

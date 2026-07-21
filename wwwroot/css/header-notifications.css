@@ -71,7 +71,7 @@
     border-radius: 14px;
     background: var(--finance-surface, #fff);
     color: var(--finance-text, #1e2939);
-    box-shadow: 0 26px 65px rgba(15, 23, 42, 0.24);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
     animation: attendance-notification-enter 160ms ease-out;
 }
 
@@ -345,7 +345,7 @@
 body.etrs-dark-theme .attendance-notification-panel {
     border-color: #2b3b52;
     background: #101827;
-    box-shadow: 0 26px 65px rgba(0, 0, 0, 0.48);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.24);
 }
 
 body.etrs-dark-theme .attendance-notification-count,

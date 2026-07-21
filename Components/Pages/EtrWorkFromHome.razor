@@ -156,7 +156,7 @@
                             <InputFile id="movUpload"
                                        class="etr-file-input"
                                        OnChange="HandleMovSelected"
-                                       accept=".pdf"
+                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.jpg,.jpeg,.png,.txt"
                                        multiple
                                        disabled="@isSubmitting" />
                             <span class="upload-note upload-file-name">@GetMovUploadLabel()</span>
@@ -798,15 +798,17 @@
         background: #ebca4a;
         color: #6f5200;
         font-size: 1rem;
-        box-shadow: 0 8px 18px rgba(235, 202, 74, 0.28);
+        box-shadow: none;
         white-space: nowrap;
-        transition: box-shadow 0.16s ease;
+        transition: none;
     }
 
     .etr-attendance-request-button:hover,
     .etr-attendance-request-button:focus-visible {
         transform: none;
-        box-shadow: 0 10px 22px rgba(235, 202, 74, 0.38);
+        background: #ebca4a;
+        color: #6f5200;
+        box-shadow: none;
         outline: none;
     }
 
@@ -2851,19 +2853,19 @@
                 {
                     Type = ToastType.Warning,
                     Title = "Unsupported file",
-                    Message = $"File '{file.Name}' is not supported. Only PDF files are accepted.",
+                    Message = $"File '{file.Name}' is not supported. Accepted formats: PDF, Word, Excel, CSV, PowerPoint, JPG, PNG, and TXT.",
                     Duration = 5000
                 });
                 continue;
             }
 
-            if (file.Size > 10 * 1024 * 1024)
+            if (file.Size > 5 * 1024 * 1024)
             {
                 ToastService.Show(new ToastMessage
                 {
                     Type = ToastType.Warning,
                     Title = "File too large",
-                    Message = $"File '{file.Name}' exceeds the 10 MB limit.",
+                    Message = $"File '{file.Name}' exceeds the 5 MB limit.",
                     Duration = 5000
                 });
                 continue;
@@ -3547,7 +3549,8 @@
         }
 
         var normalizedExtension = extension.Trim().ToLowerInvariant();
-        return normalizedExtension == ".pdf";
+        return normalizedExtension is ".pdf" or ".doc" or ".docx" or ".xls" or ".xlsx" or ".csv"
+            or ".ppt" or ".pptx" or ".jpg" or ".jpeg" or ".png" or ".txt";
     }
 
     private async Task<string?> SaveMovFilesAsync(IReadOnlyList<IBrowserFile>? files, Employee employee)
@@ -3559,7 +3562,7 @@
 
         var configuredPath = Configuration["Uploads:WfhMovPath"];
         var savedPaths = new List<string>();
-        const long maxFileSizeBytes = 10 * 1024 * 1024;
+        const long maxFileSizeBytes = 5 * 1024 * 1024;
 
         async Task<string?> WriteToPathAsync(IBrowserFile file, string root, bool returnWebRelative, bool showFailureToast)
         {
