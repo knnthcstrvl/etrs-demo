@@ -305,7 +305,7 @@
                                 {
                                     <div class="attendance-detail-section user-modal-section user-modal-identity">
                                         <div class="attendance-input-grid">
-                                            <div class="attendance-input-field">
+                                            <div class="attendance-input-field @(showDivisionDropdown ? "user-modal-field-open" : null)">
                                                 <label class="attendance-table-toolbar-label" for="userName">Name</label>
                                                 <input id="userName" class="form-control attendance-input-control" @bind="userForm.Name" />
                                             </div>
@@ -2372,7 +2372,7 @@
         new(AccessPolicy.Delete, AccessPolicy.DeleteEmployee, AccessPolicy.DeleteUser),
         new(AccessPolicy.ImportEmployees),
         new(AccessPolicy.Export, AccessPolicy.ExportLogs, AccessPolicy.ExportEmployees),
-        new(AccessPolicy.ApproveVerifications),
+        new(AccessPolicy.VerificationApprover),
         new(AccessPolicy.RequestApprover)
     };
     private readonly List<AccessMenuOption> generalAccessOptions = new()
@@ -2421,7 +2421,8 @@
     private bool CanDeleteUsers => CurrentUser.HasAccess(AccessPolicy.DeleteUser);
     private bool CanDeleteUser(UserAccount? user) => CanDeleteUsers && !IsCurrentUser(user);
     private int UserModalStepCount => isEditingUser ? 2 : 3;
-    private bool ShouldScrollUserModalBody => userModalStep == UserModalStep.PersonalInfo;
+    private bool ShouldScrollUserModalBody
+        => userModalStep == UserModalStep.PersonalInfo && !showDivisionDropdown;
 
     private IEnumerable<UserAccount> PagedUsers => filteredUsers
         .Skip((userPage - 1) * pageSize)
@@ -3866,7 +3867,13 @@
     private static string DisplayAccess(string? value)
         => string.IsNullOrWhiteSpace(value)
             ? "-"
-            : string.Join(", ", value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            : string.Join(", ", value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(DisplayAccessName));
+
+    private static string DisplayAccessName(string access)
+        => string.Equals(access, AccessPolicy.LegacyApproveVerifications, StringComparison.OrdinalIgnoreCase)
+            ? AccessPolicy.VerificationApprover
+            : access;
 
     private static IEnumerable<string> GetAccessPills(UserAccount user)
     {
@@ -3888,7 +3895,7 @@
 
         foreach (var item in access)
         {
-            yield return item;
+            yield return DisplayAccessName(item);
         }
     }
 
@@ -3905,6 +3912,9 @@
                     break;
                 case "Import":
                     normalized.Add(AccessPolicy.ImportEmployees);
+                    break;
+                case AccessPolicy.LegacyApproveVerifications:
+                    normalized.Add(AccessPolicy.VerificationApprover);
                     break;
                 default:
                     normalized.Add(token);

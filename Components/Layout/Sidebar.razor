@@ -235,7 +235,8 @@
             return AllItems;
         }
 
-        if (CurrentUser.HasAccess(AccessPolicy.ManageAttendanceLogs))
+        if (CurrentUser.HasAccess(AccessPolicy.ManageAttendanceLogs)
+            || CurrentUser.HasAccess(AccessPolicy.VerificationApprover))
         {
             list.Add(AllItems.First(i => i.Label == "Attendance Logs"));
         }

@@ -292,7 +292,7 @@
                         <i class="fa-solid fa-chevron-down attendance-dropdown-caret" aria-hidden="true"></i>
                     </button>
                     <div class="attendance-filter-select-menu dashboard-division-menu @(showDivisionPieMenu ? "show" : null)">
-                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(selectedDivisionPie) ? "active" : null)" @onclick='() => SelectDivisionPie(string.Empty)'>All Divisions/Centers/Admin Units</button>
+                        <button type="button" class="attendance-filter-select-option @(string.IsNullOrWhiteSpace(selectedDivisionPie) ? "active" : null)" @onclick='() => SelectDivisionPie(string.Empty)'>All</button>
                         @foreach (var option in divisionPieOptions)
                         {
                             <button type="button" class="attendance-filter-select-option @(string.Equals(selectedDivisionPie, option, StringComparison.OrdinalIgnoreCase) ? "active" : null)" @onclick='() => SelectDivisionPie(option)'>@option</button>
@@ -3162,7 +3162,7 @@
     private string DashboardChartColumnStyle => $"--dashboard-chart-columns: {Math.Max(lateUndertimeChart.Count, 1)};";
     private string DivisionPiePeriodLabel => FormatDateRange(filterStart, filterEnd);
     private string SelectedDivisionPieLabel => string.IsNullOrWhiteSpace(selectedDivisionPie)
-        ? "All Divisions/Centers/Admin Units"
+        ? "All"
         : selectedDivisionPie;
     private double DivisionPieOnsitePercent => divisionPieTotal <= 0
         ? 0

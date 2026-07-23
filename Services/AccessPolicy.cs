@@ -18,7 +18,8 @@ namespace Financial.Services
         public const string Export = "Export";
         public const string ExportLogs = "Export Logs";
         public const string ExportEmployees = "Export Employees";
-        public const string ApproveVerifications = "Approve Verifications";
+        public const string VerificationApprover = "Verification Approver";
+        public const string LegacyApproveVerifications = "Approve Verifications";
         public const string RequestApprover = "Request Approver";
         public const string ManageAttendanceLogs = "Manage Attendance Logs";
         public const string ManageEmployees = "Manage Employees";
@@ -42,7 +43,7 @@ namespace Financial.Services
             Export,
             ExportLogs,
             ExportEmployees,
-            ApproveVerifications,
+            VerificationApprover,
             RequestApprover
         };
 
@@ -76,6 +77,7 @@ namespace Financial.Services
 
             return requested switch
             {
+                VerificationApprover => accessSet.Contains(LegacyApproveVerifications),
                 "View" => accessSet.Contains(ViewLogs),
                 "Import" => accessSet.Contains(ImportEmployees),
 
@@ -149,6 +151,7 @@ namespace Financial.Services
         public static bool HasAnyAccess(IEnumerable<string> accessLevels)
             => accessLevels.Any(level => SpecificAccess.Contains(level, StringComparer.OrdinalIgnoreCase)
                 || GeneralAccess.Contains(level, StringComparer.OrdinalIgnoreCase)
+                || string.Equals(level, LegacyApproveVerifications, StringComparison.OrdinalIgnoreCase)
                 || IsLegacyAccess(level));
 
         public static bool IsLegacyAccess(string access)

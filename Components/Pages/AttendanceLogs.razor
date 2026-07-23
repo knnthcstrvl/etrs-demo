@@ -21,7 +21,7 @@
     <title>ETRS | Attendance Logs</title>
 </HeadContent>
 
-<RequireAccess RequiredAccess=@(new string[] { AccessPolicy.ManageAttendanceLogs })>
+<RequireAccess RequiredAccess=@(new string[] { AccessPolicy.ManageAttendanceLogs, AccessPolicy.VerificationApprover })>
     <div class="dashboard-shell">
     <div class="panel-heading attendance-logs-heading">
         <div>
@@ -656,20 +656,37 @@
                             <div>
                                 <h2 class="attendance-detail-title">@SidecarPreviewTitle</h2>
                             </div>
-                            @if (selectedWfhLog is not null && CurrentUser.HasAccess(AccessPolicy.ApproveVerifications))
+                            @if (selectedWfhLog is not null && IsCurrentVerificationPending)
                             {
                                 <div class="attendance-detail-header-actions">
                                     <button type="button"
-                                            class="btn btn-sm btn-success attendance-detail-header-button"
-                                            @onclick="() => ApproveVerificationSidecarAsync()"
-                                            disabled="@isApprovingVerification">
-                                        <i class="fa-solid fa-check" aria-hidden="true"></i> Accept
+                                            class="attendance-detail-header-button attendance-verification-action attendance-verification-accept"
+                                            title="Accept"
+                                            aria-label="Accept verification"
+                                            @onclick="() => OpenVerificationConfirmation(true)"
+                                            disabled="@(isApprovingVerification || !CanApproveVerifications)">
+                                        <i class="fa-solid fa-check" aria-hidden="true"></i>
                                     </button>
                                     <button type="button"
-                                            class="btn btn-sm btn-danger attendance-detail-header-button"
-                                            @onclick="() => RejectVerificationSidecarAsync()"
-                                            disabled="@isApprovingVerification">
-                                        <i class="fa-solid fa-xmark" aria-hidden="true"></i> Reject
+                                            class="attendance-detail-header-button attendance-verification-action attendance-verification-reject"
+                                            title="Reject"
+                                            aria-label="Reject verification"
+                                            @onclick="() => OpenVerificationConfirmation(false)"
+                                            disabled="@(isApprovingVerification || !CanApproveVerifications)">
+                                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            }
+                            else if (selectedWfhLog is not null)
+                            {
+                                <div class="attendance-detail-header-actions">
+                                    <button type="button"
+                                            class="attendance-detail-header-button attendance-verification-action attendance-verification-undo"
+                                            title="Undo decision"
+                                            aria-label="Undo verification decision"
+                                            @onclick="OpenVerificationUndoConfirmation"
+                                            disabled="@(isApprovingVerification || !CanApproveVerifications)">
+                                        <i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i>
                                     </button>
                                 </div>
                             }
@@ -1203,20 +1220,37 @@
                         <h2 class="attendance-detail-title">Means of Verification</h2>
                         <div class="attendance-detail-meta">@movPreviewTitle</div>
                     </div>
-                    @if (selectedWfhLog is not null && CurrentUser.HasAccess(AccessPolicy.ApproveVerifications))
+                    @if (selectedWfhLog is not null && IsCurrentVerificationPending)
                     {
                         <div class="attendance-detail-header-actions">
                             <button type="button"
-                                    class="btn btn-sm btn-success attendance-detail-header-button"
-                                    @onclick="() => ApproveMovVerificationAsync(selectedWfhLog)"
-                                    disabled="@isApprovingVerification">
-                                <i class="fa-solid fa-check" aria-hidden="true"></i> Accept
+                                    class="attendance-detail-header-button attendance-verification-action attendance-verification-accept"
+                                    title="Accept"
+                                    aria-label="Accept verification"
+                                    @onclick="() => OpenVerificationConfirmation(true)"
+                                    disabled="@(isApprovingVerification || !CanApproveVerifications)">
+                                <i class="fa-solid fa-check" aria-hidden="true"></i>
                             </button>
                             <button type="button"
-                                    class="btn btn-sm btn-danger attendance-detail-header-button"
-                                    @onclick="() => RejectMovVerificationAsync(selectedWfhLog)"
-                                    disabled="@isApprovingVerification">
-                                <i class="fa-solid fa-xmark" aria-hidden="true"></i> Reject
+                                    class="attendance-detail-header-button attendance-verification-action attendance-verification-reject"
+                                    title="Reject"
+                                    aria-label="Reject verification"
+                                    @onclick="() => OpenVerificationConfirmation(false)"
+                                    disabled="@(isApprovingVerification || !CanApproveVerifications)">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    }
+                    else if (selectedWfhLog is not null)
+                    {
+                        <div class="attendance-detail-header-actions">
+                            <button type="button"
+                                    class="attendance-detail-header-button attendance-verification-action attendance-verification-undo"
+                                    title="Undo decision"
+                                    aria-label="Undo verification decision"
+                                    @onclick="OpenVerificationUndoConfirmation"
+                                    disabled="@(isApprovingVerification || !CanApproveVerifications)">
+                                <i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i>
                             </button>
                         </div>
                     }
@@ -1225,7 +1259,6 @@
                 <div class="attendance-detail-body attendance-mov-preview-body">
                     @MovPreviewContent
                 </div>
-
             </div>
         </div>
     }
@@ -1372,6 +1405,31 @@
                     <button type="button" class="btn btn-primary attendance-detail-done" @onclick="SaveEditLogAsync" disabled="@isSavingEditLog">@(isSavingEditLog ? "Saving..." : "Save Changes")</button>
                 </div>
             </div>
+            </div>
+        </div>
+    }
+
+    @if (pendingVerificationApproval.HasValue || pendingVerificationUndo)
+    {
+        var isUndoConfirmation = pendingVerificationUndo;
+        var confirmationVerb = isUndoConfirmation
+            ? "undo the decision for"
+            : pendingVerificationApproval == true ? "accept" : "reject";
+        <div class="attendance-verification-confirm-overlay attendance-verification-confirm-page-overlay" @onclick="CloseVerificationConfirmation">
+            <div class="attendance-verification-confirm-modal" @onclick:stopPropagation="true">
+                <div class="attendance-verification-confirm-header">
+                    <h2>@(isUndoConfirmation ? "Confirm Undo" : pendingVerificationApproval == true ? "Confirm Acceptance" : "Confirm Rejection")</h2>
+                    <button type="button" class="attendance-detail-close" @onclick="CloseVerificationConfirmation" aria-label="Close confirmation" disabled="@isApprovingVerification">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="attendance-verification-confirm-body">
+                    Are you sure you want to @confirmationVerb this @SidecarPreviewTitle.ToLowerInvariant()?
+                </div>
+                <div class="attendance-detail-footer attendance-verification-confirm-actions">
+                    <button type="button" class="attendance-detail-text-action" @onclick="CloseVerificationConfirmation" disabled="@isApprovingVerification">Cancel</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ConfirmVerificationAsync" disabled="@isApprovingVerification">@(isApprovingVerification ? "Confirming..." : "Confirm")</button>
+                </div>
             </div>
         </div>
     }
@@ -2910,6 +2968,85 @@
         background: #ffffff;
     }
 
+    .attendance-verification-action {
+        width: 2.5rem;
+        min-width: 2.5rem;
+        padding: 0;
+        border-radius: 50%;
+    }
+
+    .attendance-verification-accept { color: #15803d; }
+    .attendance-verification-reject { color: #b91c1c; }
+    .attendance-verification-undo { color: var(--etrs-gray-700); }
+
+    .attendance-verification-confirm-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1400;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(30, 41, 57, 0.22);
+        backdrop-filter: blur(4px);
+    }
+
+    .attendance-verification-confirm-modal {
+        width: min(420px, 100%);
+        overflow: hidden;
+        border: 1px solid var(--etrs-gray-200, #e5e7eb);
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 22px 50px rgba(30, 41, 57, 0.22);
+    }
+
+    .attendance-verification-confirm-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 1rem 0.85rem;
+        border-bottom: 1px solid var(--etrs-gray-200, #e5e7eb);
+    }
+
+    .attendance-verification-confirm-header h2 {
+        margin: 0;
+        color: #111827;
+        font-size: 1.05rem;
+        font-weight: 800;
+    }
+
+    .attendance-verification-confirm-body {
+        padding: 1rem;
+        color: #4b5563;
+        line-height: 1.5;
+    }
+
+    .attendance-verification-confirm-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.9rem 1rem 1rem;
+        background: #f9fafb;
+        border-top: 1px solid var(--etrs-gray-200, #e5e7eb);
+    }
+
+    .attendance-verification-confirm-actions .attendance-detail-text-action {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--etrs-gray-700, #374151);
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .attendance-verification-confirm-actions .attendance-detail-text-action:hover,
+    .attendance-verification-confirm-actions .attendance-detail-text-action:focus-visible {
+        color: var(--etrs-black, #111827);
+        text-decoration: none;
+    }
+
     .attendance-mov-preview-image {
         display: block;
         width: 100%;
@@ -3876,6 +4013,34 @@
         }
     }
 
+    body.etrs-dark-theme .attendance-verification-accept { color: #86efac !important; }
+    body.etrs-dark-theme .attendance-verification-reject { color: #fca5a5 !important; }
+    body.etrs-dark-theme .attendance-verification-undo { color: #dbe7f6 !important; }
+    body.etrs-dark-theme .attendance-verification-confirm-overlay {
+        background: rgba(6, 12, 22, 0.62) !important;
+        backdrop-filter: blur(8px) !important;
+    }
+
+    body.etrs-dark-theme .attendance-verification-confirm-modal {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.46) !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-verification-confirm-header,
+    body.etrs-dark-theme .attendance-verification-confirm-actions {
+        background: #111c2d !important;
+        border-color: #2f4058 !important;
+    }
+
+    body.etrs-dark-theme .attendance-verification-confirm-header h2 {
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-verification-confirm-body {
+        color: #9fb3d0 !important;
+    }
 </style>
 
 @code {
@@ -4003,6 +4168,9 @@
     private string movPreviewTitle = string.Empty;
     private int movImagePreviewIndex;
     private bool isApprovingVerification;
+    private bool CanApproveVerifications => CurrentUser.HasAccess(AccessPolicy.VerificationApprover);
+    private bool? pendingVerificationApproval;
+    private bool pendingVerificationUndo;
     private RenderFragment MovPreviewContent => builder =>
     {
         var sequence = 0;
@@ -4193,6 +4361,70 @@
     private string SidecarPreviewTitle => sidecarPreviewMode == SidecarPreviewMode.PhotoVerification
         ? "Photo Verification"
         : "Means of Verification";
+    private bool IsCurrentVerificationPending
+    {
+        get
+        {
+            if (selectedWfhLog is null)
+            {
+                return false;
+            }
+
+            var status = IsPhotoVerificationSidecar
+                ? selectedWfhLog.PhotoVerificationApprovalStatus
+                : selectedWfhLog.MovApprovalStatus;
+
+            return string.IsNullOrWhiteSpace(status)
+                || string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private void OpenVerificationConfirmation(bool approve)
+    {
+        if (!CanApproveVerifications) return;
+
+        pendingVerificationUndo = false;
+        pendingVerificationApproval = approve;
+    }
+
+    private void OpenVerificationUndoConfirmation()
+    {
+        if (!CanApproveVerifications) return;
+
+        pendingVerificationApproval = null;
+        pendingVerificationUndo = true;
+    }
+
+    private void CloseVerificationConfirmation()
+    {
+        pendingVerificationApproval = null;
+        pendingVerificationUndo = false;
+    }
+
+    private async Task ConfirmVerificationAsync()
+    {
+        if (!CanApproveVerifications
+            || (!pendingVerificationApproval.HasValue && !pendingVerificationUndo)
+            || selectedWfhLog is null) return;
+
+        if (pendingVerificationUndo)
+        {
+            await UndoCurrentVerificationAsync(selectedWfhLog);
+            CloseVerificationConfirmation();
+            return;
+        }
+
+        var approve = pendingVerificationApproval.GetValueOrDefault();
+        if (IsPhotoVerificationSidecar)
+        {
+            if (approve) await ApprovePhotoVerificationAsync(selectedWfhLog); else await RejectPhotoVerificationAsync(selectedWfhLog);
+        }
+        else
+        {
+            if (approve) await ApproveMovVerificationAsync(selectedWfhLog); else await RejectMovVerificationAsync(selectedWfhLog);
+        }
+        CloseVerificationConfirmation();
+    }
     private bool CanReturnToAttendanceDetail => editReturnOnsiteLog is not null || editReturnWfhLog is not null;
     private bool showEditTardinessMenu;
     private ElementReference inputEmployeeSearchWrapRef;
@@ -5605,6 +5837,7 @@
 
     private void CloseMovPreview()
     {
+        CloseVerificationConfirmation();
         movPreviewOpenVersion++;
         showMovPreviewModal = false;
         showMovPreviewWithAttendanceDetail = false;
@@ -6934,7 +7167,7 @@
         var configuredPath = Configuration["Uploads:WfhMovPath"];
         var safeName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Path.GetFileName(file.Name)}";
 
-        async Task<string?> WriteToPathAsync(string root, bool returnWebRelative)
+        async Task<string?> WriteToPathAsync(string root, bool returnWebRelative, bool showFailureToast)
         {
             try
             {
@@ -6958,25 +7191,29 @@
             }
             catch (Exception ex)
             {
-                ShowToast(ToastType.Error, "File upload failed", $"Could not save MOV to '{root}': {ex.Message}");
+                if (showFailureToast)
+                {
+                    ShowToast(ToastType.Error, "File upload failed", $"Could not save MOV to '{root}': {ex.Message}");
+                }
+
                 return null;
             }
         }
 
         if (!string.IsNullOrWhiteSpace(configuredPath))
         {
-            var result = await WriteToPathAsync(configuredPath, false);
+            var result = await WriteToPathAsync(configuredPath, false, false);
             if (!string.IsNullOrWhiteSpace(result))
             {
                 return result;
             }
 
             var fallback = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
-            return await WriteToPathAsync(fallback, true);
+            return await WriteToPathAsync(fallback, true, true);
         }
 
         var defaultRoot = Path.Combine(Environment.WebRootPath ?? string.Empty, "uploads", "wfh-mov");
-        return await WriteToPathAsync(defaultRoot, true);
+        return await WriteToPathAsync(defaultRoot, true, true);
     }
 
     private static void UpdateTimeField(Action<string> setter, ChangeEventArgs args)
@@ -8060,7 +8297,7 @@
 
     private async Task ApproveMovVerificationAsync(AttendanceLogWfh log)
     {
-        if (isApprovingVerification || log == null)
+        if (!CanApproveVerifications || isApprovingVerification || log == null)
         {
             return;
         }
@@ -8100,7 +8337,6 @@
             selectedWfhLog = wfhLogs.FirstOrDefault(l => l.AttendanceLogWfhId == dbLog.AttendanceLogWfhId);
             _ = InvokeAsync(StateHasChanged);
             ShowToast(ToastType.Success, "MOV Approved", "MOV has been approved successfully.");
-            CloseMovPreview();
         }
         catch (Exception ex)
         {
@@ -8112,9 +8348,59 @@
         }
     }
 
+    private async Task UndoCurrentVerificationAsync(AttendanceLogWfh log)
+    {
+        if (!CanApproveVerifications || isApprovingVerification || log is null)
+        {
+            return;
+        }
+
+        isApprovingVerification = true;
+
+        try
+        {
+            var dbLog = await Db.AttendanceLogsWfh.FirstOrDefaultAsync(l => l.AttendanceLogWfhId == log.AttendanceLogWfhId);
+            if (dbLog is null)
+            {
+                ShowToast(ToastType.Error, "Error", "Log not found in database.");
+                return;
+            }
+
+            if (IsPhotoVerificationSidecar)
+            {
+                dbLog.PhotoVerificationApprovalStatus = "Pending";
+                dbLog.PhotoVerificationApprovedAt = null;
+                dbLog.PhotoVerificationRejectedAt = null;
+            }
+            else
+            {
+                dbLog.MovApprovalStatus = "Pending";
+                dbLog.MovApprovedAt = null;
+                dbLog.MovRejectedAt = null;
+            }
+
+            dbLog.Tardiness = string.Empty;
+            Db.AttendanceLogsWfh.Update(dbLog);
+            await Db.SaveChangesAsync();
+
+            await LoadLogsAsync();
+            selectedWfhLog = wfhLogs.FirstOrDefault(l => l.AttendanceLogWfhId == dbLog.AttendanceLogWfhId);
+            await InvokeAsync(StateHasChanged);
+            ShowToast(ToastType.Success, "Decision Undone", $"{SidecarPreviewTitle} has been reset to pending.");
+        }
+        catch (Exception ex)
+        {
+            ShowToast(ToastType.Error, "Error", $"Error undoing verification decision: {ex.Message}");
+        }
+        finally
+        {
+            isApprovingVerification = false;
+        }
+    }
+
     private async Task RejectMovVerificationAsync(AttendanceLogWfh log)
     {
-        if (isApprovingVerification || log == null)
+        if (!CanApproveVerifications || isApprovingVerification || log == null)
         {
             return;
         }
@@ -8154,7 +8440,6 @@
             selectedWfhLog = wfhLogs.FirstOrDefault(l => l.AttendanceLogWfhId == dbLog.AttendanceLogWfhId);
             _ = InvokeAsync(StateHasChanged);
             ShowToast(ToastType.Success, "MOV Rejected", "MOV has been rejected and attendance marked as Absent.");
-            CloseMovPreview();
         }
         catch (Exception ex)
         {
@@ -8202,7 +8487,7 @@
 
     private async Task ApprovePhotoVerificationAsync(AttendanceLogWfh log)
     {
-        if (isApprovingVerification || log == null)
+        if (!CanApproveVerifications || isApprovingVerification || log == null)
         {
             return;
         }
@@ -8242,7 +8527,6 @@
             selectedWfhLog = wfhLogs.FirstOrDefault(l => l.AttendanceLogWfhId == dbLog.AttendanceLogWfhId);
             _ = InvokeAsync(StateHasChanged);
             ShowToast(ToastType.Success, "Photo Verification Approved", "Photo verification has been approved successfully.");
-            CloseMovPreview();
         }
         catch (Exception ex)
         {
@@ -8256,7 +8540,7 @@
 
     private async Task RejectPhotoVerificationAsync(AttendanceLogWfh log)
     {
-        if (isApprovingVerification || log == null)
+        if (!CanApproveVerifications || isApprovingVerification || log == null)
         {
             return;
         }
@@ -8287,7 +8571,6 @@
             selectedWfhLog = wfhLogs.FirstOrDefault(l => l.AttendanceLogWfhId == dbLog.AttendanceLogWfhId);
             _ = InvokeAsync(StateHasChanged);
             ShowToast(ToastType.Success, "Photo Verification Rejected", "Photo verification has been rejected and attendance marked as Absent.");
-            CloseMovPreview();
         }
         catch (Exception ex)
         {

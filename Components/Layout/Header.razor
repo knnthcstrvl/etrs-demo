@@ -22,14 +22,13 @@
         </div>
 
         <div class="finance-header-actions">
-            @if (CanApproveRequests)
-            {
-                <div class="attendance-notification-wrap">
+            <div class="attendance-notification-wrap">
                     <button type="button"
                             class="finance-theme-toggle attendance-notification-toggle @(showNotifications ? "active" : null)"
                             title="Attendance email requests"
                             aria-label="Attendance email requests"
                             aria-expanded="@showNotifications"
+                            disabled="@(!CanApproveRequests)"
                             @onclick="ToggleNotificationsAsync">
                         <i class="fa-regular fa-bell" aria-hidden="true"></i>
                         @if (pendingRequests.Count > 0)
@@ -161,8 +160,7 @@
                             </div>
                         </section>
                     }
-                </div>
-            }
+            </div>
 
             <button type="button"
                     class="finance-theme-toggle"

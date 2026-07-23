@@ -25,6 +25,12 @@
     color: var(--finance-brand-strong, #1e2939);
 }
 
+.attendance-notification-toggle:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    filter: grayscale(1);
+}
+
 .attendance-notification-badge {
     position: absolute;
     top: 4px;
@@ -221,7 +227,7 @@
     gap: 0.4rem;
     border: 1px solid #ebca4a;
     background: #ebca4a;
-    color: #6f5200;
+    color: #111827;
 }
 
 .attendance-notification-actions button:disabled {
@@ -285,7 +291,7 @@
     border: 1px solid #ebca4a;
     border-radius: 8px;
     background: #ebca4a;
-    color: #6f5200;
+    color: #111827;
     font-size: 0.72rem;
     font-weight: 700;
 }
@@ -349,10 +355,14 @@ body.etrs-dark-theme .attendance-notification-panel {
 }
 
 body.etrs-dark-theme .attendance-notification-count,
-body.etrs-dark-theme .attendance-notification-avatar,
-body.etrs-dark-theme .notification-accept {
+body.etrs-dark-theme .attendance-notification-avatar {
     background: #ebca4a;
     color: #4d3900;
+}
+
+body.etrs-dark-theme .notification-accept {
+    background: #ebca4a;
+    color: #111827;
 }
 
 body.etrs-dark-theme .attendance-notification-dismiss {
@@ -372,7 +382,7 @@ body.etrs-dark-theme .attendance-rejection-details {
 body.etrs-dark-theme .attendance-rejection-submit {
     border-color: #ebca4a;
     background: #ebca4a;
-    color: #4d3900;
+    color: #111827;
 }
 
 @keyframes attendance-notification-enter {
