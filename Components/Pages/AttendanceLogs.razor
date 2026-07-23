@@ -377,7 +377,7 @@
                             <th>@SortHeader("Division/Center/Admin Unit", "division", false)</th>
                             <th>@SortHeader("Designation", "designation", false)</th>
                             <th>@SortHeader("Status", "status", false)</th>
-                            <th>Attendance Date</th>
+                            <th>@SortHeader("Attendance Date", "date", false)</th>
                             <th>@SortHeader("AM", "am", false)</th>
                             <th>@SortHeader("PM", "pm", false)</th>
                             <th>LATE/UNDERTIME</th>
@@ -447,7 +447,7 @@
                             <th>@SortHeader("Division/Center/Admin Unit", "division", true)</th>
                             <th>@SortHeader("Designation", "designation", true)</th>
                             <th>@SortHeader("Status", "status", true)</th>
-                            <th>Attendance Date</th>
+                            <th>@SortHeader("Attendance Date", "date", true)</th>
                             <th>Target</th>
                             <th>Accomplishment</th>
                             <th>MOV</th>
@@ -1118,15 +1118,39 @@
                         </div>
                         <div>
                             <div class="attendance-detail-eyebrow">CSV Export</div>
-                            <div class="attendance-detail-person">Select the period range to include in the export.</div>
+                            <div class="attendance-detail-person">Choose how you want to filter the logs for export.</div>
                             <div class="attendance-detail-meta">This export downloads a ZIP file with separate onsite and WFH CSV files.</div>
                         </div>
                     </div>
 
                     <div class="attendance-detail-section attendance-detail-section-primary">
-                        <div class="attendance-export-periods">
+                        @if (exportDateFilter is null)
+                        {
+                            <div class="attendance-export-filter-choice attendance-export-step" role="group" aria-label="Export date filter">
+                                <span class="attendance-detail-label">Filter by</span>
+                                <div class="attendance-export-filter-options">
+                                    <button type="button" class="attendance-export-filter-option" @onclick="() => SelectExportDateFilter(ExportDateFilter.Period)">
+                                        <i class="fa-regular fa-calendar-days" aria-hidden="true"></i>
+                                        <span>Period</span>
+                                    </button>
+                                    <button type="button" class="attendance-export-filter-option" @onclick="() => SelectExportDateFilter(ExportDateFilter.SpecificDate)">
+                                        <i class="fa-regular fa-calendar-check" aria-hidden="true"></i>
+                                        <span>Specific Date</span>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        @if (exportDateFilter == ExportDateFilter.Period)
+                        {
+                        <div class="attendance-export-periods attendance-export-filter-selection attendance-export-step">
                             <div class="attendance-export-period-row @(showExportPeriodMenu ? "menu-open" : null)">
-                                <span class="attendance-detail-label">From</span>
+                                <div class="attendance-export-selection-heading">
+                                    <span class="attendance-detail-label">From</span>
+                                    <button type="button" class="attendance-export-back" @onclick="ResetExportDateFilter" aria-label="Back to export filter options" title="Back">
+                                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                                 <div class="attendance-filter-select-wrap period-dropdown attendance-export-period-dropdown @(showExportPeriodMenu ? "menu-open" : null)" @onclick:stopPropagation="true">
                                     <button type="button" class="attendance-filter-select-trigger period-button @(showExportPeriodMenu ? "active" : null)" @ref="exportPeriodButtonRef" @onclick="ToggleExportPeriodMenu">
                                         <span class="period-button-content">
@@ -1200,12 +1224,35 @@
                                 </div>
                             }
                         </div>
+                        }
+                        else if (exportDateFilter == ExportDateFilter.SpecificDate)
+                        {
+                            <div class="attendance-export-filter-selection attendance-export-step">
+                                <div class="attendance-export-selection-heading">
+                                    <label class="attendance-detail-label" for="attendanceExportSpecificDateFrom">From</label>
+                                    <button type="button" class="attendance-export-back" @onclick="ResetExportDateFilter" aria-label="Back to export filter options" title="Back">
+                                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <input id="attendanceExportSpecificDateFrom"
+                                       type="date"
+                                       class="attendance-input-control attendance-export-date-input"
+                                       @bind="exportSpecificDateFrom"
+                                       @bind:format="yyyy-MM-dd" />
+                                <label class="attendance-detail-label" for="attendanceExportSpecificDateTo">To</label>
+                                <input id="attendanceExportSpecificDateTo"
+                                       type="date"
+                                       class="attendance-input-control attendance-export-date-input"
+                                       @bind="exportSpecificDateTo"
+                                       @bind:format="yyyy-MM-dd" />
+                            </div>
+                        }
                     </div>
                 </div>
 
                     <div class="attendance-detail-footer">
                     <button type="button" class="attendance-detail-text-action" @onclick="CloseExportLogsModal" disabled="@isExportingLogs">Cancel</button>
-                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@isExportingLogs">@(isExportingLogs ? "Exporting..." : "Export CSV")</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@(isExportingLogs || exportDateFilter is null)">@(isExportingLogs ? "Exporting..." : "Export CSV")</button>
                 </div>
             </div>
         </div>
@@ -1499,6 +1546,88 @@
         display: flex;
         flex-direction: column;
         gap: 0.85rem;
+    }
+
+    .attendance-export-filter-choice,
+    .attendance-export-filter-selection {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+
+    .attendance-export-step {
+        animation: attendance-export-step-in 180ms ease-out both;
+    }
+
+    @@keyframes attendance-export-step-in {
+        from {
+            opacity: 0;
+            transform: translateX(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .attendance-export-selection-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 24px;
+    }
+
+    .attendance-export-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    }
+
+    .attendance-export-back:hover {
+        background: var(--finance-surface-soft, #f4f7fb);
+        transform: translateX(-2px);
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .attendance-export-step {
+            animation: none;
+        }
+    }
+
+    .attendance-export-filter-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .attendance-export-filter-option {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        min-height: 48px;
+        border: 1px solid var(--finance-border, #d6deea);
+        border-radius: 8px;
+        background: var(--finance-surface, #fff);
+        color: inherit;
+        font-weight: 600;
+        transition: background 0.15s ease;
+    }
+
+    .attendance-export-filter-option:hover {
+        background: var(--finance-surface-soft, #f4f7fb);
+    }
+
+    .attendance-export-date-input {
+        width: 100%;
     }
 
     .attendance-export-period-row {
@@ -3688,6 +3817,23 @@
         color: #8ea2ff !important;
     }
 
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-filter-option,
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-date-input {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-filter-option:hover,
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-back:hover {
+        background: #1b2a3d !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-back {
+        color: #9fb3d0 !important;
+    }
+
     body.etrs-dark-theme .attendance-input-modal .attendance-input-mode-card,
     body.etrs-dark-theme .attendance-input-modal .attendance-input-result-card,
     body.etrs-dark-theme .attendance-input-modal .attendance-input-file-button {
@@ -4155,6 +4301,9 @@
     private ManualInputForm inputForm = new();
     private bool showExportLogsModal;
     private bool isExportingLogs;
+    private ExportDateFilter? exportDateFilter;
+    private DateTime exportSpecificDateFrom = DateTime.Today;
+    private DateTime exportSpecificDateTo = DateTime.Today;
     private bool showEditLogsModal;
     private bool isSavingEditLog;
     private EditLogForm editLogForm = new();
@@ -5594,6 +5743,9 @@
 
     private void OpenExportLogsModal()
     {
+        exportDateFilter = null;
+        exportSpecificDateFrom = DateTime.Today;
+        exportSpecificDateTo = DateTime.Today;
         exportSelectedPeriod = selectedPeriod;
         exportSecondSelectedPeriod = secondSelectedPeriod;
         showExportAddPeriod = exportSecondSelectedPeriod is not null;
@@ -5603,6 +5755,20 @@
         openExportPeriodMenuUpward = false;
         openExportPeriod2MenuUpward = false;
         showExportLogsModal = true;
+    }
+
+    private void SelectExportDateFilter(ExportDateFilter filter)
+    {
+        exportDateFilter = filter;
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
+    }
+
+    private void ResetExportDateFilter()
+    {
+        exportDateFilter = null;
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
     }
 
     private void CloseExportLogsModal()
@@ -6053,30 +6219,42 @@
         var column = state.SortColumn?.Trim().ToLowerInvariant();
         var descending = state.SortDescending;
 
+        if (column == "date")
+        {
+            return OrderByDirection(logs, descending, log => log.AttendanceDate.Date)
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName))
+                .ThenBy(log => NormalizeSortValue(log.MiddleName))
+                .ThenBy(log => NormalizeSortValue(log.IdNumber));
+        }
+
+        var groupedByDate = logs.OrderByDescending(log => log.AttendanceDate.Date);
+
         return column switch
         {
-            "id" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.IdNumber))
+            "id" => ThenByDirection(groupedByDate, descending, log => NormalizeSortValue(log.IdNumber))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "division" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.DivisionCenterUnit))
+            "division" => ThenByDirection(groupedByDate, descending, log => NormalizeSortValue(log.DivisionCenterUnit))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "designation" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.Designation))
+            "designation" => ThenByDirection(groupedByDate, descending, log => NormalizeSortValue(log.Designation))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "status" => OrderByDirection(logs, descending, log => NormalizeSortValue(GetEmployeeType(log)))
+            "status" => ThenByDirection(groupedByDate, descending, log => NormalizeSortValue(GetEmployeeType(log)))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "am" => OrderByDirection(logs, descending, log => log.TimeInAm ?? DateTime.MinValue)
+            "am" => ThenByDirection(groupedByDate, descending, log => log.TimeInAm ?? DateTime.MinValue)
                 .ThenBy(log => log.TimeOutAm ?? DateTime.MinValue)
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "pm" => OrderByDirection(logs, descending, log => GetCreditedOnsiteTimeInPm(log) ?? DateTime.MinValue)
+            "pm" => ThenByDirection(groupedByDate, descending, log => GetCreditedOnsiteTimeInPm(log) ?? DateTime.MinValue)
                 .ThenBy(log => log.TimeOutPm ?? DateTime.MinValue)
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "employee" or null or "" => OrderByEmployee(logs, descending),
-            _ => OrderByEmployee(logs, false)
+            "employee" => ThenByEmployee(groupedByDate, descending),
+            null or "" => ThenByEmployee(groupedByDate, false),
+            _ => ThenByEmployee(groupedByDate, false)
         };
     }
 
@@ -6085,30 +6263,53 @@
         var column = state.SortColumn?.Trim().ToLowerInvariant();
         var descending = state.SortDescending;
 
+        if (column == "date")
+        {
+            return OrderByDirection(logs, descending, log => log.AttendanceDate.Date)
+                .ThenBy(log => NormalizeSortValue(log.LastName))
+                .ThenBy(log => NormalizeSortValue(log.FirstName))
+                .ThenBy(log => NormalizeSortValue(log.MiddleName))
+                .ThenBy(log => NormalizeSortValue(log.IdNumber));
+        }
+
+        var groupedByDate = logs.OrderByDescending(log => log.AttendanceDate.Date);
+
         return column switch
         {
-            "id" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.IdNumber))
+            "id" => ThenByDirection(groupedByDate, descending, log => NormalizeSortValue(log.IdNumber))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "division" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.DivisionCenterUnit))
+            "division" => ThenByDirection(groupedByDate, descending, log => NormalizeSortValue(log.DivisionCenterUnit))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "designation" => OrderByDirection(logs, descending, log => NormalizeSortValue(log.Designation))
+            "designation" => ThenByDirection(groupedByDate, descending, log => NormalizeSortValue(log.Designation))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "status" => OrderByDirection(logs, descending, log => NormalizeSortValue(GetEmployeeType(log)))
+            "status" => ThenByDirection(groupedByDate, descending, log => NormalizeSortValue(GetEmployeeType(log)))
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "timein" => OrderByDirection(logs, descending, log => log.TimeIn ?? DateTime.MinValue)
+            "timein" => ThenByDirection(groupedByDate, descending, log => log.TimeIn ?? DateTime.MinValue)
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "timeout" => OrderByDirection(logs, descending, log => log.TimeOut ?? DateTime.MinValue)
+            "timeout" => ThenByDirection(groupedByDate, descending, log => log.TimeOut ?? DateTime.MinValue)
                 .ThenBy(log => NormalizeSortValue(log.LastName))
                 .ThenBy(log => NormalizeSortValue(log.FirstName)),
-            "employee" or null or "" => OrderByEmployee(logs, descending),
-            _ => OrderByEmployee(logs, false)
+            "employee" => ThenByEmployee(groupedByDate, descending),
+            null or "" => ThenByEmployee(groupedByDate, false),
+            _ => ThenByEmployee(groupedByDate, false)
         };
     }
+
+    private static IOrderedEnumerable<T> ThenByEmployee<T>(IOrderedEnumerable<T> logs, bool descending) where T : class
+        => descending
+            ? logs.ThenByDescending(log => NormalizeSortValue(GetLastName(log)))
+                .ThenByDescending(log => NormalizeSortValue(GetFirstName(log)))
+                .ThenByDescending(log => NormalizeSortValue(GetMiddleName(log)))
+                .ThenByDescending(log => NormalizeSortValue(GetIdNumber(log)))
+            : logs.ThenBy(log => NormalizeSortValue(GetLastName(log)))
+                .ThenBy(log => NormalizeSortValue(GetFirstName(log)))
+                .ThenBy(log => NormalizeSortValue(GetMiddleName(log)))
+                .ThenBy(log => NormalizeSortValue(GetIdNumber(log)));
 
     private static IOrderedEnumerable<T> OrderByEmployee<T>(IEnumerable<T> logs, bool descending) where T : class
         => descending
@@ -6123,6 +6324,9 @@
 
     private static IOrderedEnumerable<T> OrderByDirection<T, TKey>(IEnumerable<T> source, bool descending, Func<T, TKey> selector)
         => descending ? source.OrderByDescending(selector) : source.OrderBy(selector);
+
+    private static IOrderedEnumerable<T> ThenByDirection<T, TKey>(IOrderedEnumerable<T> source, bool descending, Func<T, TKey> selector)
+        => descending ? source.ThenByDescending(selector) : source.ThenBy(selector);
 
     private static string NormalizeSortValue(string? value) => value?.Trim() ?? string.Empty;
 
@@ -7486,7 +7690,8 @@
         {
             "ACTIVE" => "Active",
             "INACTIVE" => "Inactive",
-            "REGULAR" => "Regular",
+            "REGULAR" => "Permanent",
+            "PERMANENT" => "Permanent",
             "COS" => "COS",
             "JO" => "JO",
             "CASUAL" => "Casual",
@@ -8061,7 +8266,7 @@
             return;
         }
 
-        var (start, end) = GetExportPeriodRange();
+        var (start, end) = GetExportDateRange();
         var startDate = start.Date;
         var endExclusive = end.Date.AddDays(1);
 
@@ -8132,8 +8337,24 @@
         }
     }
 
-    private (DateTime Start, DateTime End) GetExportPeriodRange()
+    private (DateTime Start, DateTime End) GetExportDateRange()
     {
+        if (exportDateFilter == ExportDateFilter.SpecificDate)
+        {
+            var dateStart = exportSpecificDateFrom.Date <= exportSpecificDateTo.Date
+                ? exportSpecificDateFrom.Date
+                : exportSpecificDateTo.Date;
+            var dateEnd = exportSpecificDateFrom.Date >= exportSpecificDateTo.Date
+                ? exportSpecificDateFrom.Date
+                : exportSpecificDateTo.Date;
+            return (dateStart, dateEnd);
+        }
+
+        if (exportDateFilter != ExportDateFilter.Period)
+        {
+            throw new InvalidOperationException("Choose Period or Specific Date before exporting.");
+        }
+
         if (exportSelectedPeriod == null && exportSecondSelectedPeriod == null)
         {
             throw new InvalidOperationException("Select at least one export period.");
@@ -8159,6 +8380,12 @@
         return (start, end);
     }
 
+    private enum ExportDateFilter
+    {
+        Period,
+        SpecificDate
+    }
+
     private string BuildOnsiteCsv(IEnumerable<AttendanceLog> logs)
     {
         var rows = new List<string>
@@ -8179,7 +8406,7 @@
 
         rows.AddRange(logs.Select(log => string.Join(",", new[]
         {
-            CsvValue(log.IdNumber),
+            CsvValue(PrefixApostropheForExcelFormula(log.IdNumber)),
             CsvValue(FormatName(log.LastName, log.FirstName, log.MiddleName)),
             CsvValue(log.DivisionCenterUnit),
             CsvValue(log.Designation),
@@ -8215,14 +8442,14 @@
 
         rows.AddRange(logs.Select(log => string.Join(",", new[]
         {
-            CsvValue(log.IdNumber),
+            CsvValue(PrefixApostropheForExcelFormula(log.IdNumber)),
             CsvValue(FormatName(log.LastName, log.FirstName, log.MiddleName)),
             CsvValue(log.DivisionCenterUnit),
             CsvValue(log.Designation),
             CsvValue(GetWfhAttendanceStatus(log)),
             CsvValue(log.AttendanceDate.ToString("yyyy-MM-dd")),
-            CsvValue(log.Target),
-            CsvValue(log.Accomplishment),
+            CsvValue(PrefixApostropheForExcelFormula(log.Target)),
+            CsvValue(PrefixApostropheForExcelFormula(log.Accomplishment)),
             CsvValue(log.TimeIn),
             CsvValue(log.TimeOut),
             CsvValue(DisplayTardiness(log.Tardiness))
@@ -8230,6 +8457,11 @@
 
         return string.Join(global::System.Environment.NewLine, rows);
     }
+
+    private static string PrefixApostropheForExcelFormula(string? value)
+        => !string.IsNullOrEmpty(value) && value[0] is '=' or '+' or '-' or '@'
+            ? $"' {value}"
+            : value ?? string.Empty;
 
     private static string BuildAttendanceLogsZip(string onsiteCsv, string wfhCsv, string timestamp)
     {

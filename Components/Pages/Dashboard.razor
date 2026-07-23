@@ -138,12 +138,12 @@
             <strong>@employeeCount</strong>
         </div>
         <div class="metric-card">
-            <span class="metric-label">Onsite Logs Today</span>
+            <span class="metric-label">Onsite Logs Current Period</span>
             <strong>@onsiteLogsToday</strong>
             <div class="metric-percent" title="Percentage of employees">@OnsitePercentLabel</div>
         </div>
         <div class="metric-card">
-            <span class="metric-label">WFH Logs Today</span>
+            <span class="metric-label">WFH Logs Current Period</span>
             <strong>@wfhLogsToday</strong>
             <div class="metric-percent" title="Percentage of employees">@WfhPercentLabel</div>
         </div>
@@ -3701,7 +3701,7 @@
             },
             logs.Select(log => new[]
             {
-                log.IdNumber,
+                PrefixApostropheForExcelFormula(log.IdNumber),
                 FormatName(log.LastName, log.FirstName, log.MiddleName),
                 log.DivisionCenterUnit,
                 log.Designation,
@@ -3711,6 +3711,11 @@
                 log.TimeOutPm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
                 DisplayTardiness(log.Tardiness)
             }));
+
+    private static string PrefixApostropheForExcelFormula(string? value)
+        => !string.IsNullOrEmpty(value) && value[0] is '=' or '+' or '-' or '@'
+            ? $"' {value}"
+            : value ?? string.Empty;
 
     private string BuildWfhCsv(IEnumerable<AttendanceLogWfh> logs)
         => BuildCsv(
@@ -3730,14 +3735,14 @@
             },
             logs.Select(log => new[]
             {
-                log.IdNumber,
+                PrefixApostropheForExcelFormula(log.IdNumber),
                 FormatName(log.LastName, log.FirstName, log.MiddleName),
                 log.DivisionCenterUnit,
                 log.Designation,
                 GetWfhAttendanceStatus(log),
                 log.AttendanceDate.ToString("yyyy-MM-dd"),
-                log.Target,
-                log.Accomplishment,
+                PrefixApostropheForExcelFormula(log.Target),
+                PrefixApostropheForExcelFormula(log.Accomplishment),
                 log.TimeIn?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
                 log.TimeOut?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
                 DisplayTardiness(log.Tardiness)

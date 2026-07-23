@@ -2011,7 +2011,7 @@
         ["Status"] = "Status"
     };
     private static readonly string[] EmployeeActivityOptions = { "Active", "Inactive" };
-    private static readonly string[] EmployeeTypeOptions = { "Regular", "COS", "JO", "Casual", "Intern" };
+    private static readonly string[] EmployeeTypeOptions = { "Permanent", "COS", "JO", "Casual", "Intern" };
 
     private List<Employee> employees = new();
     private List<Employee> filteredEmployees = new();
@@ -2597,7 +2597,8 @@
         {
             "ACTIVE" => "Active",
             "INACTIVE" => "Inactive",
-            "REGULAR" => "Regular",
+            "REGULAR" => "Permanent",
+            "PERMANENT" => "Permanent",
             "COS" => "COS",
             "JO" => "JO",
             "CASUAL" => "Casual",
@@ -2950,7 +2951,7 @@
     private bool isEditingEmployee;
     private Employee employeeForm = new();
     private string employeeStatusActivity = "Active";
-    private string employeeStatusType = "Regular";
+    private string employeeStatusType = "Permanent";
     private string? activeEmployeeStatusDropdown;
     private bool openEmployeeStatusActivityUpward;
     private bool openEmployeeStatusTypeUpward;
@@ -3324,7 +3325,7 @@
 
         employeeStatusType = EmployeeTypeOptions.Contains(employmentType, StringComparer.OrdinalIgnoreCase)
             ? employmentType
-            : "Regular";
+            : "Permanent";
 
         SyncEmployeeFormStatus();
     }
