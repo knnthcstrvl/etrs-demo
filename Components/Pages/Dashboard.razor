@@ -2,10 +2,10 @@
 <PageTitle>ETRS | Dashboard</PageTitle>
 @using Financial.Data
 @using Financial.Model.Dtr
+@using Financial.Services
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
 @using System.Globalization
-@using System.Text
 @inject ProcurementDbContext Db
 @inject IJSRuntime JS
 @inject Financial.Services.CurrentUserService CurrentUser
@@ -593,16 +593,38 @@
                             <i class="fa-solid fa-file-export"></i>
                         </div>
                         <div>
-                            <div class="attendance-detail-eyebrow">CSV Export</div>
-                            <div class="attendance-detail-person">Select the period range to include in the @ExportLogTypeLabel export.</div>
-                            <div class="attendance-detail-meta">This export downloads a single @ExportLogTypeLabel CSV file.</div>
+                            <div class="attendance-detail-eyebrow">PDF Export</div>
+                            <div class="attendance-detail-person">Choose how you want to filter the logs for export.</div>
+                            <div class="attendance-detail-meta">Selected tables download as read-only, tabular PDFs. A ZIP is used only when both tables are included.</div>
                         </div>
                     </div>
 
                     <div class="attendance-detail-section attendance-detail-section-primary">
-                        <div class="attendance-export-periods" @ref="exportPeriodControlsRef" @onclick:stopPropagation="true">
+                        @if (exportDateFilter is null)
+                        {
+                            <div class="attendance-export-filter-choice attendance-export-step" role="group" aria-label="Export date filter">
+                                <span class="attendance-detail-label">Filter by</span>
+                                <div class="attendance-export-filter-options">
+                                    <button type="button" class="attendance-export-filter-option" @onclick="() => SelectExportDateFilter(ExportDateFilter.Period)">
+                                        <span>Period</span>
+                                    </button>
+                                    <button type="button" class="attendance-export-filter-option" @onclick="() => SelectExportDateFilter(ExportDateFilter.SpecificDate)">
+                                        <span>Specific Date</span>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        @if (exportDateFilter == ExportDateFilter.Period)
+                        {
+                        <div class="attendance-export-periods attendance-export-filter-selection attendance-export-step" @ref="exportPeriodControlsRef" @onclick:stopPropagation="true">
                             <div class="attendance-export-period-row @(showExportPeriodMenu ? "menu-open" : null)">
-                                <span class="attendance-detail-label">From</span>
+                                <div class="attendance-export-selection-heading">
+                                    <span class="attendance-detail-label">From</span>
+                                    <button type="button" class="attendance-export-back" @onclick="ResetExportDateFilter" aria-label="Back to export filter options" title="Back">
+                                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                                 <div class="attendance-filter-select-wrap period-dropdown attendance-export-period-dropdown @(showExportPeriodMenu ? "menu-open" : null)" @onclick:stopPropagation="true">
                                     <button type="button" class="attendance-filter-select-trigger period-button @(showExportPeriodMenu ? "active" : null)" @ref="exportPeriodButtonRef" @onclick="ToggleExportPeriodMenu">
                                         <span class="period-button-content">
@@ -676,12 +698,54 @@
                                 </div>
                             }
                         </div>
+                        }
+                        else if (exportDateFilter == ExportDateFilter.SpecificDate)
+                        {
+                            <div class="attendance-export-filter-selection attendance-export-step">
+                                <div class="attendance-export-selection-heading">
+                                    <label class="attendance-detail-label" for="dashboardExportSpecificDateFrom">From</label>
+                                    <button type="button" class="attendance-export-back" @onclick="ResetExportDateFilter" aria-label="Back to export filter options" title="Back">
+                                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <input id="dashboardExportSpecificDateFrom" type="date"
+                                       class="attendance-input-control attendance-export-date-input"
+                                       @bind="exportSpecificDateFrom" @bind:format="yyyy-MM-dd" />
+                                <label class="attendance-detail-label" for="dashboardExportSpecificDateTo">To</label>
+                                <input id="dashboardExportSpecificDateTo" type="date"
+                                       class="attendance-input-control attendance-export-date-input"
+                                       @bind="exportSpecificDateTo" @bind:format="yyyy-MM-dd" />
+                            </div>
+                        }
+
+                        @if (exportDateFilter is not null)
+                        {
+                            <div class="attendance-export-table-selection">
+                                <span class="attendance-detail-label">Tables to include <span aria-hidden="true">*</span></span>
+                                <div class="attendance-export-table-options" role="group" aria-label="Tables to include">
+                                    <label class="attendance-export-table-option">
+                                        <input type="checkbox" @bind="includeOnsiteInExport" />
+                                        <span>Onsite</span>
+                                    </label>
+                                    <label class="attendance-export-table-option">
+                                        <input type="checkbox" @bind="includeWfhInExport" />
+                                        <span>WFH</span>
+                                    </label>
+                                </div>
+                                @if (!HasExportTableSelection)
+                                {
+                                    <span class="attendance-export-table-validation">Select at least one table.</span>
+                                }
+                            </div>
+                        }
                     </div>
                 </div>
 
                 <div class="attendance-detail-footer">
-                    <button type="button" class="attendance-detail-text-action" @onclick="CloseExportLogsModal" disabled="@isExportingLogs">Cancel</button>
-                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@isExportingLogs">@(isExportingLogs ? "Exporting..." : "Export CSV")</button>
+                    <button type="button" class="attendance-detail-text-action attendance-export-cancel" @onclick="CloseExportLogsModal" disabled="@isExportingLogs">Cancel</button>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="CopyAttendanceLogsAsync" disabled="@(isExportingLogs || exportDateFilter is null || !HasExportTableSelection)">@copyTableButtonText</button>
+                    <span class="attendance-export-action-separator" aria-hidden="true">|</span>
+                    <button type="button" class="btn btn-primary attendance-detail-done" @onclick="ExportAttendanceLogsAsync" disabled="@(isExportingLogs || exportDateFilter is null || !HasExportTableSelection)">@(isExportingLogs ? "Exporting..." : "Export PDF")</button>
                 </div>
             </div>
         </div>
@@ -1590,6 +1654,15 @@
         padding-inline: 1.25rem;
     }
 
+    .attendance-export-action-separator {
+        color: var(--etrs-gray-300);
+        user-select: none;
+    }
+
+    .attendance-export-cancel {
+        margin-right: auto;
+    }
+
     .attendance-detail-text-action {
         border: 0;
         background: transparent;
@@ -1692,6 +1765,131 @@
         display: flex;
         flex-direction: column;
         gap: 0.85rem;
+    }
+
+    .attendance-export-filter-choice,
+    .attendance-export-filter-selection {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+
+    .attendance-export-step {
+        animation: attendance-export-step-in 180ms ease-out both;
+    }
+
+    @@keyframes attendance-export-step-in {
+        from {
+            opacity: 0;
+            transform: translateX(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .attendance-export-selection-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 24px;
+    }
+
+    .attendance-export-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    }
+
+    .attendance-export-back:hover {
+        background: var(--finance-surface-soft, #f4f7fb);
+        transform: translateX(-2px);
+    }
+
+    .attendance-export-filter-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .attendance-export-filter-option {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        border: 1px solid var(--finance-border, #d6deea);
+        border-radius: 8px;
+        background: var(--finance-surface, #fff);
+        color: inherit;
+        font-weight: 600;
+        transition: background 0.15s ease;
+    }
+
+    .attendance-export-filter-option:hover {
+        background: var(--finance-surface-soft, #f4f7fb);
+    }
+
+    .attendance-export-date-input {
+        width: 100%;
+        min-height: 3rem;
+        padding: 0.75rem 0.9rem;
+        border: 1px solid var(--etrs-gray-200);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--etrs-black);
+        box-shadow: none;
+    }
+
+    .attendance-export-date-input:focus {
+        border-color: var(--etrs-gray-400);
+        box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
+        outline: none;
+    }
+
+    .attendance-export-table-selection {
+        display: grid;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .attendance-export-table-options {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .attendance-export-table-option {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        cursor: pointer;
+    }
+
+    .attendance-export-table-option input {
+        width: 1rem;
+        height: 1rem;
+        accent-color: var(--finance-primary, #198754);
+    }
+
+    .attendance-export-table-validation {
+        color: var(--bs-danger);
+        font-size: 0.78rem;
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .attendance-export-step {
+            animation: none;
+        }
     }
 
     .attendance-export-period-row {
@@ -2839,6 +3037,23 @@
         color: #8ea2ff !important;
     }
 
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-filter-option,
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-date-input {
+        background: #0f1828 !important;
+        border-color: #2f4058 !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-filter-option:hover,
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-back:hover {
+        background: #1b2a3d !important;
+        color: #f8fafc !important;
+    }
+
+    body.etrs-dark-theme .attendance-export-modal .attendance-export-back {
+        color: #9fb3d0 !important;
+    }
+
     body.etrs-dark-theme .attendance-export-modal .period-button,
     body.etrs-dark-theme .attendance-export-modal .attendance-filter-select-trigger {
         background: #111c2d !important;
@@ -3083,7 +3298,14 @@
     private List<AttendanceLogWfh> viewMoreWfhLogs = new();
     private bool showExportLogsModal;
     private bool isExportingLogs;
+    private string copyTableButtonText = "Copy Table";
     private DashboardTableMenu exportLogType = DashboardTableMenu.Onsite;
+    private bool includeOnsiteInExport = true;
+    private bool includeWfhInExport = true;
+    private bool HasExportTableSelection => includeOnsiteInExport || includeWfhInExport;
+    private ExportDateFilter? exportDateFilter;
+    private DateTime exportSpecificDateFrom = DateTime.Today;
+    private DateTime exportSpecificDateTo = DateTime.Today;
     private Period? exportSelectedPeriod;
     private bool showExportPeriodMenu;
     private bool openExportPeriodMenuUpward;
@@ -3621,6 +3843,11 @@
     {
         openTableMenu = DashboardTableMenu.None;
         exportLogType = logType == DashboardTableMenu.Wfh ? DashboardTableMenu.Wfh : DashboardTableMenu.Onsite;
+        exportDateFilter = null;
+        includeOnsiteInExport = true;
+        includeWfhInExport = true;
+        exportSpecificDateFrom = DateTime.Today;
+        exportSpecificDateTo = DateTime.Today;
         exportSelectedPeriod = selectedPeriod;
         exportSecondSelectedPeriod = secondSelectedPeriod;
         showExportAddPeriod = exportSecondSelectedPeriod is not null;
@@ -3630,6 +3857,20 @@
         openExportPeriodMenuUpward = false;
         openExportPeriod2MenuUpward = false;
         showExportLogsModal = true;
+    }
+
+    private void SelectExportDateFilter(ExportDateFilter filter)
+    {
+        exportDateFilter = filter;
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
+    }
+
+    private void ResetExportDateFilter()
+    {
+        exportDateFilter = null;
+        showExportPeriodMenu = false;
+        showExportPeriod2Menu = false;
     }
 
     private void CloseExportLogsModal()
@@ -3666,90 +3907,80 @@
         CloseExportPeriodMenus();
     }
 
-    private static string BuildCsv(IEnumerable<string> headers, IEnumerable<IEnumerable<string>> rows)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine(string.Join(",", headers.Select(CsvValue)));
+    private AttendancePdfSection BuildOnsitePdfSection(IReadOnlyList<AttendanceLog> logs)
+        => new(
+            "Onsite Attendance",
+            new[] { "ID Number", "Employee", "Attendance Date", "AM", "PM" },
+            logs.Select(log => (IReadOnlyList<string>)new[]
+            {
+                log.IdNumber,
+                $"{FormatName(log.LastName, log.FirstName, log.MiddleName)}\n{FormatEmployeeMeta(log.DivisionCenterUnit, log.Designation)}",
+                log.AttendanceDate.ToString("MMM d, yyyy"),
+                FormatTimeRange(log.TimeInAm, log.TimeOutAm),
+                FormatTimeRange(log.TimeInPm, log.TimeOutPm)
+            }).ToList());
 
-        foreach (var row in rows)
+    private AttendancePdfSection BuildWfhPdfSection(IReadOnlyList<AttendanceLogWfh> logs)
+        => new(
+            "Work From Home Attendance",
+            new[] { "ID Number", "Employee", "Division/Center/Admin Unit", "Designation", "Status", "Attendance Date", "Target", "Accomplishment", "MOV", "Verification", "Time In", "Time Out", "Late/Undertime" },
+            logs.Select(log => (IReadOnlyList<string>)new[]
+            {
+                log.IdNumber,
+                FormatName(log.LastName, log.FirstName, log.MiddleName),
+                log.DivisionCenterUnit,
+                log.Designation,
+                FormatPdfEmploymentStatus(log.Employee?.Status),
+                log.AttendanceDate.ToString("MMM d, yyyy"),
+                log.Target,
+                log.Accomplishment,
+                FormatApprovalStatus(log.MovApprovalStatus),
+                FormatApprovalStatus(log.PhotoVerificationApprovalStatus),
+                FormatPdfTime(log.TimeIn),
+                FormatPdfTime(log.TimeOut),
+                DisplayTardiness(log.Tardiness)
+            }).ToList());
+
+    private static string FormatPdfTime(DateTime? value)
+        => value?.ToString("h:mm tt") ?? "-";
+
+    private static string FormatPdfEmploymentStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
         {
-            builder.AppendLine(string.Join(",", row.Select(CsvValue)));
+            return "-";
         }
 
-        return builder.ToString();
+        var normalized = status.Trim();
+        var separatorIndex = normalized.IndexOf(',');
+        if (separatorIndex < 0)
+        {
+            separatorIndex = normalized.IndexOf(' ');
+        }
+
+        var employmentStatus = separatorIndex < 0
+            ? normalized
+            : normalized[(separatorIndex + 1)..].Trim();
+
+        return employmentStatus.ToUpperInvariant() switch
+        {
+            "REGULAR" or "PERMANENT" => "Permanent",
+            "COS" => "COS",
+            "JO" => "JO",
+            "CASUAL" => "Casual",
+            "INTERN" => "Intern",
+            "ACTIVE" or "INACTIVE" or "" => "-",
+            _ => employmentStatus
+        };
     }
 
-    private static string CsvValue(object? value)
-    {
-        var text = value?.ToString() ?? string.Empty;
-        return $"\"{text.Replace("\"", "\"\"")}\"";
-    }
-
-    private string BuildOnsiteCsv(IEnumerable<AttendanceLog> logs)
-        => BuildCsv(
-            new[]
-            {
-                "ID Number",
-                "Employee",
-                "Division/Center/Admin Unit",
-                "Designation",
-                "Status",
-                "Attendance Date",
-                "Time In (AM)",
-                "Time Out (PM)",
-                "Late/Undertime"
-            },
-            logs.Select(log => new[]
-            {
-                PrefixApostropheForExcelFormula(log.IdNumber),
-                FormatName(log.LastName, log.FirstName, log.MiddleName),
-                log.DivisionCenterUnit,
-                log.Designation,
-                GetOnsiteAttendanceStatus(log),
-                log.AttendanceDate.ToString("yyyy-MM-dd"),
-                log.TimeInAm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
-                log.TimeOutPm?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
-                DisplayTardiness(log.Tardiness)
-            }));
-
-    private static string PrefixApostropheForExcelFormula(string? value)
-        => !string.IsNullOrEmpty(value) && value[0] is '=' or '+' or '-' or '@'
-            ? $"' {value}"
-            : value ?? string.Empty;
-
-    private string BuildWfhCsv(IEnumerable<AttendanceLogWfh> logs)
-        => BuildCsv(
-            new[]
-            {
-                "ID Number",
-                "Employee",
-                "Division/Center/Admin Unit",
-                "Designation",
-                "Status",
-                "Attendance Date",
-                "Target",
-                "Accomplishment",
-                "Time In",
-                "Time Out",
-                "Late/Undertime"
-            },
-            logs.Select(log => new[]
-            {
-                PrefixApostropheForExcelFormula(log.IdNumber),
-                FormatName(log.LastName, log.FirstName, log.MiddleName),
-                log.DivisionCenterUnit,
-                log.Designation,
-                GetWfhAttendanceStatus(log),
-                log.AttendanceDate.ToString("yyyy-MM-dd"),
-                PrefixApostropheForExcelFormula(log.Target),
-                PrefixApostropheForExcelFormula(log.Accomplishment),
-                log.TimeIn?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
-                log.TimeOut?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty,
-                DisplayTardiness(log.Tardiness)
-            }));
-
-    private static string BuildCsvBase64(string csv)
-        => Convert.ToBase64String(Encoding.UTF8.GetBytes(csv));
+    private static string FormatApprovalStatus(string? status)
+        => string.Equals(status, "Approved", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "Accepted", StringComparison.OrdinalIgnoreCase)
+            ? "Accepted"
+            : string.Equals(status, "Rejected", StringComparison.OrdinalIgnoreCase)
+                ? "Rejected"
+                : "-";
 
     private sealed record FilterOption(string Value, string Label);
 
@@ -4030,54 +4261,51 @@
 
     private async Task ExportAttendanceLogsAsync()
     {
-        if (isExportingLogs)
+        if (isExportingLogs || !HasExportTableSelection)
         {
             return;
         }
 
-        var (start, end) = GetExportPeriodRange();
+        var (start, end) = GetExportDateRange();
         var endExclusive = end.Date.AddDays(1);
         isExportingLogs = true;
 
         try
         {
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            string fileName;
-            string csvContent;
+            var (exportOnsiteLogs, exportWfhLogs) = await LoadExportLogsAsync(start.Date, endExclusive);
 
-            if (exportLogType == DashboardTableMenu.Wfh)
+            var scope = string.Equals(CurrentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+                ? "All divisions/centers/admin units"
+                : string.Join(", ", CurrentUser.DivisionScope.OrderBy(value => value));
+            scope = string.IsNullOrWhiteSpace(scope) ? "Assigned organizational scope" : scope;
+            var files = new List<(string FileName, byte[] Content)>();
+
+            if (includeOnsiteInExport)
             {
-                var exportWfhLogs = await ApplyDivisionScope(Db.AttendanceLogsWfh)
-                    .AsNoTracking()
-                    .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
-                    .Where(l => l.TimeIn.HasValue
-                        || l.TimeOut.HasValue
-                        || !string.IsNullOrWhiteSpace(l.Target)
-                        || !string.IsNullOrWhiteSpace(l.Accomplishment)
-                        || !string.IsNullOrWhiteSpace(l.Mov))
-                    .OrderByDescending(l => l.AttendanceDate)
-                    .ThenBy(l => l.LastName)
-                    .ThenBy(l => l.FirstName)
-                    .ToListAsync();
+                files.Add(($"attendance_logs_onsite_{timestamp}.pdf",
+                    AttendanceLogsPdfExporter.Generate(start.Date, end.Date, CurrentUser.DisplayName, scope,
+                        new[] { BuildOnsitePdfSection(exportOnsiteLogs) })));
+            }
 
-                fileName = $"wfh_logs_{timestamp}.csv";
-                csvContent = BuildWfhCsv(exportWfhLogs);
+            if (includeWfhInExport)
+            {
+                files.Add(($"attendance_logs_wfh_{timestamp}.pdf",
+                    AttendanceLogsPdfExporter.Generate(start.Date, end.Date, CurrentUser.DisplayName, scope,
+                        new[] { BuildWfhPdfSection(exportWfhLogs) })));
+            }
+
+            if (files.Count == 1)
+            {
+                await JS.InvokeVoidAsync("attendanceLogs.downloadFileFromBase64", files[0].FileName,
+                    Convert.ToBase64String(files[0].Content), "application/pdf");
             }
             else
             {
-                var exportOnsiteLogs = await ApplyDivisionScope(Db.AttendanceLogs)
-                    .AsNoTracking()
-                    .Where(l => l.AttendanceDate >= start.Date && l.AttendanceDate < endExclusive)
-                    .OrderByDescending(l => l.AttendanceDate)
-                    .ThenBy(l => l.LastName)
-                    .ThenBy(l => l.FirstName)
-                    .ToListAsync();
-
-                fileName = $"onsite_logs_{timestamp}.csv";
-                csvContent = BuildOnsiteCsv(exportOnsiteLogs);
+                await JS.InvokeVoidAsync("attendanceLogs.downloadFileFromBase64",
+                    $"attendance_logs_{timestamp}.zip",
+                    AttendanceLogsPdfExporter.CreateZipBase64(files), "application/zip");
             }
-
-            await JS.InvokeVoidAsync("attendanceLogs.downloadFileFromBase64", fileName, BuildCsvBase64(csvContent), "text/csv;charset=utf-8");
 
             showExportLogsModal = false;
             showExportPeriodMenu = false;
@@ -4091,8 +4319,122 @@
         }
     }
 
-    private (DateTime Start, DateTime End) GetExportPeriodRange()
+    private async Task CopyAttendanceLogsAsync()
     {
+        if (!HasExportTableSelection)
+        {
+            return;
+        }
+
+        var (start, end) = GetExportDateRange();
+        var endExclusive = end.Date.AddDays(1);
+
+        try
+        {
+            var (onsiteLogs, wfhLogs) = await LoadExportLogsAsync(start.Date, endExclusive);
+            var tables = new List<string>();
+            if (includeOnsiteInExport)
+            {
+                tables.Add(BuildClipboardTable("Onsite Attendance", BuildOnsitePdfSection(onsiteLogs)));
+            }
+            if (includeWfhInExport)
+            {
+                tables.Add(BuildClipboardTable("Work From Home Attendance", BuildWfhPdfSection(wfhLogs)));
+            }
+
+            var text = string.Join(global::System.Environment.NewLine + global::System.Environment.NewLine, tables);
+
+            var copied = await JS.InvokeAsync<bool>("attendanceLogs.copyText", text);
+            copyTableButtonText = copied ? "Copied!" : "Copy failed";
+        }
+        catch
+        {
+            copyTableButtonText = "Copy failed";
+        }
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(1600);
+        copyTableButtonText = "Copy Table";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task<(List<AttendanceLog> Onsite, List<AttendanceLogWfh> Wfh)> LoadExportLogsAsync(
+        DateTime startDate, DateTime endExclusive)
+    {
+        var onsite = includeOnsiteInExport
+            ? await ApplyDivisionScope(Db.AttendanceLogs).AsNoTracking()
+                .Where(log => log.AttendanceDate >= startDate && log.AttendanceDate < endExclusive)
+                .OrderByDescending(log => log.AttendanceDate).ThenBy(log => log.LastName).ThenBy(log => log.FirstName)
+                .ToListAsync()
+            : new List<AttendanceLog>();
+
+        var wfh = includeWfhInExport
+            ? await ApplyDivisionScope(Db.AttendanceLogsWfh).AsNoTracking().Include(log => log.Employee)
+                .Where(log => log.AttendanceDate >= startDate && log.AttendanceDate < endExclusive)
+                .Where(log => log.TimeIn.HasValue || log.TimeOut.HasValue
+                    || !string.IsNullOrWhiteSpace(log.Target)
+                    || !string.IsNullOrWhiteSpace(log.Accomplishment)
+                    || !string.IsNullOrWhiteSpace(log.Mov))
+                .OrderByDescending(log => log.AttendanceDate).ThenBy(log => log.LastName).ThenBy(log => log.FirstName)
+                .ToListAsync()
+            : new List<AttendanceLogWfh>();
+
+        return (onsite, wfh);
+    }
+
+    private static string BuildClipboardTable(string title, AttendancePdfSection section)
+    {
+        var lines = new List<string> { title, string.Join('\t', section.Headers.Select(SanitizeClipboardCell)) };
+        lines.AddRange(section.Rows.Select(row => string.Join('\t', row.Select((value, index) =>
+            SanitizeClipboardCell(value, GetClipboardColumnName(section.Headers, index))))));
+        return string.Join(global::System.Environment.NewLine, lines);
+    }
+
+    private static string SanitizeClipboardCell(string? value)
+    {
+        var sanitized = (value ?? string.Empty)
+            .Replace('\t', ' ')
+            .Replace("\r", " ")
+            .Replace("\n", " ");
+
+        return sanitized;
+    }
+
+    private static string SanitizeClipboardCell(string? value, string? columnName)
+    {
+        var sanitized = SanitizeClipboardCell(value);
+        if (columnName == "ID Number")
+        {
+            return sanitized.Length > 0 ? $"'{sanitized}" : sanitized;
+        }
+
+        return columnName is "Target" or "Accomplishment" or "Accomplishement"
+            ? PrefixApostropheForExcelFormula(sanitized)
+            : sanitized;
+    }
+
+    private static string? GetClipboardColumnName(IReadOnlyList<string> headers, int index)
+        => index < headers.Count ? headers[index] : null;
+
+    private static string PrefixApostropheForExcelFormula(string value)
+        => value.Length > 0 && value[0] is '=' or '+' or '-' or '@'
+            ? $"'{value}"
+            : value;
+
+    private (DateTime Start, DateTime End) GetExportDateRange()
+    {
+        if (exportDateFilter == ExportDateFilter.SpecificDate)
+        {
+            return exportSpecificDateFrom.Date <= exportSpecificDateTo.Date
+                ? (exportSpecificDateFrom.Date, exportSpecificDateTo.Date)
+                : (exportSpecificDateTo.Date, exportSpecificDateFrom.Date);
+        }
+
+        if (exportDateFilter != ExportDateFilter.Period)
+        {
+            throw new InvalidOperationException("Choose Period or Specific Date before exporting.");
+        }
+
         if (exportSelectedPeriod == null && exportSecondSelectedPeriod == null)
         {
             throw new InvalidOperationException("Select at least one export period.");
@@ -4116,6 +4458,12 @@
             : exportSecondSelectedPeriod.End;
 
         return (start, end);
+    }
+
+    private enum ExportDateFilter
+    {
+        Period,
+        SpecificDate
     }
 
     private (DateTime Start, DateTime EndExclusive) GetSelectedRange()
