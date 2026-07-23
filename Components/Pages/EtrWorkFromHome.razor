@@ -441,7 +441,6 @@
                                 <div class="etr-camera-guide" aria-hidden="true">
                                     <span class="etr-face-oval"></span>
                                     <span class="etr-face-center"></span>
-                                    <span class="etr-face-guidance">Position your face inside the oval</span>
                                 </div>
                                 @if (!string.IsNullOrWhiteSpace(photoCameraMessage))
                                 {
@@ -462,7 +461,7 @@
                         else
                         {
                             <button type="button" class="btn btn-primary attendance-detail-done etr-photo-action-button" @onclick="CapturePhotoAsync" disabled="@(isPhotoCaptureClosing || isPhotoValidating)">
-                                @(isPhotoValidating ? "Checking..." : "Capture")
+                                @(isPhotoValidating ? "Capturing..." : "Capture")
                             </button>
                         }
                     </div>
@@ -3335,7 +3334,7 @@
         }
         catch
         {
-            photoCameraMessage = "Camera or face validation is unavailable. Check browser permissions and try again.";
+            photoCameraMessage = "Camera is unavailable. Check browser permissions and try again.";
             ToastService.Show(new ToastMessage
             {
                 Type = ToastType.Error,
@@ -3374,8 +3373,8 @@
                 ToastService.Show(new ToastMessage
                 {
                     Type = ToastType.Warning,
-                    Title = string.IsNullOrWhiteSpace(result.Title) ? "Photo validation failed" : result.Title,
-                    Message = string.IsNullOrWhiteSpace(result.Message) ? "Adjust the camera and try again." : result.Message,
+                    Title = string.IsNullOrWhiteSpace(result.Title) ? "Photo capture failed" : result.Title,
+                    Message = string.IsNullOrWhiteSpace(result.Message) ? "Wait for the camera preview and try again." : result.Message,
                     Duration = 5000
                 });
                 return;
@@ -3399,8 +3398,8 @@
             ToastService.Show(new ToastMessage
             {
                 Type = ToastType.Error,
-                Title = "Photo validation unavailable",
-                Message = "The photo could not be validated. Wait for the camera preview and face guide, then try again.",
+                Title = "Photo capture unavailable",
+                Message = "The photo could not be captured. Wait for the camera preview and try again.",
                 Duration = 5000
             });
         }

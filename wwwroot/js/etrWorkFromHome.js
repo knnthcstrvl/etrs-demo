@@ -182,19 +182,6 @@ window.etrWorkFromHome = (function () {
 
         videoElement.srcObject = stream;
         await videoElement.play();
-
-        setFaceGuideState(videoElement, 'checking');
-        let detector;
-        try {
-            detector = await getFaceDetector();
-        }
-        catch (error) {
-            stopCamera(videoElement);
-            throw error;
-        }
-        const state = { active: true, timer: null, detector: detector, lastAssessment: null };
-        cameraStates.set(videoElement, state);
-        scheduleFaceTracking(videoElement, state);
     }
 
     function stopCamera(videoElement) {
@@ -301,51 +288,6 @@ window.etrWorkFromHome = (function () {
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = 'high';
         context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-        const guideRegion = {
-            x: Math.floor(canvas.width * 0.3),
-            y: Math.floor(canvas.height * 0.08),
-            width: Math.max(1, Math.floor(canvas.width * 0.4)),
-            height: Math.max(1, Math.floor(canvas.height * 0.64))
-        };
-        const guideBrightness = analyzeBrightness(context, guideRegion);
-        if (guideBrightness < 45) {
-            return invalidCapture('Photo is too dark', 'Move to a brighter area or face a light source so your face is clearly visible.');
-        }
-
-        if (guideBrightness > 220) {
-            return invalidCapture('Photo is too bright', 'Move away from strong light or reduce glare so your face is clearly visible.');
-        }
-
-        const detector = await getFaceDetector();
-        const faceAssessment = detectFace(videoElement, detector);
-
-        if (faceAssessment.status === 'none') {
-            return invalidCapture('Face not detected', 'Keep one clearly visible face inside the oval, then try again.');
-        }
-
-        if (faceAssessment.status === 'multiple') {
-            return invalidCapture('Multiple faces detected', 'Only the employee taking attendance should be visible in the photo.');
-        }
-
-        if (faceAssessment.status !== 'aligned') {
-            return invalidCapture('Face not aligned', 'Center your face inside the oval and move closer or farther away as needed.');
-        }
-
-        const faceRegion = getFaceRegion(faceAssessment.detection, canvas, videoElement);
-        const brightness = analyzeBrightness(context, faceRegion);
-        if (brightness < 55) {
-            return invalidCapture('Photo is too dark', 'Move to a brighter area or face a light source so your face is clearly visible.');
-        }
-
-        if (brightness > 205) {
-            return invalidCapture('Photo is too bright', 'Move away from strong light or reduce glare so your face is clearly visible.');
-        }
-
-        const sharpness = calculateLaplacianVariance(context, faceRegion);
-        if (sharpness < 40) {
-            return invalidCapture('Photo is blurred', 'Hold still, clean the camera lens, and wait for the image to become sharp before trying again.');
-        }
 
         return {
             isValid: true,
