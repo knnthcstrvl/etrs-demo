@@ -20,7 +20,7 @@ namespace Financial.Data
             var optionsBuilder = new DbContextOptionsBuilder<EtrsDbContext>();
             var connectionString = configuration.GetConnectionString("DefaultConnection");
             // Avoid connecting to the database just to discover its version during EF design-time commands.
-            optionsBuilder.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0)));
+            optionsBuilder.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 4, 11)));
 
             return new EtrsDbContext(optionsBuilder.Options);
         }

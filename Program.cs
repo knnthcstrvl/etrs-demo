@@ -16,7 +16,7 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-var mySqlServerVersion = new MySqlServerVersion(new Version(8, 0, 0));
+var mySqlServerVersion = new MySqlServerVersion(new Version(8, 4, 11));
 
 // Register EtrsDbContext (project-specific) instead of ProcurementDbContext
 // builder.Services.AddDbContext<EtrsDbContext>(options =>
