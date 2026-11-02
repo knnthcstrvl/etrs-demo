@@ -143,8 +143,6 @@ using (var scope = app.Services.CreateScope())
         var db = scope.ServiceProvider.GetRequiredService<EtrsDbContext>();
         // Ensure EF migrations are applied
         await db.Database.MigrateAsync();
-        await Financial.Data.DatabaseSchemaUpdater.EnsureUserAccountColumnsAsync(db);
-        await Financial.Data.DatabaseSchemaUpdater.EnsureAttendanceLogWfhColumnsAsync(db);
 
         await Financial.Data.Seeders.UserAccountSeeder.SeedAdminAsync(db);
         // Seed sample accounts and records in Development, or when demo login is explicitly enabled.
