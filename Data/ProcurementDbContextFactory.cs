@@ -14,10 +14,13 @@ namespace Financial.Data
                 .SetBasePath(basePath)
                 .AddJsonFile("appsettings.json", optional: false)
                 .AddJsonFile("appsettings.Development.json", optional: true)
+                .AddEnvironmentVariables()
                 .Build();
 
             var optionsBuilder = new DbContextOptionsBuilder<EtrsDbContext>();
-            optionsBuilder.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            // Avoid connecting to the database just to discover its version during EF design-time commands.
+            optionsBuilder.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0)));
 
             return new EtrsDbContext(optionsBuilder.Options);
         }
