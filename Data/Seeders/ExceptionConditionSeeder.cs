@@ -12,7 +12,23 @@ namespace Financial.Data.Seeders
                 ("Skeletal Workforce", "Employee is reporting under the skeletal workforce arrangement."),
                 ("On Travel", "Employee is deployed or travelling to another site."),
                 ("Holiday", "Employee is covered by an official holiday schedule."),
-                ("On Leave", "Employee is on approved leave.")
+                ("On Leave", "Employee is on approved leave."),
+                ("Official Business", "Employee is assigned to official business outside the office."),
+                ("Training", "Employee is attending an approved training or seminar."),
+                ("Field Work", "Employee is conducting approved field work."),
+                ("Court Appearance", "Employee is required to attend an official court proceeding."),
+                ("Medical Appointment", "Employee has an approved medical appointment."),
+                ("Disaster Response", "Employee is assigned to disaster response operations."),
+                ("Flexible Schedule", "Employee is working under an approved flexible schedule."),
+                ("Suspension of Work", "Office work is suspended by an official announcement."),
+                ("Client Meeting", "Employee is attending an approved external client meeting."),
+                ("Plantation Visit", "Employee is visiting an agricultural or research site."),
+                ("Inventory", "Employee is participating in an approved inventory activity."),
+                ("Equipment Calibration", "Employee is assigned to equipment calibration work."),
+                ("Emergency Leave", "Employee is on approved emergency leave."),
+                ("Committee Assignment", "Employee is attending an official committee assignment."),
+                ("Remote Field Support", "Employee is supporting field operations remotely."),
+                ("Special Project", "Employee is assigned to an approved special project.")
             };
 
             var existing = await db.ExceptionConditions.ToListAsync();
@@ -28,7 +44,7 @@ namespace Financial.Data.Seeders
                         ConditionName = item.Name,
                         Description = item.Description,
                         IsActive = true,
-                        DateCreated = DateTime.UtcNow
+                        DateCreated = RandomDate(random)
                     });
                     hasChanges = true;
                     continue;
@@ -48,5 +64,10 @@ namespace Financial.Data.Seeders
                 await db.SaveChangesAsync();
             }
         }
+
+        private static readonly Random random = new();
+
+        private static DateTime RandomDate(Random random)
+            => DateTime.UtcNow.AddDays(-random.Next(0, 730)).AddMinutes(-random.Next(0, 1440));
     }
 }

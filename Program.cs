@@ -134,12 +134,16 @@ using (var scope = app.Services.CreateScope())
         await Financial.Data.DatabaseSchemaUpdater.EnsureUserAccountColumnsAsync(db);
         await Financial.Data.DatabaseSchemaUpdater.EnsureAttendanceLogWfhColumnsAsync(db);
 
-        // Run only critical seeders on startup. Other seeders are disabled to
-        // avoid inserting demo/legacy data in production. Keep UserAccount seeding.
         await Financial.Data.Seeders.UserAccountSeeder.SeedAdminAsync(db);
-        // EmployeeSeeder, ExceptionConditionSeeder,
-        // AttendanceLogSeeder and AttendanceLogWfhSeeder are intentionally
-        // disabled. Run them manually if needed.
+        if (app.Environment.IsDevelopment())
+        {
+            await Financial.Data.Seeders.UserAccountSeeder.SeedDemoAsync(db);
+            await Financial.Data.Seeders.EmployeeSeeder.SeedAsync(db);
+            await Financial.Data.Seeders.ExceptionConditionSeeder.SeedAsync(db);
+            await Financial.Data.Seeders.AttendanceLogSeeder.SeedAsync(db);
+            await Financial.Data.Seeders.AttendanceLogWfhSeeder.SeedAsync(db);
+            await Financial.Data.Seeders.AttendanceEmailRequestSeeder.SeedAsync(db);
+        }
     }
     catch (Exception ex)
     {

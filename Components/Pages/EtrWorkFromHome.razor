@@ -27,8 +27,7 @@
     <div class="etr-stage">
         <section class="etr-copy-panel" aria-labelledby="etrWfhTitle">
             <div class="etr-logo-row">
-                <img class="etr-logo etr-logo-bagong" src="@Assets["images/bagong-pilipinas.png"]" alt="bagong-pilipinas" />
-                <img class="etr-logo" src="@Assets["images/bswm-light.png"]" alt="bswm" />
+                <span class="etr-wordmark">ETRS</span>
             </div>
             <div class="etr-copy-content">
                 <h1 id="etrWfhTitle" class="etr-title">Electronic Time Record<br>Work From Home</h1>
@@ -723,15 +722,13 @@
         margin-bottom: clamp(1rem, 3vh, 1.75rem);
     }
 
-    .etr-logo {
-        width: clamp(72px, 8vw, 112px);
-        height: auto;
-        object-fit: contain;
-        filter: drop-shadow(0 8px 16px rgba(0,0,0,0.35));
-    }
-
-    .etr-logo-bagong {
-        width: clamp(58px, 6.6vw, 94px);
+    .etr-wordmark {
+        color: #ffffff;
+        font-size: clamp(2rem, 4vw, 3rem);
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        line-height: 1;
+        text-shadow: 0 8px 16px rgba(0,0,0,0.35);
     }
 
     .etr-copy-content {
@@ -896,14 +893,6 @@
 
         .etr-stage {
             gap: 1rem;
-        }
-
-        .etr-logo {
-            width: 68px;
-        }
-
-        .etr-logo-bagong {
-            width: 58px;
         }
 
         .etr-copy-content {

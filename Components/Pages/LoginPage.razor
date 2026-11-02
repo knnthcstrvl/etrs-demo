@@ -4,6 +4,7 @@
 @inject Financial.Services.IToastService ToastService
 @inject Financial.Services.CurrentUserService CurrentUser
 @inject IJSRuntime JS
+@inject IConfiguration Configuration
 
 @rendermode InteractiveServer
 
@@ -72,6 +73,15 @@
 
             <button type="submit" class="login-button">Login</button>
         </EditForm>
+
+        @if (Configuration.GetValue<bool>("DemoLogin:Enabled"))
+        {
+            <div class="demo-login-divider"><span>Portfolio preview</span></div>
+            <button type="button" class="demo-login-button" @onclick="LoginAsDemoAsync" disabled="@_isLoggingIn">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                Try the demo
+            </button>
+        }
     </div>
 </div>
 
@@ -216,6 +226,69 @@
 
     .login-button:active {
         transform: translateY(1px);
+    }
+
+    .demo-login-divider {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1.2rem 0 0.9rem;
+        color: #7b8492;
+        font-size: 0.78rem;
+    }
+
+    .demo-login-divider::before,
+    .demo-login-divider::after {
+        content: "";
+        height: 1px;
+        flex: 1;
+        background: #e5e7eb;
+    }
+
+    .demo-login-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        width: 100%;
+        padding: 0.72rem 1rem;
+        border: 1px solid #d9dee7;
+        border-radius: 12px;
+        background: #fff;
+        color: #25324b;
+        font-size: 0.92rem;
+        font-weight: 600;
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .demo-login-button:hover:not(:disabled) {
+        background: #f8fafc;
+        border-color: #b9c2d0;
+    }
+
+    .demo-login-button:disabled {
+        cursor: wait;
+        opacity: 0.7;
+    }
+
+    body.etrs-dark-theme .demo-login-divider {
+        color: #9fb3d0;
+    }
+
+    body.etrs-dark-theme .demo-login-divider::before,
+    body.etrs-dark-theme .demo-login-divider::after {
+        background: #2f4058;
+    }
+
+    body.etrs-dark-theme .demo-login-button {
+        border-color: #2f4058;
+        background: #111c2d;
+        color: #f8fafc;
+    }
+
+    body.etrs-dark-theme .demo-login-button:hover:not(:disabled) {
+        background: #1b2a3d;
+        border-color: #3a506f;
     }
 
     .deleted-account-overlay {
@@ -459,6 +532,7 @@
     private readonly LoginDto _loginDto = new();
     private EditContext _editContext = default!;
     private bool showDeletedAccountModal;
+    private bool _isLoggingIn;
 
     protected override async Task OnInitializedAsync()
     {
@@ -515,6 +589,24 @@
     private async Task HandleValidSubmit()
     {
         await LoginSubmit();
+    }
+
+    private async Task LoginAsDemoAsync()
+    {
+        if (_isLoggingIn) return;
+
+        _isLoggingIn = true;
+        _loginDto.Username = "demo.user001";
+        _loginDto.Password = "Demo@123";
+        _loginDto.RememberMe = false;
+        try
+        {
+            await LoginSubmit();
+        }
+        finally
+        {
+            _isLoggingIn = false;
+        }
     }
 
     private void HandleInvalidSubmit(EditContext editContext)
