@@ -16,6 +16,7 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var mySqlServerVersion = new MySqlServerVersion(new Version(8, 0, 0));
 
 // Register EtrsDbContext (project-specific) instead of ProcurementDbContext
 // builder.Services.AddDbContext<EtrsDbContext>(options =>
@@ -27,11 +28,11 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 // Register EtrsDbContext (project-specific) instead of ProcurementDbContext
 builder.Services.AddDbContext<EtrsDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options.UseMySql(connectionString, mySqlServerVersion));
 
 // Provide factory to create DbContext instances for long-lived services
 builder.Services.AddDbContextFactory<EtrsDbContext>(
-    options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)),
+    options => options.UseMySql(connectionString, mySqlServerVersion),
     ServiceLifetime.Scoped);
 
 builder.Services.AddAuthentication(options =>
