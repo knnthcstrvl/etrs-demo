@@ -97,7 +97,11 @@ In the Development environment, the application seeds demo accounts and sample r
 | --- | --- |
 | `demo.user001` | `Demo@123` |
 
-The login page’s demo shortcut is enabled by default in `appsettings.Development.json`. The startup seeder also creates a local bootstrap administrator (`admin` / `Admin@123`) when one does not already exist. These are development-only credentials: change or remove them before deploying, and never enable demo sign-in in a public environment.
+The login page’s demo shortcut is enabled by default in `appsettings.Development.json`. The startup seeder also creates a local bootstrap administrator (`admin` / `Admin@123`) when one does not already exist. These are development-only credentials. The demo account is an administrator and demo accounts are seeded only in Development; do not turn on the shortcut against a production database.
+
+### Render deployment
+
+Render runs this app in Production, so it does not load `appsettings.Development.json`. To display the demo shortcut, add `DemoLogin__Enabled=true` under **Environment** for the Render web service and redeploy. This only controls whether the button is rendered; it does not create a demo account. The current demo account seeder is Development-only and grants administrator access. Only enable the shortcut when the app is connected to a separate demo database with a suitably restricted demo account. Aiven is the database provider; configure this setting on Render, not Aiven.
 
 ## Configuration
 
@@ -107,7 +111,7 @@ Use `appsettings.Development.json`, .NET user secrets, or environment variables 
 | --- | --- |
 | `ConnectionStrings:DefaultConnection` | SQL Server database connection. |
 | `Jwt:Issuer`, `Jwt:Audience`, `Jwt:Key` | JWT validation settings; use a strong secret key. |
-| `DemoLogin:Enabled` | Shows the demo login shortcut when enabled. Keep disabled outside Development. |
+| `DemoLogin:Enabled` | Shows the demo login shortcut when enabled. In Render, set `DemoLogin__Enabled=true` on the web service. Enable it only with a separate demo database and restricted demo account. |
 | `Email:Smtp:Host`, `Email:Smtp:Port` | SMTP server used for email workflows. |
 | `Email:Smtp:Accounts` | SMTP sender account credentials; configure with user secrets/environment variables. |
 | `Uploads:WfhMovPath` | Optional shared folder for work-from-home MOV files. Ensure the app identity has read/write access. |
