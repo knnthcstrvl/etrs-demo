@@ -16,4 +16,4 @@ EXPOSE 10000
 COPY --from=build /app/publish .
 
 ENV ASPNETCORE_URLS=http://0.0.0.0:10000
-ENTRYPOINT ["dotnet", "ETRS.dll"]
+ENTRYPOINT ["dotnet", "Financial.dll"]
