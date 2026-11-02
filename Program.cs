@@ -147,7 +147,8 @@ using (var scope = app.Services.CreateScope())
         await Financial.Data.DatabaseSchemaUpdater.EnsureAttendanceLogWfhColumnsAsync(db);
 
         await Financial.Data.Seeders.UserAccountSeeder.SeedAdminAsync(db);
-        if (app.Environment.IsDevelopment())
+        // Seed sample accounts and records in Development, or when demo login is explicitly enabled.
+        if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("DemoLogin:Enabled"))
         {
             await Financial.Data.Seeders.UserAccountSeeder.SeedDemoAsync(db);
             await Financial.Data.Seeders.EmployeeSeeder.SeedAsync(db);
