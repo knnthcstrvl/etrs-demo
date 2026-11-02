@@ -151,11 +151,11 @@
         IsProfileMenuOpen = false;
     }
 
-    private void Logout()
+    private async Task Logout()
     {
         try
         {
-            AuthStateProvider.UpdateAuthenticationState(string.Empty);
+            await AuthStateProvider.UpdateAuthenticationState(string.Empty);
         }
         catch { }
 

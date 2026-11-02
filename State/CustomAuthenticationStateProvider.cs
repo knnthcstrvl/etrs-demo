@@ -10,6 +10,7 @@ namespace Financial.State
         private readonly ClaimsPrincipal anonymous = new(new ClaimsIdentity());
         private readonly ProtectedLocalStorage _protectedLocalStorage;
         private readonly ProtectedSessionStorage _protectedSessionStorage;
+        private AuthenticationState? _cachedAuthenticationState;
         public IConstantState _constant;
 
         public CustomAuthenticationStateProvider(
@@ -24,15 +25,27 @@ namespace Financial.State
 
         public async override Task<AuthenticationState> GetAuthenticationStateAsync()
         {
+            if (_cachedAuthenticationState is not null)
+            {
+                return _cachedAuthenticationState;
+            }
+
             try
             {
                 var token = await GetStoredTokenAsync();
 
                 if (string.IsNullOrWhiteSpace(token))
-                    return new AuthenticationState(anonymous);
+                {
+                    _cachedAuthenticationState = new AuthenticationState(anonymous);
+                    return _cachedAuthenticationState;
+                }
 
                 var gatherClaims = DecryptJWTService.DecryptToken(token);
-                if (gatherClaims == null) return new AuthenticationState(anonymous);
+                if (gatherClaims == null)
+                {
+                    _cachedAuthenticationState = new AuthenticationState(anonymous);
+                    return _cachedAuthenticationState;
+                }
 
                 if (long.TryParse(gatherClaims.Expiry, out var expirySeconds))
                 {
@@ -47,15 +60,18 @@ namespace Financial.State
                 }
 
                 var claimsPrincipal = SetClaimPrincipal(gatherClaims);
-                return new AuthenticationState(claimsPrincipal);
+                _cachedAuthenticationState = new AuthenticationState(claimsPrincipal);
+                return _cachedAuthenticationState;
             }
             catch
             {
+                // Protected browser storage may be unavailable during prerendering.
+                // Leave the cache empty so an interactive circuit can retry.
                 return new AuthenticationState(anonymous);
             }
         }
 
-        public async void UpdateAuthenticationState(string jwtToken, bool rememberMe = false)
+        public async Task UpdateAuthenticationState(string jwtToken, bool rememberMe = false)
         {
             var claimsPrincipal = new ClaimsPrincipal();
             if (!string.IsNullOrEmpty(jwtToken))
@@ -66,13 +82,15 @@ namespace Financial.State
                 var getUserClaims = DecryptJWTService.DecryptToken(jwtToken);
 
                 claimsPrincipal = getUserClaims is null ? anonymous : SetClaimPrincipal(getUserClaims);
-                NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(claimsPrincipal)));
+                _cachedAuthenticationState = new AuthenticationState(claimsPrincipal);
+                NotifyAuthenticationStateChanged(Task.FromResult(_cachedAuthenticationState));
             }
             else
             {
                 _constant.JWTToken = string.Empty;
                 await DeleteStoredTokensAsync();
-                NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(anonymous)));
+                _cachedAuthenticationState = new AuthenticationState(anonymous);
+                NotifyAuthenticationStateChanged(Task.FromResult(_cachedAuthenticationState));
             }
         }
 

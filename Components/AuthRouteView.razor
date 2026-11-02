@@ -32,7 +32,7 @@
             {
                 if (AuthStateProvider is Financial.State.CustomAuthenticationStateProvider customAuthStateProvider)
                 {
-                    customAuthStateProvider.UpdateAuthenticationState(string.Empty);
+                    await customAuthStateProvider.UpdateAuthenticationState(string.Empty);
                 }
 
                 _authState = await AuthStateProvider.GetAuthenticationStateAsync();

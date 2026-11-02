@@ -571,7 +571,7 @@
                 return;
             }
 
-            AuthStateProvider.UpdateAuthenticationState(response.JWTToken, _loginDto.RememberMe);
+            await AuthStateProvider.UpdateAuthenticationState(response.JWTToken, _loginDto.RememberMe);
             _constants.JWTToken = response.JWTToken;
             // ensure CurrentUserService refreshes immediately so UI (sidebar/menu) updates
             try { await CurrentUser.InitializeAsync(); } catch { }
