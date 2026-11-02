@@ -28,11 +28,13 @@ var mySqlServerVersion = new MySqlServerVersion(new Version(8, 0, 0));
 
 // Register EtrsDbContext (project-specific) instead of ProcurementDbContext
 builder.Services.AddDbContext<EtrsDbContext>(options =>
-    options.UseMySql(connectionString, mySqlServerVersion));
+    options.UseMySql(connectionString, mySqlServerVersion,
+        mySqlOptions => mySqlOptions.EnableRetryOnFailure()));
 
 // Provide factory to create DbContext instances for long-lived services
 builder.Services.AddDbContextFactory<EtrsDbContext>(
-    options => options.UseMySql(connectionString, mySqlServerVersion),
+    options => options.UseMySql(connectionString, mySqlServerVersion,
+        mySqlOptions => mySqlOptions.EnableRetryOnFailure()),
     ServiceLifetime.Scoped);
 
 builder.Services.AddAuthentication(options =>
